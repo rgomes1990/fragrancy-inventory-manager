@@ -8,7 +8,12 @@ export interface Product {
   category_id: string;
   created_at: string;
   updated_at: string;
-  categories?: Category;
+  categories?: {
+    id: string;
+    name: string;
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 export interface Customer {
@@ -29,8 +34,30 @@ export interface Sale {
   total_price: number;
   sale_date: string;
   created_at: string;
-  customers?: Customer;
-  products?: Product;
+  customers?: {
+    id: string;
+    name: string;
+    whatsapp?: string;
+    email?: string;
+    created_at: string;
+    updated_at: string;
+  };
+  products?: {
+    id: string;
+    name: string;
+    cost_price: number;
+    sale_price: number;
+    quantity: number;
+    category_id: string;
+    created_at: string;
+    updated_at: string;
+    categories?: {
+      id: string;
+      name: string;
+      created_at: string;
+      updated_at: string;
+    };
+  };
 }
 
 export interface AuthorizedUser {

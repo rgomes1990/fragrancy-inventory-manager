@@ -209,6 +209,10 @@ const OrdersPage = () => {
     }, 0);
   };
 
+  const getTotalOrdersValue = () => {
+    return orders.reduce((total, order) => total + order.total_amount, 0);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -333,6 +337,12 @@ const OrdersPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 p-4 bg-green-50 rounded-lg">
+            <div className="text-lg font-bold text-green-800">
+              Valor Total de Todas as Encomendas: R$ {getTotalOrdersValue().toFixed(2)}
+            </div>
+          </div>
+          
           {loading ? (
             <div className="text-center py-8">Carregando encomendas...</div>
           ) : (
