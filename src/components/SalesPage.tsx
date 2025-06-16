@@ -304,9 +304,9 @@ const SalesPage = () => {
 
   // Agrupar produtos por categoria - FIXED: ensure non-empty keys and values
   const productsByCategory = products.reduce((acc, product) => {
-    const categoryName = product.categories?.name || 'Sem categoria';
+    const categoryName = product.categories?.name?.trim() || 'Sem categoria';
     // Ensure category name is not empty and is valid for SelectItem
-    const validCategoryName = categoryName.trim() || 'Sem categoria';
+    const validCategoryName = categoryName || 'Sem categoria';
     if (!acc[validCategoryName]) {
       acc[validCategoryName] = [];
     }
@@ -372,13 +372,15 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(productsByCategory).map(([category, categoryProducts]) => {
-                      // Ensure category has a valid, non-empty value
-                      const categoryKey = category || 'sem-categoria';
+                    {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
+                      // Double check that categoryName is not empty
+                      const safeCategoryName = categoryName.trim() || 'Sem categoria';
+                      const categoryKey = `category-${safeCategoryName}`;
+                      
                       return (
                         <div key={categoryKey}>
                           <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                            {category}
+                            {safeCategoryName}
                           </div>
                           {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
                             <SelectItem key={product.id} value={product.id}>
@@ -484,7 +486,7 @@ const SalesPage = () => {
                   <SelectValue placeholder="Filtrar por mês" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os meses</SelectItem>
+                  <SelectItem value="all-months">Todos os meses</SelectItem>
                   {getMonthOptions().map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
