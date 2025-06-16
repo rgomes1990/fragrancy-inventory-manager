@@ -12,6 +12,8 @@ import ProductsPage from '@/components/ProductsPage';
 import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
 import ReportsPage from '@/components/ReportsPage';
+import CategoriesPage from '@/components/CategoriesPage';
+import OrdersPage from '@/components/OrdersPage';
 
 const queryClient = new QueryClient();
 
@@ -37,10 +39,14 @@ const AppContent = () => {
         return <Dashboard />;
       case 'products':
         return <ProductsPage />;
+      case 'categories':
+        return <CategoriesPage />;
       case 'customers':
         return <CustomersPage />;
       case 'sales':
         return <SalesPage />;
+      case 'orders':
+        return <OrdersPage />;
       case 'reports':
         return <ReportsPage />;
       default:

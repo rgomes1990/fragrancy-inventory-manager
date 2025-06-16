@@ -30,6 +30,27 @@ export type Database = {
         }
         Relationships: []
       }
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string | null
@@ -57,9 +78,77 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          cost_price: number
+          created_at: string
+          id: string
+          order_id: string
+          product_name: string
+          quantity: number
+          subtotal: number
+        }
+        Insert: {
+          cost_price: number
+          created_at?: string
+          id?: string
+          order_id: string
+          product_name: string
+          quantity: number
+          subtotal: number
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          id?: string
+          order_id?: string
+          product_name?: string
+          quantity?: number
+          subtotal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          customer_name: string
+          id: string
+          notes: string | null
+          status: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name: string
+          id?: string
+          notes?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
-          category: string
+          category_id: string | null
           cost_price: number
           created_at: string | null
           id: string
@@ -69,7 +158,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          category?: string
+          category_id?: string | null
           cost_price: number
           created_at?: string | null
           id?: string
@@ -79,7 +168,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          category?: string
+          category_id?: string | null
           cost_price?: number
           created_at?: string | null
           id?: string
@@ -88,7 +177,15 @@ export type Database = {
           sale_price?: number
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales: {
         Row: {

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { Plus, ShoppingCart, Trash2, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer } from '@/types/database';
@@ -17,11 +17,12 @@ const SalesPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [formData, setFormData] = useState({
     customer_id: '',
     product_id: '',
     quantity: '',
-    sale_date: new Date().toISOString().split('T')[0], // Data atual por padrão
+    sale_date: new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
@@ -36,13 +37,16 @@ const SalesPage = () => {
           .select(`
             *,
             customers(name),
-            products(name, sale_price)
+            products(name, sale_price, categories(name))
           `)
           .order('created_at', { ascending: false }),
         supabase
           .from('products')
-          .select('*')
-          .order('category, name'),
+          .select(`
+            *,
+            categories(name)
+          `)
+          .order('name'),
         supabase
           .from('customers')
           .select('*')
@@ -83,55 +87,106 @@ const SalesPage = () => {
       }
 
       const quantity = parseInt(formData.quantity);
-      if (quantity > product.quantity) {
-        toast({
-          title: "Erro",
-          description: "Quantidade insuficiente em estoque.",
-          variant: "destructive",
-        });
-        return;
+      
+      // Se editando, restaurar o estoque antes de verificar
+      if (editingSale) {
+        const oldQuantity = editingSale.quantity;
+        if (quantity > (product.quantity + oldQuantity)) {
+          toast({
+            title: "Erro",
+            description: "Quantidade insuficiente em estoque.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        if (quantity > product.quantity) {
+          toast({
+            title: "Erro",
+            description: "Quantidade insuficiente em estoque.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       const unit_price = product.sale_price;
       const total_price = unit_price * quantity;
 
-      // Registrar a venda com data personalizada
-      const { error: saleError } = await supabase
-        .from('sales')
-        .insert([{
-          customer_id: formData.customer_id,
-          product_id: formData.product_id,
-          quantity,
-          unit_price,
-          total_price,
-          sale_date: formData.sale_date + 'T00:00:00.000Z',
-        }]);
+      const saleData = {
+        customer_id: formData.customer_id,
+        product_id: formData.product_id,
+        quantity,
+        unit_price,
+        total_price,
+        sale_date: formData.sale_date + 'T00:00:00.000Z',
+      };
 
-      if (saleError) throw saleError;
+      if (editingSale) {
+        // Atualizar venda
+        const { error: saleError } = await supabase
+          .from('sales')
+          .update(saleData)
+          .eq('id', editingSale.id);
 
-      // Atualizar estoque do produto
-      const { error: updateError } = await supabase
-        .from('products')
-        .update({ quantity: product.quantity - quantity })
-        .eq('id', formData.product_id);
+        if (saleError) throw saleError;
 
-      if (updateError) throw updateError;
+        // Restaurar estoque da venda anterior e aplicar nova quantidade
+        const newQuantity = product.quantity + editingSale.quantity - quantity;
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({ quantity: newQuantity })
+          .eq('id', formData.product_id);
 
-      toast({
-        title: "Sucesso",
-        description: "Venda registrada com sucesso!",
-      });
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Sucesso",
+          description: "Venda atualizada com sucesso!",
+        });
+      } else {
+        // Registrar nova venda
+        const { error: saleError } = await supabase
+          .from('sales')
+          .insert([saleData]);
+
+        if (saleError) throw saleError;
+
+        // Atualizar estoque do produto
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({ quantity: product.quantity - quantity })
+          .eq('id', formData.product_id);
+
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Sucesso",
+          description: "Venda registrada com sucesso!",
+        });
+      }
 
       resetForm();
       fetchData();
     } catch (error) {
-      console.error('Erro ao registrar venda:', error);
+      console.error('Erro ao salvar venda:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível registrar a venda.",
+        description: "Não foi possível salvar a venda.",
         variant: "destructive",
       });
     }
+  };
+
+  const handleEdit = (sale: Sale) => {
+    setEditingSale(sale);
+    setFormData({
+      customer_id: sale.customer_id,
+      product_id: sale.product_id,
+      quantity: sale.quantity.toString(),
+      sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
+    });
+    setShowForm(true);
   };
 
   const handleDelete = async (sale: Sale) => {
@@ -179,6 +234,7 @@ const SalesPage = () => {
       quantity: '',
       sale_date: new Date().toISOString().split('T')[0],
     });
+    setEditingSale(null);
     setShowForm(false);
   };
 
@@ -186,10 +242,11 @@ const SalesPage = () => {
 
   // Agrupar produtos por categoria
   const productsByCategory = products.reduce((acc, product) => {
-    if (!acc[product.category]) {
-      acc[product.category] = [];
+    const categoryName = product.category?.name || 'Sem categoria';
+    if (!acc[categoryName]) {
+      acc[categoryName] = [];
     }
-    acc[product.category].push(product);
+    acc[categoryName].push(product);
     return acc;
   }, {} as Record<string, Product[]>);
 
@@ -209,7 +266,9 @@ const SalesPage = () => {
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>Nova Venda</CardTitle>
+            <CardTitle>
+              {editingSale ? 'Editar Venda' : 'Nova Venda'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -241,7 +300,7 @@ const SalesPage = () => {
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
                           {category}
                         </div>
-                        {categoryProducts.filter(p => p.quantity > 0).map((product) => (
+                        {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
                           <SelectItem key={product.id} value={product.id}>
                             {product.name} (Estoque: {product.quantity})
                           </SelectItem>
@@ -258,7 +317,6 @@ const SalesPage = () => {
                   id="quantity"
                   type="number"
                   min="1"
-                  max={selectedProduct?.quantity || 1}
                   value={formData.quantity}
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
                   required
@@ -308,7 +366,7 @@ const SalesPage = () => {
                   className="bg-gradient-to-r from-purple-600 to-pink-600"
                   disabled={!formData.customer_id || !formData.product_id || !formData.quantity}
                 >
-                  Registrar Venda
+                  {editingSale ? 'Atualizar Venda' : 'Registrar Venda'}
                 </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancelar
@@ -358,14 +416,23 @@ const SalesPage = () => {
                     <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
                     <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(sale)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(sale)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(sale)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

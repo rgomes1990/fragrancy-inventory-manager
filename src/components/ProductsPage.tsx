@@ -4,14 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Product } from '@/types/database';
+import { Product, Category } from '@/types/database';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -20,26 +22,39 @@ const ProductsPage = () => {
     cost_price: '',
     sale_price: '',
     quantity: '',
+    category_id: '',
   });
 
   useEffect(() => {
-    fetchProducts();
+    fetchData();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [productsRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select(`
+            *,
+            categories(name)
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('categories')
+          .select('*')
+          .order('name')
+      ]);
 
-      if (error) throw error;
-      setProducts(data || []);
+      if (productsRes.error) throw productsRes.error;
+      if (categoriesRes.error) throw categoriesRes.error;
+
+      setProducts(productsRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (error) {
-      console.error('Erro ao buscar produtos:', error);
+      console.error('Erro ao buscar dados:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os produtos.",
+        description: "Não foi possível carregar os dados.",
         variant: "destructive",
       });
     } finally {
@@ -56,6 +71,7 @@ const ProductsPage = () => {
         cost_price: parseFloat(formData.cost_price),
         sale_price: parseFloat(formData.sale_price),
         quantity: parseInt(formData.quantity),
+        category_id: formData.category_id,
       };
 
       if (editingProduct) {
@@ -82,7 +98,7 @@ const ProductsPage = () => {
       }
 
       resetForm();
-      fetchProducts();
+      fetchData();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
       toast({
@@ -100,6 +116,7 @@ const ProductsPage = () => {
       cost_price: product.cost_price.toString(),
       sale_price: product.sale_price.toString(),
       quantity: product.quantity.toString(),
+      category_id: product.category_id,
     });
     setShowForm(true);
   };
@@ -119,7 +136,7 @@ const ProductsPage = () => {
         title: "Sucesso",
         description: "Produto excluído com sucesso!",
       });
-      fetchProducts();
+      fetchData();
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
       toast({
@@ -136,6 +153,7 @@ const ProductsPage = () => {
       cost_price: '',
       sale_price: '',
       quantity: '',
+      category_id: '',
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -171,6 +189,21 @@ const ProductsPage = () => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   required
                 />
+              </div>
+              <div>
+                <Label htmlFor="category">Categoria</Label>
+                <Select value={formData.category_id} onValueChange={(value) => setFormData({...formData, category_id: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="cost_price">Preço de Custo</Label>
@@ -232,6 +265,7 @@ const ProductsPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Categoria</TableHead>
                   <TableHead>Preço de Custo</TableHead>
                   <TableHead>Preço de Venda</TableHead>
                   <TableHead>Quantidade</TableHead>
@@ -245,6 +279,7 @@ const ProductsPage = () => {
                   return (
                     <TableRow key={product.id}>
                       <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>{product.category?.name || 'Sem categoria'}</TableCell>
                       <TableCell>R$ {product.cost_price.toFixed(2)}</TableCell>
                       <TableCell>R$ {product.sale_price.toFixed(2)}</TableCell>
                       <TableCell>

@@ -9,7 +9,9 @@ import {
   ShoppingCart, 
   BarChart3, 
   LogOut,
-  Sparkles
+  Sparkles,
+  Tag,
+  ShoppingBag
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -24,8 +26,10 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onPageChange }) 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'products', label: 'Produtos', icon: Package },
+    { id: 'categories', label: 'Categorias', icon: Tag },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'sales', label: 'Vendas', icon: ShoppingCart },
+    { id: 'orders', label: 'Encomendas', icon: ShoppingBag },
     { id: 'reports', label: 'Relatórios', icon: BarChart3 },
   ];
 
