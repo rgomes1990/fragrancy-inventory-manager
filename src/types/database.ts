@@ -8,7 +8,7 @@ export interface Product {
   category_id: string;
   created_at: string;
   updated_at: string;
-  category?: Category;
+  categories?: Category;
 }
 
 export interface Customer {
@@ -29,8 +29,8 @@ export interface Sale {
   total_price: number;
   sale_date: string;
   created_at: string;
-  customer?: Customer;
-  product?: Product;
+  customers?: Customer;
+  products?: Product;
 }
 
 export interface AuthorizedUser {
@@ -65,5 +65,16 @@ export interface OrderItem {
   cost_price: number;
   quantity: number;
   subtotal: number;
+  created_at: string;
+}
+
+export interface AuditLog {
+  id: string;
+  table_name: string;
+  operation: string;
+  record_id: string;
+  old_values?: any;
+  new_values?: any;
+  user_name: string;
   created_at: string;
 }
