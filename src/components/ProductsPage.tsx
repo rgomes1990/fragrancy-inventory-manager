@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,17 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Product, Category } from '@/types/database';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [stockFilter, setStockFilter] = useState<'all' | 'with-stock' | 'no-stock'>('all');
   const [formData, setFormData] = useState({
     name: '',
     cost_price: '',
@@ -28,6 +29,10 @@ const ProductsPage = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    filterProducts();
+  }, [products, stockFilter]);
 
   const fetchData = async () => {
     try {
@@ -60,6 +65,23 @@ const ProductsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterProducts = () => {
+    let filtered = products;
+    
+    switch (stockFilter) {
+      case 'with-stock':
+        filtered = products.filter(product => product.quantity > 0);
+        break;
+      case 'no-stock':
+        filtered = products.filter(product => product.quantity === 0);
+        break;
+      default:
+        filtered = products;
+    }
+    
+    setFilteredProducts(filtered);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,10 +274,25 @@ const ProductsPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="w-5 h-5" />
-            <span>Lista de Produtos</span>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Lista de Produtos</span>
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Filter className="w-4 h-4" />
+              <Select value={stockFilter} onValueChange={(value: 'all' | 'with-stock' | 'no-stock') => setStockFilter(value)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os produtos</SelectItem>
+                  <SelectItem value="with-stock">Com estoque</SelectItem>
+                  <SelectItem value="no-stock">Sem estoque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -274,7 +311,7 @@ const ProductsPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((product) => {
+                {filteredProducts.map((product) => {
                   const margin = ((product.sale_price - product.cost_price) / product.cost_price * 100).toFixed(1);
                   return (
                     <TableRow key={product.id}>
@@ -284,8 +321,10 @@ const ProductsPage = () => {
                       <TableCell>R$ {product.sale_price.toFixed(2)}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${
-                          product.quantity <= 5 
+                          product.quantity === 0 
                             ? 'bg-red-100 text-red-800' 
+                            : product.quantity <= 5 
+                            ? 'bg-yellow-100 text-yellow-800' 
                             : 'bg-green-100 text-green-800'
                         }`}>
                           {product.quantity}

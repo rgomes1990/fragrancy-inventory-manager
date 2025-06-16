@@ -2,14 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, Users, ShoppingCart, TrendingUp, DollarSign } from 'lucide-react';
+import { Package, Users, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
 
 interface DashboardStats {
   totalProducts: number;
   totalCustomers: number;
   totalSales: number;
   totalRevenue: number;
-  lowStockProducts: number;
+  totalCostValue: number;
+  totalSaleValue: number;
 }
 
 const Dashboard = () => {
@@ -18,7 +19,8 @@ const Dashboard = () => {
     totalCustomers: 0,
     totalSales: 0,
     totalRevenue: 0,
-    lowStockProducts: 0,
+    totalCostValue: 0,
+    totalSaleValue: 0,
   });
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
@@ -31,11 +33,10 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       // Buscar estatísticas
-      const [productsRes, customersRes, salesRes, lowStockRes] = await Promise.all([
+      const [productsRes, customersRes, salesRes] = await Promise.all([
         supabase.from('products').select('id', { count: 'exact' }),
         supabase.from('customers').select('id', { count: 'exact' }),
-        supabase.from('sales').select('total_price', { count: 'exact' }),
-        supabase.from('products').select('id', { count: 'exact' }).lte('quantity', 5)
+        supabase.from('sales').select('total_price', { count: 'exact' })
       ]);
 
       // Calcular receita total
@@ -44,6 +45,19 @@ const Dashboard = () => {
         .select('total_price');
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+
+      // Calcular valor total em custo e venda dos produtos
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('cost_price, sale_price, quantity');
+      
+      const totalCostValue = productsData?.reduce((sum, product) => {
+        return sum + (Number(product.cost_price) * Number(product.quantity));
+      }, 0) || 0;
+      
+      const totalSaleValue = productsData?.reduce((sum, product) => {
+        return sum + (Number(product.sale_price) * Number(product.quantity));
+      }, 0) || 0;
 
       // Buscar vendas recentes
       const { data: recentSalesData } = await supabase
@@ -61,7 +75,8 @@ const Dashboard = () => {
         totalCustomers: customersRes.count || 0,
         totalSales: salesRes.count || 0,
         totalRevenue,
-        lowStockProducts: lowStockRes.count || 0,
+        totalCostValue,
+        totalSaleValue,
       });
 
       setRecentSales(recentSalesData || []);
@@ -101,14 +116,28 @@ const Dashboard = () => {
       color: 'from-yellow-500 to-yellow-600',
       bgColor: 'bg-yellow-50',
     },
+    {
+      title: 'Valor em Custo',
+      value: `R$ ${stats.totalCostValue.toFixed(2)}`,
+      icon: TrendingUp,
+      color: 'from-red-500 to-red-600',
+      bgColor: 'bg-red-50',
+    },
+    {
+      title: 'Valor em Estoque',
+      value: `R$ ${stats.totalSaleValue.toFixed(2)}`,
+      icon: Package,
+      color: 'from-indigo-500 to-indigo-600',
+      bgColor: 'bg-indigo-50',
+    },
   ];
 
   if (loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse"></div>
           ))}
         </div>
@@ -126,7 +155,7 @@ const Dashboard = () => {
       </div>
 
       {/* Cards de estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statsCards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -147,26 +176,8 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Alertas e vendas recentes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Alertas de estoque baixo */}
-        {stats.lowStockProducts > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
-            <CardHeader>
-              <CardTitle className="text-orange-800 flex items-center space-x-2">
-                <TrendingUp className="w-5 h-5" />
-                <span>Alerta de Estoque</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-orange-700">
-                {stats.lowStockProducts} produto(s) com estoque baixo (≤ 5 unidades)
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Vendas recentes */}
+      {/* Vendas recentes */}
+      <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Vendas Recentes</CardTitle>

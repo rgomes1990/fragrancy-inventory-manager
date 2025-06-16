@@ -15,26 +15,11 @@ const OrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const { currentUser } = useAuth();
+  const { setUserContext } = useAuth();
 
   useEffect(() => {
     fetchOrders();
   }, []);
-
-  // Definir usuário no contexto antes de operações no banco
-  const setUserContext = async () => {
-    if (currentUser) {
-      try {
-        await supabase.rpc('set_config', {
-          setting_name: 'app.current_user',
-          setting_value: currentUser,
-          is_local: false
-        });
-      } catch (error) {
-        console.error('Erro ao definir contexto do usuário:', error);
-      }
-    }
-  };
 
   const fetchOrders = async () => {
     try {

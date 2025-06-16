@@ -6,28 +6,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Trash2, Edit } from 'lucide-react';
+import { Plus, ShoppingCart, Trash2, Edit, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer } from '@/types/database';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SalesPage = () => {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const { setUserContext } = useAuth();
   const [formData, setFormData] = useState({
     customer_id: '',
     product_id: '',
     quantity: '',
+    unit_price: '',
     sale_date: new Date().toISOString().split('T')[0],
   });
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    filterSalesByMonth();
+  }, [sales, selectedMonth]);
 
   const fetchData = async () => {
     try {
@@ -72,10 +82,31 @@ const SalesPage = () => {
     }
   };
 
+  const filterSalesByMonth = () => {
+    if (!selectedMonth) {
+      setFilteredSales(sales);
+      setMonthlyTotal(0);
+      return;
+    }
+
+    const filtered = sales.filter(sale => {
+      const saleDate = new Date(sale.sale_date);
+      const saleMonth = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
+      return saleMonth === selectedMonth;
+    });
+
+    const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
+    
+    setFilteredSales(filtered);
+    setMonthlyTotal(total);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
+      await setUserContext();
+      
       const product = products.find(p => p.id === formData.product_id);
       if (!product) {
         toast({
@@ -87,6 +118,7 @@ const SalesPage = () => {
       }
 
       const quantity = parseInt(formData.quantity);
+      const unit_price = parseFloat(formData.unit_price || product.sale_price.toString());
       
       // Se editando, restaurar o estoque antes de verificar
       if (editingSale) {
@@ -110,7 +142,6 @@ const SalesPage = () => {
         }
       }
 
-      const unit_price = product.sale_price;
       const total_price = unit_price * quantity;
 
       const saleData = {
@@ -140,6 +171,16 @@ const SalesPage = () => {
 
         if (updateError) throw updateError;
 
+        // Se o preço unitário foi alterado, atualizar o produto também
+        if (unit_price !== product.sale_price) {
+          const { error: priceUpdateError } = await supabase
+            .from('products')
+            .update({ sale_price: unit_price })
+            .eq('id', formData.product_id);
+
+          if (priceUpdateError) throw priceUpdateError;
+        }
+
         toast({
           title: "Sucesso",
           description: "Venda atualizada com sucesso!",
@@ -153,9 +194,17 @@ const SalesPage = () => {
         if (saleError) throw saleError;
 
         // Atualizar estoque do produto
+        const newQuantity = product.quantity - quantity;
+        const updateData: any = { quantity: newQuantity };
+
+        // Se o preço unitário foi alterado, atualizar o produto também
+        if (unit_price !== product.sale_price) {
+          updateData.sale_price = unit_price;
+        }
+
         const { error: updateError } = await supabase
           .from('products')
-          .update({ quantity: product.quantity - quantity })
+          .update(updateData)
           .eq('id', formData.product_id);
 
         if (updateError) throw updateError;
@@ -184,6 +233,7 @@ const SalesPage = () => {
       customer_id: sale.customer_id,
       product_id: sale.product_id,
       quantity: sale.quantity.toString(),
+      unit_price: sale.unit_price.toString(),
       sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
     });
     setShowForm(true);
@@ -193,6 +243,8 @@ const SalesPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
 
     try {
+      await setUserContext();
+      
       // Restaurar estoque
       const product = products.find(p => p.id === sale.product_id);
       if (product) {
@@ -232,6 +284,7 @@ const SalesPage = () => {
       customer_id: '',
       product_id: '',
       quantity: '',
+      unit_price: '',
       sale_date: new Date().toISOString().split('T')[0],
     });
     setEditingSale(null);
@@ -239,6 +292,16 @@ const SalesPage = () => {
   };
 
   const selectedProduct = products.find(p => p.id === formData.product_id);
+
+  // Atualizar preço unitário quando produto for selecionado
+  useEffect(() => {
+    if (selectedProduct && !editingSale) {
+      setFormData(prev => ({
+        ...prev,
+        unit_price: selectedProduct.sale_price.toString()
+      }));
+    }
+  }, [selectedProduct, editingSale]);
 
   // Agrupar produtos por categoria
   const productsByCategory = products.reduce((acc, product) => {
@@ -249,6 +312,19 @@ const SalesPage = () => {
     acc[categoryName].push(product);
     return acc;
   }, {} as Record<string, Product[]>);
+
+  // Gerar opções de mês dos últimos 12 meses
+  const getMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      options.push({ value, label });
+    }
+    return options;
+  };
 
   return (
     <div className="space-y-6">
@@ -324,6 +400,18 @@ const SalesPage = () => {
               </div>
 
               <div>
+                <Label htmlFor="unit_price">Preço Unitário</Label>
+                <Input
+                  id="unit_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.unit_price}
+                  onChange={(e) => setFormData({...formData, unit_price: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="sale_date">Data da Venda</Label>
                 <Input
                   id="sale_date"
@@ -334,7 +422,7 @@ const SalesPage = () => {
                 />
               </div>
               
-              {selectedProduct && formData.quantity && (
+              {selectedProduct && formData.quantity && formData.unit_price && (
                 <div className="lg:col-span-4 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium mb-2">Resumo da Venda</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -344,7 +432,7 @@ const SalesPage = () => {
                     </div>
                     <div>
                       <span className="text-gray-600">Preço Unitário:</span>
-                      <p className="font-medium">R$ {selectedProduct.sale_price.toFixed(2)}</p>
+                      <p className="font-medium">R$ {parseFloat(formData.unit_price || '0').toFixed(2)}</p>
                     </div>
                     <div>
                       <span className="text-gray-600">Quantidade:</span>
@@ -353,7 +441,7 @@ const SalesPage = () => {
                     <div>
                       <span className="text-gray-600">Total:</span>
                       <p className="font-bold text-lg">
-                        R$ {(selectedProduct.sale_price * parseInt(formData.quantity || '0')).toFixed(2)}
+                        R$ {(parseFloat(formData.unit_price || '0') * parseInt(formData.quantity || '0')).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -364,7 +452,7 @@ const SalesPage = () => {
                 <Button 
                   type="submit" 
                   className="bg-gradient-to-r from-purple-600 to-pink-600"
-                  disabled={!formData.customer_id || !formData.product_id || !formData.quantity}
+                  disabled={!formData.customer_id || !formData.product_id || !formData.quantity || !formData.unit_price}
                 >
                   {editingSale ? 'Atualizar Venda' : 'Registrar Venda'}
                 </Button>
@@ -379,10 +467,35 @@ const SalesPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <ShoppingCart className="w-5 h-5" />
-            <span>Histórico de Vendas</span>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <ShoppingCart className="w-5 h-5" />
+              <span>Histórico de Vendas</span>
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4" />
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filtrar por mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos os meses</SelectItem>
+                  {getMonthOptions().map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {selectedMonth && (
+            <div className="mt-2 p-3 bg-green-50 rounded-lg">
+              <div className="text-lg font-bold text-green-800">
+                Total do mês selecionado: R$ {monthlyTotal.toFixed(2)}
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -401,7 +514,7 @@ const SalesPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales.map((sale) => (
+                {filteredSales.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell>
                       {new Date(sale.sale_date).toLocaleDateString('pt-BR')}

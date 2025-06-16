@@ -8,6 +8,7 @@ interface AuthContextType {
   currentUser: string | null;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  setUserContext: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,24 +19,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
   // Função para definir o usuário no contexto do banco
-  const setDatabaseUser = async (username: string) => {
-    try {
-      console.log('Definindo usuário no banco:', username);
-      
-      // Usar a função set_config corretamente
-      const { error } = await supabase.rpc('set_config', {
-        setting_name: 'app.current_user',
-        setting_value: username,
-        is_local: false
-      });
-      
-      if (error) {
+  const setUserContext = async () => {
+    if (currentUser) {
+      try {
+        console.log('Definindo usuário no contexto do banco:', currentUser);
+        
+        const { error } = await supabase.rpc('set_config', {
+          setting_name: 'app.current_user',
+          setting_value: currentUser,
+          is_local: false
+        });
+        
+        if (error) {
+          console.error('Erro ao definir usuário no banco:', error);
+        } else {
+          console.log('Usuário definido com sucesso no banco:', currentUser);
+        }
+      } catch (error) {
         console.error('Erro ao definir usuário no banco:', error);
-      } else {
-        console.log('Usuário definido com sucesso no banco:', username);
       }
-    } catch (error) {
-      console.error('Erro ao definir usuário no banco:', error);
     }
   };
 
@@ -45,10 +47,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (savedUser) {
       setIsAuthenticated(true);
       setCurrentUser(savedUser);
-      setDatabaseUser(savedUser);
     }
     setLoading(false);
   }, []);
+
+  // Sempre definir o contexto quando o usuário atual mudar
+  useEffect(() => {
+    if (currentUser && isAuthenticated) {
+      setUserContext();
+    }
+  }, [currentUser, isAuthenticated]);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
@@ -63,10 +71,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthenticated(true);
         setCurrentUser(username);
         localStorage.setItem('currentUser', username);
-        
-        // Definir o usuário no contexto do banco
-        await setDatabaseUser(username);
-        
         return true;
       }
       return false;
@@ -83,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, loading, currentUser, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, loading, currentUser, login, logout, setUserContext }}>
       {children}
     </AuthContext.Provider>
   );
