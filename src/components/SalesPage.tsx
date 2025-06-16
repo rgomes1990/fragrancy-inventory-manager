@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -303,7 +302,7 @@ const SalesPage = () => {
     }
   }, [selectedProduct, editingSale]);
 
-  // Agrupar produtos por categoria
+  // Agrupar produtos por categoria - FIXED: ensure non-empty keys
   const productsByCategory = products.reduce((acc, product) => {
     const categoryName = product.categories?.name || 'Sem categoria';
     if (!acc[categoryName]) {
