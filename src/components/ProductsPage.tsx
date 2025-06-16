@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
+import { exportToExcel, formatProductsForExport } from '@/utils/excelExporter';
 
 // Extended Product type with all required fields
 interface ExtendedProduct {
@@ -269,6 +269,26 @@ const ProductsPage = () => {
     }
   };
 
+  const handleExportToExcel = () => {
+    try {
+      const formattedData = formatProductsForExport(filteredProducts);
+      const fileName = `produtos_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`;
+      exportToExcel(formattedData, fileName, 'Produtos');
+      
+      toast({
+        title: "Sucesso",
+        description: "Produtos exportados para Excel com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao exportar para Excel:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível exportar os produtos para Excel.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -296,6 +316,14 @@ const ProductsPage = () => {
               <SelectItem value="out-of-stock">Sem estoque</SelectItem>
             </SelectContent>
           </Select>
+          <Button 
+            onClick={handleExportToExcel}
+            variant="outline"
+            className="border-green-600 text-green-600 hover:bg-green-50"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Exportar Excel
+          </Button>
           <Button 
             onClick={() => setShowForm(true)}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
