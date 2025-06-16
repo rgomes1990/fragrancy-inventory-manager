@@ -61,7 +61,16 @@ const ProductsPage = () => {
       const { data, error } = await supabase
         .from('products')
         .select(`
-          *,
+          id,
+          name,
+          category_id,
+          cost_price,
+          sale_price,
+          quantity,
+          minimum_stock,
+          description,
+          created_at,
+          updated_at,
           categories (
             id,
             name,
