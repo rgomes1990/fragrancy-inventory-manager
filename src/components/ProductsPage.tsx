@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -139,32 +140,33 @@ const ProductsPage = () => {
     console.log('Total de produtos para cálculo:', allProducts.length);
     console.log('Produtos filtrados:', filtered.length);
     
-    // SEMPRE calcular com base em TODOS os produtos (incluindo sem estoque)
+    // Somar apenas os preços de custo (sem multiplicar pela quantidade)
     const totalCostPrice = allProducts.reduce((sum, product) => {
-      const costValue = Number(product.cost_price) * Number(product.quantity);
-      console.log(`Produto: ${product.name} | Custo: ${product.cost_price} | Qtd: ${product.quantity} | Total Custo: ${costValue}`);
+      const costValue = Number(product.cost_price);
+      console.log(`Produto: ${product.name} | Custo: ${product.cost_price}`);
       return sum + costValue;
     }, 0);
 
+    // Somar apenas os preços de venda (sem multiplicar pela quantidade)
     const totalSalePrice = allProducts.reduce((sum, product) => {
-      const saleValue = Number(product.sale_price) * Number(product.quantity);
-      console.log(`Produto: ${product.name} | Venda: ${product.sale_price} | Qtd: ${product.quantity} | Total Venda: ${saleValue}`);
+      const saleValue = Number(product.sale_price);
+      console.log(`Produto: ${product.name} | Venda: ${product.sale_price}`);
       return sum + saleValue;
     }, 0);
 
     const filteredCostPrice = filtered.reduce((sum, product) => {
-      return sum + (Number(product.cost_price) * Number(product.quantity));
+      return sum + Number(product.cost_price);
     }, 0);
 
     const filteredSalePrice = filtered.reduce((sum, product) => {
-      return sum + (Number(product.sale_price) * Number(product.quantity));
+      return sum + Number(product.sale_price);
     }, 0);
 
     console.log('=== RESULTADO FINAL ===');
-    console.log('Investimento Total (todos):', totalCostPrice);
-    console.log('Valor Total Estoque (todos):', totalSalePrice);
-    console.log('Investimento Filtrado:', filteredCostPrice);
-    console.log('Valor Filtrado:', filteredSalePrice);
+    console.log('Soma Total Preços de Custo:', totalCostPrice);
+    console.log('Soma Total Preços de Venda:', totalSalePrice);
+    console.log('Soma Filtrada Preços de Custo:', filteredCostPrice);
+    console.log('Soma Filtrada Preços de Venda:', filteredSalePrice);
 
     return {
       totalCostPrice,
@@ -340,7 +342,7 @@ const ProductsPage = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Investimento Total</p>
+                <p className="text-sm font-medium text-gray-600">Soma Preços de Custo</p>
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalCostPrice.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">Todos os produtos ({products.length})</p>
               </div>
@@ -355,7 +357,7 @@ const ProductsPage = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total Estoque</p>
+                <p className="text-sm font-medium text-gray-600">Soma Preços de Venda</p>
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalSalePrice.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">Todos os produtos ({products.length})</p>
               </div>
@@ -370,7 +372,7 @@ const ProductsPage = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Investimento Filtrado</p>
+                <p className="text-sm font-medium text-gray-600">Custo Filtrado</p>
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredCostPrice.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">
                   {stockFilter === 'all' ? 'Todos' : 
@@ -388,7 +390,7 @@ const ProductsPage = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Valor Filtrado</p>
+                <p className="text-sm font-medium text-gray-600">Venda Filtrado</p>
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredSalePrice.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">
                   {stockFilter === 'all' ? 'Todos' : 
