@@ -302,13 +302,15 @@ const SalesPage = () => {
     }
   }, [selectedProduct, editingSale]);
 
-  // Agrupar produtos por categoria - FIXED: ensure non-empty keys
+  // Agrupar produtos por categoria - FIXED: ensure non-empty keys and values
   const productsByCategory = products.reduce((acc, product) => {
     const categoryName = product.categories?.name || 'Sem categoria';
-    if (!acc[categoryName]) {
-      acc[categoryName] = [];
+    // Ensure category name is not empty and is valid for SelectItem
+    const validCategoryName = categoryName.trim() || 'Sem categoria';
+    if (!acc[validCategoryName]) {
+      acc[validCategoryName] = [];
     }
-    acc[categoryName].push(product);
+    acc[validCategoryName].push(product);
     return acc;
   }, {} as Record<string, Product[]>);
 
@@ -370,18 +372,22 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(productsByCategory).map(([category, categoryProducts]) => (
-                      <div key={category}>
-                        <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                          {category}
+                    {Object.entries(productsByCategory).map(([category, categoryProducts]) => {
+                      // Ensure category has a valid, non-empty value
+                      const categoryKey = category || 'sem-categoria';
+                      return (
+                        <div key={categoryKey}>
+                          <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
+                            {category}
+                          </div>
+                          {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} (Estoque: {product.quantity})
+                            </SelectItem>
+                          ))}
                         </div>
-                        {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} (Estoque: {product.quantity})
-                          </SelectItem>
-                        ))}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

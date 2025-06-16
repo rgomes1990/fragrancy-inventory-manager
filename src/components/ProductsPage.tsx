@@ -19,7 +19,6 @@ interface ExtendedProduct {
   cost_price: number;
   sale_price: number;
   quantity: number;
-  minimum_stock: number;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -47,7 +46,6 @@ const ProductsPage = () => {
     cost_price: '',
     sale_price: '',
     quantity: '',
-    minimum_stock: '',
     description: '',
   });
 
@@ -67,7 +65,6 @@ const ProductsPage = () => {
           cost_price,
           sale_price,
           quantity,
-          minimum_stock,
           description,
           created_at,
           updated_at,
@@ -138,7 +135,6 @@ const ProductsPage = () => {
         cost_price: parseFloat(formData.cost_price),
         sale_price: parseFloat(formData.sale_price),
         quantity: parseInt(formData.quantity),
-        minimum_stock: parseInt(formData.minimum_stock),
         description: formData.description,
       };
 
@@ -187,7 +183,6 @@ const ProductsPage = () => {
       cost_price: String(product.cost_price),
       sale_price: String(product.sale_price),
       quantity: String(product.quantity),
-      minimum_stock: String(product.minimum_stock),
       description: product.description || '',
     });
     setShowForm(true);
@@ -228,7 +223,6 @@ const ProductsPage = () => {
       cost_price: '',
       sale_price: '',
       quantity: '',
-      minimum_stock: '',
       description: '',
     });
     setEditingProduct(null);
@@ -330,16 +324,6 @@ const ProductsPage = () => {
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="minimum_stock">Estoque Mínimo</Label>
-                  <Input
-                    id="minimum_stock"
-                    type="number"
-                    value={formData.minimum_stock}
-                    onChange={(e) => setFormData({...formData, minimum_stock: e.target.value})}
-                    required
-                  />
-                </div>
               </div>
               <div>
                 <Label htmlFor="description">Descrição</Label>
@@ -384,7 +368,6 @@ const ProductsPage = () => {
                   <TableHead>Preço de Custo</TableHead>
                   <TableHead>Preço de Venda</TableHead>
                   <TableHead>Estoque</TableHead>
-                  <TableHead>Estoque Mín.</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -396,20 +379,12 @@ const ProductsPage = () => {
                     <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
                     <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
                     <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
-                    <TableCell className={product.quantity <= product.minimum_stock ? 'text-red-600 font-bold' : ''}>
-                      {product.quantity}
-                    </TableCell>
-                    <TableCell>{product.minimum_stock}</TableCell>
+                    <TableCell>{product.quantity}</TableCell>
                     <TableCell>
                       {product.quantity === 0 ? (
                         <span className="flex items-center text-red-600">
                           <AlertTriangle className="w-4 h-4 mr-1" />
                           Sem estoque
-                        </span>
-                      ) : product.quantity <= product.minimum_stock ? (
-                        <span className="flex items-center text-yellow-600">
-                          <AlertTriangle className="w-4 h-4 mr-1" />
-                          Estoque baixo
                         </span>
                       ) : (
                         <span className="text-green-600">Disponível</span>
