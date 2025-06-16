@@ -17,23 +17,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
+  // Função para definir o usuário no contexto do banco
+  const setDatabaseUser = async (username: string) => {
+    try {
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user',
+        setting_value: username,
+        is_local: false
+      });
+    } catch (error) {
+      console.error('Erro ao definir usuário no banco:', error);
+    }
+  };
+
   useEffect(() => {
     // Verificar se há um usuário logado no localStorage
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
       setIsAuthenticated(true);
       setCurrentUser(savedUser);
-      // Definir o usuário atual na configuração da sessão do Supabase
-      supabase.rpc('verify_login', {
-        username_input: savedUser,
-        password_input: 'perfumes@2025'
-      }).then(() => {
-        // Configurar a variável de sessão para auditoria
-        return supabase.rpc('verify_login', {
-          username_input: 'set_config_user',
-          password_input: savedUser
-        });
-      });
+      setDatabaseUser(savedUser);
     }
     setLoading(false);
   }, []);
@@ -52,8 +55,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentUser(username);
         localStorage.setItem('currentUser', username);
         
-        // Executar uma query SQL personalizada para definir a variável de sessão
-        await supabase.from('audit_log').select('id').limit(1);
+        // Definir o usuário no contexto do banco
+        await setDatabaseUser(username);
         
         return true;
       }
