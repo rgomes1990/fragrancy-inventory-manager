@@ -34,22 +34,12 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Definir filtro de estoque
-      let stockCondition = '';
-      if (stockFilter === 'in-stock') {
-        stockCondition = 'quantity > 0';
-      } else if (stockFilter === 'out-of-stock') {
-        stockCondition = 'quantity = 0';
-      }
-
       // Buscar produtos com filtro de estoque se aplicável
       let productsQuery = supabase.from('products').select('id, cost_price, sale_price, quantity');
-      if (stockCondition) {
-        if (stockFilter === 'in-stock') {
-          productsQuery = productsQuery.gt('quantity', 0);
-        } else if (stockFilter === 'out-of-stock') {
-          productsQuery = productsQuery.eq('quantity', 0);
-        }
+      if (stockFilter === 'in-stock') {
+        productsQuery = productsQuery.gt('quantity', 0);
+      } else if (stockFilter === 'out-of-stock') {
+        productsQuery = productsQuery.eq('quantity', 0);
       }
 
       // Buscar estatísticas base
@@ -66,19 +56,18 @@ const Dashboard = () => {
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
 
-      // Calcular investimento total e valor em estoque
-      const productsData = productsRes.data || [];
-      
-      // Para investimento total: sempre usar TODOS os produtos (sem filtro de estoque)
+      // Buscar TODOS os produtos para calcular o investimento total (sempre todos, independente do filtro)
       const { data: allProductsData } = await supabase
         .from('products')
         .select('cost_price, sale_price, quantity');
       
+      // Investimento Total: soma de (preço de custo × quantidade) de TODOS os produtos
       const totalInvestment = allProductsData?.reduce((sum, product) => {
         return sum + (Number(product.cost_price) * Number(product.quantity));
       }, 0) || 0;
       
-      // Para valor em estoque: usar produtos filtrados
+      // Valor em Estoque: soma de (preço de venda × quantidade) dos produtos filtrados
+      const productsData = productsRes.data || [];
       const totalSaleValue = productsData.reduce((sum, product) => {
         return sum + (Number(product.sale_price) * Number(product.quantity));
       }, 0);
