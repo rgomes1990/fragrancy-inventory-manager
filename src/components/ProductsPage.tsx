@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,16 +9,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Product, Category } from '@/types/database';
+import { Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Extended Product type with all required fields
+interface ExtendedProduct {
+  id: string;
+  name: string;
+  category_id: string | null;
+  cost_price: number;
+  sale_price: number;
+  quantity: number;
+  minimum_stock: number;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  categories?: {
+    id: string;
+    name: string;
+    created_at: string;
+    updated_at: string;
+  } | null;
+}
+
 const ProductsPage = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ExtendedProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<ExtendedProduct[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ExtendedProduct | null>(null);
   const [stockFilter, setStockFilter] = useState('all');
   const { setUserContext } = useAuth();
 
@@ -43,7 +64,10 @@ const ProductsPage = () => {
         .select(`
           *,
           categories (
-            name
+            id,
+            name,
+            created_at,
+            updated_at
           )
         `)
         .order('created_at', { ascending: false });
@@ -81,7 +105,7 @@ const ProductsPage = () => {
     }
   };
 
-  const filterProducts = (products: Product[], filter: string) => {
+  const filterProducts = (products: ExtendedProduct[], filter: string) => {
     switch (filter) {
       case 'in-stock':
         return products.filter(product => product.quantity > 0);
@@ -147,7 +171,7 @@ const ProductsPage = () => {
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: ExtendedProduct) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
