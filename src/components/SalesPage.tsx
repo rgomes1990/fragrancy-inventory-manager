@@ -21,6 +21,7 @@ const SalesPage = () => {
     customer_id: '',
     product_id: '',
     quantity: '',
+    sale_date: new Date().toISOString().split('T')[0], // Data atual por padrão
   });
 
   useEffect(() => {
@@ -41,7 +42,7 @@ const SalesPage = () => {
         supabase
           .from('products')
           .select('*')
-          .order('name'),
+          .order('category, name'),
         supabase
           .from('customers')
           .select('*')
@@ -94,7 +95,7 @@ const SalesPage = () => {
       const unit_price = product.sale_price;
       const total_price = unit_price * quantity;
 
-      // Registrar a venda
+      // Registrar a venda com data personalizada
       const { error: saleError } = await supabase
         .from('sales')
         .insert([{
@@ -103,6 +104,7 @@ const SalesPage = () => {
           quantity,
           unit_price,
           total_price,
+          sale_date: formData.sale_date + 'T00:00:00.000Z',
         }]);
 
       if (saleError) throw saleError;
@@ -175,11 +177,21 @@ const SalesPage = () => {
       customer_id: '',
       product_id: '',
       quantity: '',
+      sale_date: new Date().toISOString().split('T')[0],
     });
     setShowForm(false);
   };
 
   const selectedProduct = products.find(p => p.id === formData.product_id);
+
+  // Agrupar produtos por categoria
+  const productsByCategory = products.reduce((acc, product) => {
+    if (!acc[product.category]) {
+      acc[product.category] = [];
+    }
+    acc[product.category].push(product);
+    return acc;
+  }, {} as Record<string, Product[]>);
 
   return (
     <div className="space-y-6">
@@ -200,7 +212,7 @@ const SalesPage = () => {
             <CardTitle>Nova Venda</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="customer">Cliente</Label>
                 <Select value={formData.customer_id} onValueChange={(value) => setFormData({...formData, customer_id: value})}>
@@ -216,6 +228,7 @@ const SalesPage = () => {
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
                 <Label htmlFor="product">Produto</Label>
                 <Select value={formData.product_id} onValueChange={(value) => setFormData({...formData, product_id: value})}>
@@ -223,14 +236,22 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.filter(p => p.quantity > 0).map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name} (Estoque: {product.quantity})
-                      </SelectItem>
+                    {Object.entries(productsByCategory).map(([category, categoryProducts]) => (
+                      <div key={category}>
+                        <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
+                          {category}
+                        </div>
+                        {categoryProducts.filter(p => p.quantity > 0).map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name} (Estoque: {product.quantity})
+                          </SelectItem>
+                        ))}
+                      </div>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
                 <Label htmlFor="quantity">Quantidade</Label>
                 <Input
@@ -243,9 +264,20 @@ const SalesPage = () => {
                   required
                 />
               </div>
+
+              <div>
+                <Label htmlFor="sale_date">Data da Venda</Label>
+                <Input
+                  id="sale_date"
+                  type="date"
+                  value={formData.sale_date}
+                  onChange={(e) => setFormData({...formData, sale_date: e.target.value})}
+                  required
+                />
+              </div>
               
               {selectedProduct && formData.quantity && (
-                <div className="md:col-span-3 p-4 bg-gray-50 rounded-lg">
+                <div className="lg:col-span-4 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium mb-2">Resumo da Venda</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
@@ -270,7 +302,7 @@ const SalesPage = () => {
                 </div>
               )}
 
-              <div className="md:col-span-3 flex space-x-2">
+              <div className="lg:col-span-4 flex space-x-2">
                 <Button 
                   type="submit" 
                   className="bg-gradient-to-r from-purple-600 to-pink-600"
@@ -316,8 +348,12 @@ const SalesPage = () => {
                     <TableCell>
                       {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
                     </TableCell>
-                    <TableCell className="font-medium">{sale.customer?.name}</TableCell>
-                    <TableCell>{sale.product?.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {sale.customer?.name || 'Cliente não encontrado'}
+                    </TableCell>
+                    <TableCell>
+                      {sale.product?.name || 'Produto não encontrado'}
+                    </TableCell>
                     <TableCell>{sale.quantity}</TableCell>
                     <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
                     <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>

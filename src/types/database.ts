@@ -5,6 +5,7 @@ export interface Product {
   cost_price: number;
   sale_price: number;
   quantity: number;
+  category: string;
   created_at: string;
   updated_at: string;
 }

@@ -9,13 +9,144 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      authorized_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          password_hash: string
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          password_hash: string
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          password_hash?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          category: string
+          cost_price: number
+          created_at: string | null
+          id: string
+          name: string
+          quantity: number
+          sale_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string
+          cost_price: number
+          created_at?: string | null
+          id?: string
+          name: string
+          quantity?: number
+          sale_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          cost_price?: number
+          created_at?: string | null
+          id?: string
+          name?: string
+          quantity?: number
+          sale_price?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sales: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          product_id: string | null
+          quantity: number
+          sale_date: string | null
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          product_id?: string | null
+          quantity: number
+          sale_date?: string | null
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          product_id?: string | null
+          quantity?: number
+          sale_date?: string | null
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      verify_login: {
+        Args: { username_input: string; password_input: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
