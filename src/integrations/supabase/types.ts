@@ -273,6 +273,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      set_config: {
+        Args: {
+          setting_name: string
+          setting_value: string
+          is_local?: boolean
+        }
+        Returns: string
+      }
       verify_login: {
         Args: { username_input: string; password_input: string }
         Returns: boolean

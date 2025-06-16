@@ -20,11 +20,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Função para definir o usuário no contexto do banco
   const setDatabaseUser = async (username: string) => {
     try {
-      await supabase.rpc('set_config', {
+      // Usar a função set_config corretamente
+      const { error } = await supabase.rpc('set_config', {
         setting_name: 'app.current_user',
         setting_value: username,
         is_local: false
       });
+      
+      if (error) {
+        console.error('Erro ao definir usuário no banco:', error);
+      }
     } catch (error) {
       console.error('Erro ao definir usuário no banco:', error);
     }
