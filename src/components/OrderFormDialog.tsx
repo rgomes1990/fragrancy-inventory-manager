@@ -8,8 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Order, OrderItem } from '@/types/database';
+import { Order } from '@/types/database';
 import { useOrderData } from '@/hooks/useOrderData';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderFormDialogProps {
   isOpen: boolean;
@@ -30,8 +31,25 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<FormOrderItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const { currentUser } = useAuth();
 
   const { order, orderItems, loading: loadingOrderData } = useOrderData(editingOrder?.id || null);
+
+  // Definir usuário no contexto antes de operações no banco
+  const setUserContext = async () => {
+    if (currentUser) {
+      try {
+        await supabase.rpc('set_config', {
+          setting_name: 'app.current_user',
+          setting_value: currentUser,
+          is_local: false
+        });
+        console.log('Contexto do usuário definido para:', currentUser);
+      } catch (error) {
+        console.error('Erro ao definir contexto do usuário:', error);
+      }
+    }
+  };
 
   // Resetar formulário quando o dialog é aberto/fechado
   useEffect(() => {
@@ -94,6 +112,8 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
     setLoading(true);
 
     try {
+      await setUserContext();
+      
       const totalAmount = calculateTotal();
 
       if (editingOrder) {

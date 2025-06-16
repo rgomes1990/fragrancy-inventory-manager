@@ -21,6 +21,8 @@ export const useOrderData = (orderId: string | null) => {
   const fetchOrderData = async (id: string) => {
     setLoading(true);
     try {
+      console.log('Buscando dados da encomenda:', id);
+      
       // Buscar dados da encomenda
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
