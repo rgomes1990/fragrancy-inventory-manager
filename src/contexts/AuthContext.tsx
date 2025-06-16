@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           username_input: 'set_config_user',
           password_input: savedUser
         });
-      }).catch(console.error);
+      });
     }
     setLoading(false);
   }, []);

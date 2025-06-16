@@ -36,7 +36,7 @@ const ProductsPage = () => {
           .from('products')
           .select(`
             *,
-            categories(name)
+            categories(id, name, created_at, updated_at)
           `)
           .order('created_at', { ascending: false }),
         supabase

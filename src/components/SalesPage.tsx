@@ -36,15 +36,15 @@ const SalesPage = () => {
           .from('sales')
           .select(`
             *,
-            customers(name),
-            products(name, sale_price, categories(name))
+            customers(id, name, whatsapp, email, created_at, updated_at),
+            products(id, name, cost_price, sale_price, quantity, category_id, created_at, updated_at, categories(id, name, created_at, updated_at))
           `)
           .order('created_at', { ascending: false }),
         supabase
           .from('products')
           .select(`
             *,
-            categories(name)
+            categories(id, name, created_at, updated_at)
           `)
           .order('name'),
         supabase
@@ -242,7 +242,7 @@ const SalesPage = () => {
 
   // Agrupar produtos por categoria
   const productsByCategory = products.reduce((acc, product) => {
-    const categoryName = product.category?.name || 'Sem categoria';
+    const categoryName = product.categories?.name || 'Sem categoria';
     if (!acc[categoryName]) {
       acc[categoryName] = [];
     }
