@@ -132,6 +132,7 @@ const ProductsPage = () => {
   };
 
   const calculateSummary = (allProducts: ExtendedProduct[], filtered: ExtendedProduct[]) => {
+    // SEMPRE calcular com base em TODOS os produtos (incluindo sem estoque)
     const totalCostPrice = allProducts.reduce((sum, product) => {
       return sum + (Number(product.cost_price) * Number(product.quantity));
     }, 0);
