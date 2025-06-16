@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,8 @@ const ProductsPage = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('Total de produtos buscados:', data?.length || 0);
+      console.log('Produtos:', data);
       setProducts(data || []);
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
@@ -132,13 +135,21 @@ const ProductsPage = () => {
   };
 
   const calculateSummary = (allProducts: ExtendedProduct[], filtered: ExtendedProduct[]) => {
+    console.log('=== CALCULANDO RESUMO ===');
+    console.log('Total de produtos para cálculo:', allProducts.length);
+    console.log('Produtos filtrados:', filtered.length);
+    
     // SEMPRE calcular com base em TODOS os produtos (incluindo sem estoque)
     const totalCostPrice = allProducts.reduce((sum, product) => {
-      return sum + (Number(product.cost_price) * Number(product.quantity));
+      const costValue = Number(product.cost_price) * Number(product.quantity);
+      console.log(`Produto: ${product.name} | Custo: ${product.cost_price} | Qtd: ${product.quantity} | Total Custo: ${costValue}`);
+      return sum + costValue;
     }, 0);
 
     const totalSalePrice = allProducts.reduce((sum, product) => {
-      return sum + (Number(product.sale_price) * Number(product.quantity));
+      const saleValue = Number(product.sale_price) * Number(product.quantity);
+      console.log(`Produto: ${product.name} | Venda: ${product.sale_price} | Qtd: ${product.quantity} | Total Venda: ${saleValue}`);
+      return sum + saleValue;
     }, 0);
 
     const filteredCostPrice = filtered.reduce((sum, product) => {
@@ -148,6 +159,12 @@ const ProductsPage = () => {
     const filteredSalePrice = filtered.reduce((sum, product) => {
       return sum + (Number(product.sale_price) * Number(product.quantity));
     }, 0);
+
+    console.log('=== RESULTADO FINAL ===');
+    console.log('Investimento Total (todos):', totalCostPrice);
+    console.log('Valor Total Estoque (todos):', totalSalePrice);
+    console.log('Investimento Filtrado:', filteredCostPrice);
+    console.log('Valor Filtrado:', filteredSalePrice);
 
     return {
       totalCostPrice,
@@ -297,7 +314,7 @@ const ProductsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Investimento Total</p>
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalCostPrice.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Todos os produtos</p>
+                <p className="text-xs text-gray-500">Todos os produtos ({products.length})</p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-white" />
@@ -312,7 +329,7 @@ const ProductsPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Valor Total Estoque</p>
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalSalePrice.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Todos os produtos</p>
+                <p className="text-xs text-gray-500">Todos os produtos ({products.length})</p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-white" />
@@ -329,7 +346,7 @@ const ProductsPage = () => {
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredCostPrice.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">
                   {stockFilter === 'all' ? 'Todos' : 
-                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'}
+                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'} ({filteredProducts.length})
                 </p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -347,7 +364,7 @@ const ProductsPage = () => {
                 <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredSalePrice.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">
                   {stockFilter === 'all' ? 'Todos' : 
-                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'}
+                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'} ({filteredProducts.length})
                 </p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
