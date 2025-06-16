@@ -105,3 +105,12 @@ export interface AuditLog {
   user_name: string;
   created_at: string;
 }
+
+export interface Reinvestment {
+  id: string;
+  amount: number;
+  date: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -48,6 +48,7 @@ const getPageTitle = (page: string) => {
     sales: 'Vendas',
     orders: 'Encomendas',
     reports: 'Relatórios',
+    'profit-report': 'Lucro vs Investimento',
     audit: 'Auditoria',
   };
   return titles[page as keyof typeof titles] || 'Dashboard';

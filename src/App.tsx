@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -14,6 +15,7 @@ import ReportsPage from '@/components/ReportsPage';
 import CategoriesPage from '@/components/CategoriesPage';
 import OrdersPage from '@/components/OrdersPage';
 import AuditLogPage from '@/components/AuditLogPage';
+import ProfitReportPage from '@/components/ProfitReportPage';
 
 const queryClient = new QueryClient();
 
@@ -49,6 +51,8 @@ const AppContent = () => {
         return <OrdersPage />;
       case 'reports':
         return <ReportsPage />;
+      case 'profit-report':
+        return <ProfitReportPage />;
       case 'audit':
         return <AuditLogPage />;
       default:

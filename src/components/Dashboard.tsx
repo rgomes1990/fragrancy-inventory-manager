@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,8 +9,8 @@ interface DashboardStats {
   totalCustomers: number;
   totalSales: number;
   totalRevenue: number;
-  totalInvestment: number;
-  totalSaleValue: number;
+  totalCostSum: number;
+  totalSaleSum: number;
 }
 
 const Dashboard = () => {
@@ -20,8 +19,8 @@ const Dashboard = () => {
     totalCustomers: 0,
     totalSales: 0,
     totalRevenue: 0,
-    totalInvestment: 0,
-    totalSaleValue: 0,
+    totalCostSum: 0,
+    totalSaleSum: 0,
   });
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
@@ -56,21 +55,20 @@ const Dashboard = () => {
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
 
-      // Buscar TODOS os produtos para calcular o investimento total (sempre todos, independente do filtro)
+      // Buscar TODOS os produtos para calcular a soma total (sempre todos, independente do filtro)
       const { data: allProductsData } = await supabase
         .from('products')
         .select('cost_price, sale_price, quantity');
       
-      // Investimento Total: soma de (preço de custo × quantidade) de TODOS os produtos
-      const totalInvestment = allProductsData?.reduce((sum, product) => {
-        return sum + (Number(product.cost_price) * Number(product.quantity));
+      // Soma Total dos Preços de Custo: soma simples de cost_price de TODOS os produtos
+      const totalCostSum = allProductsData?.reduce((sum, product) => {
+        return sum + Number(product.cost_price);
       }, 0) || 0;
       
-      // Valor em Estoque: soma de (preço de venda × quantidade) dos produtos filtrados
-      const productsData = productsRes.data || [];
-      const totalSaleValue = productsData.reduce((sum, product) => {
-        return sum + (Number(product.sale_price) * Number(product.quantity));
-      }, 0);
+      // Soma Total dos Preços de Venda: soma simples de sale_price de TODOS os produtos
+      const totalSaleSum = allProductsData?.reduce((sum, product) => {
+        return sum + Number(product.sale_price);
+      }, 0) || 0;
 
       // Buscar vendas recentes
       const { data: recentSalesData } = await supabase
@@ -83,13 +81,15 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(5);
 
+      const productsData = productsRes.data || [];
+
       setStats({
         totalProducts: productsData.length,
         totalCustomers: customersRes.count || 0,
         totalSales: salesRes.count || 0,
         totalRevenue,
-        totalInvestment,
-        totalSaleValue,
+        totalCostSum,
+        totalSaleSum,
       });
 
       setRecentSales(recentSalesData || []);
@@ -132,16 +132,15 @@ const Dashboard = () => {
         bgColor: 'bg-yellow-50',
       },
       {
-        title: 'Investimento Total',
-        value: `R$ ${stats.totalInvestment.toFixed(2)}`,
+        title: 'Soma Preços de Custo',
+        value: `R$ ${stats.totalCostSum.toFixed(2)}`,
         icon: TrendingUp,
         color: 'from-red-500 to-red-600',
         bgColor: 'bg-red-50',
       },
       {
-        title: stockFilter === 'all' ? 'Valor em Estoque' :
-               stockFilter === 'in-stock' ? 'Valor Produtos c/ Estoque' : 'Valor Produtos s/ Estoque',
-        value: `R$ ${stats.totalSaleValue.toFixed(2)}`,
+        title: 'Soma Preços de Venda',
+        value: `R$ ${stats.totalSaleSum.toFixed(2)}`,
         icon: Package,
         color: 'from-indigo-500 to-indigo-600',
         bgColor: 'bg-indigo-50',
