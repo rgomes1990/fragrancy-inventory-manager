@@ -137,8 +137,8 @@ const OrdersPage = () => {
       notes: order.notes || '',
     });
     
-    if (order.order_items && order.order_items.length > 0) {
-      setItems(order.order_items.map(item => ({
+    if (order.items && order.items.length > 0) {
+      setItems(order.items.map(item => ({
         product_name: item.product_name,
         cost_price: item.cost_price.toString(),
         quantity: item.quantity.toString(),

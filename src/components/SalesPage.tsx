@@ -407,10 +407,10 @@ const SalesPage = () => {
                       {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {sale.customer?.name || 'Cliente não encontrado'}
+                      {sale.customers?.name || 'Cliente não encontrado'}
                     </TableCell>
                     <TableCell>
-                      {sale.product?.name || 'Produto não encontrado'}
+                      {sale.products?.name || 'Produto não encontrado'}
                     </TableCell>
                     <TableCell>{sale.quantity}</TableCell>
                     <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>

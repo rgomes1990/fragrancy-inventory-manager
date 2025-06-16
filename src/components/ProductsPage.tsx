@@ -279,7 +279,7 @@ const ProductsPage = () => {
                   return (
                     <TableRow key={product.id}>
                       <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.category?.name || 'Sem categoria'}</TableCell>
+                      <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
                       <TableCell>R$ {product.cost_price.toFixed(2)}</TableCell>
                       <TableCell>R$ {product.sale_price.toFixed(2)}</TableCell>
                       <TableCell>
