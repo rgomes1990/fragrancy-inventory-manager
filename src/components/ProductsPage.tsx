@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
@@ -29,6 +29,13 @@ interface ExtendedProduct {
   } | null;
 }
 
+interface ProductSummary {
+  totalCostPrice: number;
+  totalSalePrice: number;
+  filteredCostPrice: number;
+  filteredSalePrice: number;
+}
+
 const ProductsPage = () => {
   const [products, setProducts] = useState<ExtendedProduct[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<ExtendedProduct[]>([]);
@@ -37,6 +44,12 @@ const ProductsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ExtendedProduct | null>(null);
   const [stockFilter, setStockFilter] = useState('all');
+  const [productSummary, setProductSummary] = useState<ProductSummary>({
+    totalCostPrice: 0,
+    totalSalePrice: 0,
+    filteredCostPrice: 0,
+    filteredSalePrice: 0,
+  });
   const { setUserContext } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -118,8 +131,35 @@ const ProductsPage = () => {
     }
   };
 
+  const calculateSummary = (allProducts: ExtendedProduct[], filtered: ExtendedProduct[]) => {
+    const totalCostPrice = allProducts.reduce((sum, product) => {
+      return sum + (Number(product.cost_price) * Number(product.quantity));
+    }, 0);
+
+    const totalSalePrice = allProducts.reduce((sum, product) => {
+      return sum + (Number(product.sale_price) * Number(product.quantity));
+    }, 0);
+
+    const filteredCostPrice = filtered.reduce((sum, product) => {
+      return sum + (Number(product.cost_price) * Number(product.quantity));
+    }, 0);
+
+    const filteredSalePrice = filtered.reduce((sum, product) => {
+      return sum + (Number(product.sale_price) * Number(product.quantity));
+    }, 0);
+
+    return {
+      totalCostPrice,
+      totalSalePrice,
+      filteredCostPrice,
+      filteredSalePrice,
+    };
+  };
+
   useEffect(() => {
-    setFilteredProducts(filterProducts(products, stockFilter));
+    const filtered = filterProducts(products, stockFilter);
+    setFilteredProducts(filtered);
+    setProductSummary(calculateSummary(products, filtered));
   }, [products, stockFilter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -246,6 +286,75 @@ const ProductsPage = () => {
             Novo Produto
           </Button>
         </div>
+      </div>
+
+      {/* Cards de resumo financeiro */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-blue-50 border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Investimento Total</p>
+                <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalCostPrice.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Todos os produtos</p>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-50 border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Total Estoque</p>
+                <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalSalePrice.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Todos os produtos</p>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-purple-50 border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Investimento Filtrado</p>
+                <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredCostPrice.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">
+                  {stockFilter === 'all' ? 'Todos' : 
+                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-indigo-50 border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Valor Filtrado</p>
+                <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredSalePrice.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">
+                  {stockFilter === 'all' ? 'Todos' : 
+                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'}
+                </p>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {showForm && (
