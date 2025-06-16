@@ -19,7 +19,6 @@ interface ExtendedProduct {
   cost_price: number;
   sale_price: number;
   quantity: number;
-  description: string | null;
   created_at: string;
   updated_at: string;
   categories?: {
@@ -46,7 +45,6 @@ const ProductsPage = () => {
     cost_price: '',
     sale_price: '',
     quantity: '',
-    description: '',
   });
 
   useEffect(() => {
@@ -65,7 +63,6 @@ const ProductsPage = () => {
           cost_price,
           sale_price,
           quantity,
-          description,
           created_at,
           updated_at,
           categories (
@@ -135,7 +132,6 @@ const ProductsPage = () => {
         cost_price: parseFloat(formData.cost_price),
         sale_price: parseFloat(formData.sale_price),
         quantity: parseInt(formData.quantity),
-        description: formData.description,
       };
 
       await setUserContext();
@@ -183,7 +179,6 @@ const ProductsPage = () => {
       cost_price: String(product.cost_price),
       sale_price: String(product.sale_price),
       quantity: String(product.quantity),
-      description: product.description || '',
     });
     setShowForm(true);
   };
@@ -223,7 +218,6 @@ const ProductsPage = () => {
       cost_price: '',
       sale_price: '',
       quantity: '',
-      description: '',
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -324,14 +318,6 @@ const ProductsPage = () => {
                     required
                   />
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="description">Descrição</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                />
               </div>
               <div className="flex space-x-2">
                 <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600">
