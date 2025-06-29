@@ -185,6 +185,7 @@ export type Database = {
           cost_price: number
           created_at: string | null
           id: string
+          image_url: string | null
           name: string
           quantity: number
           sale_price: number
@@ -195,6 +196,7 @@ export type Database = {
           cost_price: number
           created_at?: string | null
           id?: string
+          image_url?: string | null
           name: string
           quantity?: number
           sale_price: number
@@ -205,6 +207,7 @@ export type Database = {
           cost_price?: number
           created_at?: string | null
           id?: string
+          image_url?: string | null
           name?: string
           quantity?: number
           sale_price?: number

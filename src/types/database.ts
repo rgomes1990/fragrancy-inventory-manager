@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   name: string;
@@ -6,6 +5,7 @@ export interface Product {
   sale_price: number;
   quantity: number;
   category_id: string;
+  image_url?: string;
   created_at: string;
   updated_at: string;
   categories?: {
@@ -49,6 +49,7 @@ export interface Sale {
     sale_price: number;
     quantity: number;
     category_id: string;
+    image_url?: string;
     created_at: string;
     updated_at: string;
     categories?: {

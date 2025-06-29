@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp, FileText, Search, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp, FileText, Search, Calendar, Upload, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
@@ -20,6 +20,7 @@ interface ExtendedProduct {
   cost_price: number;
   sale_price: number;
   quantity: number;
+  image_url: string | null;
   created_at: string;
   updated_at: string;
   categories?: {
@@ -48,6 +49,7 @@ const ProductsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [dateFilteredSummary, setDateFilteredSummary] = useState({ count: 0, totalCost: 0, totalSale: 0 });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [productSummary, setProductSummary] = useState<ProductSummary>({
     totalCostPrice: 0,
     totalSalePrice: 0,
@@ -62,6 +64,7 @@ const ProductsPage = () => {
     cost_price: '',
     sale_price: '',
     quantity: '',
+    image_url: null as string | null,
   });
 
   useEffect(() => {
@@ -80,6 +83,7 @@ const ProductsPage = () => {
           cost_price,
           sale_price,
           quantity,
+          image_url,
           created_at,
           updated_at,
           categories (
@@ -142,14 +146,12 @@ const ProductsPage = () => {
     console.log('Total de produtos para cálculo:', allProducts.length);
     console.log('Produtos filtrados:', filtered.length);
     
-    // Somar apenas os preços de custo (sem multiplicar pela quantidade)
     const totalCostPrice = allProducts.reduce((sum, product) => {
       const costValue = Number(product.cost_price);
       console.log(`Produto: ${product.name} | Custo: ${product.cost_price}`);
       return sum + costValue;
     }, 0);
 
-    // Somar apenas os preços de venda (sem multiplicar pela quantidade)
     const totalSalePrice = allProducts.reduce((sum, product) => {
       const saleValue = Number(product.sale_price);
       console.log(`Produto: ${product.name} | Venda: ${product.sale_price}`);
@@ -207,7 +209,6 @@ const ProductsPage = () => {
     setFilteredProducts(filtered);
     setProductSummary(calculateSummary(products, filtered));
 
-    // Calcular resumo por data se data estiver selecionada
     if (selectedDate) {
       const dateFiltered = filterByDate(products, selectedDate);
       const count = dateFiltered.length;
@@ -219,6 +220,39 @@ const ProductsPage = () => {
     }
   }, [products, stockFilter, searchTerm, selectedDate]);
 
+  const handleImageUpload = async (file: File) => {
+    if (!file) return null;
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Erro ao fazer upload da imagem:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível fazer upload da imagem.",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -229,6 +263,7 @@ const ProductsPage = () => {
         cost_price: parseFloat(formData.cost_price),
         sale_price: parseFloat(formData.sale_price),
         quantity: parseInt(formData.quantity),
+        image_url: formData.image_url,
       };
 
       await setUserContext();
@@ -276,6 +311,7 @@ const ProductsPage = () => {
       cost_price: String(product.cost_price),
       sale_price: String(product.sale_price),
       quantity: String(product.quantity),
+      image_url: product.image_url,
     });
     setShowForm(true);
   };
@@ -335,6 +371,7 @@ const ProductsPage = () => {
       cost_price: '',
       sale_price: '',
       quantity: '',
+      image_url: null,
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -382,7 +419,6 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {/* Filtro por data */}
       <Card className="bg-yellow-50 border-yellow-200">
         <CardContent className="p-4">
           <div className="flex items-center space-x-4">
@@ -426,7 +462,6 @@ const ProductsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Cards de resumo financeiro */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-blue-50 border-0 shadow-md">
           <CardContent className="p-4">
@@ -565,9 +600,52 @@ const ProductsPage = () => {
                     required
                   />
                 </div>
+                <div>
+                  <Label htmlFor="image">Foto do Produto</Label>
+                  <div className="space-y-2">
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const imageUrl = await handleImageUpload(file);
+                          if (imageUrl) {
+                            setFormData({...formData, image_url: imageUrl});
+                          }
+                        }
+                      }}
+                      disabled={uploadingImage}
+                    />
+                    {uploadingImage && (
+                      <p className="text-sm text-gray-500 flex items-center">
+                        <Upload className="w-4 h-4 mr-1 animate-spin" />
+                        Fazendo upload...
+                      </p>
+                    )}
+                    {formData.image_url && (
+                      <div className="flex items-center space-x-2">
+                        <img 
+                          src={formData.image_url} 
+                          alt="Preview" 
+                          className="w-20 h-20 object-cover rounded border"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFormData({...formData, image_url: null})}
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="flex space-x-2">
-                <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600">
+                <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600" disabled={uploadingImage}>
                   {editingProduct ? 'Atualizar' : 'Cadastrar'}
                 </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>
@@ -596,6 +674,7 @@ const ProductsPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Foto</TableHead>
                   <TableHead>Nome</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Preço de Custo</TableHead>
@@ -609,6 +688,19 @@ const ProductsPage = () => {
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
+                    <TableCell>
+                      {product.image_url ? (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="w-12 h-12 object-cover rounded border"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
+                          <Image className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
                     <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
