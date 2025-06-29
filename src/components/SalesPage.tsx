@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -416,6 +415,8 @@ const SalesPage = () => {
 
   // Agrupar produtos por categoria
   const productsByCategory = products.reduce((acc, product) => {
+    if (!product || !product.id) return acc;
+    
     const categoryName = product.categories?.name || 'Sem categoria';
     if (!acc[categoryName]) {
       acc[categoryName] = [];
@@ -485,7 +486,7 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.map((customer) => (
+                    {customers.filter(customer => customer && customer.id && customer.name).map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
                       </SelectItem>
@@ -501,18 +502,24 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => (
-                      <div key={categoryName}>
-                        <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                          {categoryName}
+                    {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
+                      if (!categoryProducts || categoryProducts.length === 0) return null;
+                      
+                      return (
+                        <div key={categoryName}>
+                          <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
+                            {categoryName}
+                          </div>
+                          {categoryProducts
+                            .filter(p => p && p.id && p.name && (p.quantity > 0 || (editingSale && p.id === editingSale.product_id)))
+                            .map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} (Estoque: {product.quantity})
+                              </SelectItem>
+                            ))}
                         </div>
-                        {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} (Estoque: {product.quantity})
-                          </SelectItem>
-                        ))}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

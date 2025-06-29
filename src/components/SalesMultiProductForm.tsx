@@ -58,7 +58,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
   };
 
   const handleProductChange = (index: number, productId: string) => {
-    const product = products.find(p => p.id === productId);
+    const product = products.find(p => p && p.id === productId);
     if (product) {
       updateItem(index, 'product_id', productId);
       updateItem(index, 'unit_price', product.sale_price);
@@ -90,12 +90,13 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
 
   // Agrupar produtos por categoria
   const productsByCategory = products.reduce((acc, product) => {
-    const categoryName = product.categories?.name?.trim() || 'Sem categoria';
-    const validCategoryName = categoryName || 'Sem categoria';
-    if (!acc[validCategoryName]) {
-      acc[validCategoryName] = [];
+    if (!product || !product.id || !product.name) return acc;
+    
+    const categoryName = (product.categories?.name && product.categories.name.trim()) || 'Sem categoria';
+    if (!acc[categoryName]) {
+      acc[categoryName] = [];
     }
-    acc[validCategoryName].push(product);
+    acc[categoryName].push(product);
     return acc;
   }, {} as Record<string, Product[]>);
 
@@ -117,7 +118,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((customer) => (
+                  {customers.filter(customer => customer && customer.id && customer.name).map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
                     </SelectItem>
@@ -149,7 +150,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
 
             <div className="space-y-4">
               {items.map((item, index) => {
-                const selectedProduct = products.find(p => p.id === item.product_id);
+                const selectedProduct = products.find(p => p && p.id === item.product_id);
                 
                 return (
                   <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border rounded-lg">
@@ -164,15 +165,17 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
-                            const safeCategoryName = categoryName.trim() || 'Sem categoria';
-                            const categoryKey = `category-${safeCategoryName}`;
+                            if (!categoryProducts || categoryProducts.length === 0) return null;
+                            
+                            const validProducts = categoryProducts.filter(p => p && p.id && p.name && p.quantity > 0);
+                            if (validProducts.length === 0) return null;
                             
                             return (
-                              <div key={categoryKey}>
+                              <div key={categoryName}>
                                 <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                                  {safeCategoryName}
+                                  {categoryName}
                                 </div>
-                                {categoryProducts.filter(p => p.quantity > 0).map((product) => (
+                                {validProducts.map((product) => (
                                   <SelectItem key={product.id} value={product.id}>
                                     {product.name} (Estoque: {product.quantity})
                                   </SelectItem>
