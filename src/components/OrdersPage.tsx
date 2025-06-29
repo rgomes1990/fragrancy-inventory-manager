@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ShoppingBag, Trash2, Edit } from 'lucide-react';
+import { Plus, ShoppingBag, Trash2, Edit, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Order } from '@/types/database';
@@ -79,6 +79,88 @@ const OrdersPage = () => {
     }
   };
 
+  const handleConfirmOrder = async (order: Order) => {
+    if (!confirm('Confirmar encomenda e criar produtos? Esta ação não pode ser desfeita.')) return;
+
+    try {
+      await setUserContext();
+
+      // Buscar itens da encomenda
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+
+      if (itemsError) throw itemsError;
+
+      if (!orderItems || orderItems.length === 0) {
+        toast({
+          title: "Erro",
+          description: "Nenhum item encontrado na encomenda.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Buscar categoria padrão ou criar uma se não existir
+      let { data: defaultCategory } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('name', 'Encomendas')
+        .single();
+
+      if (!defaultCategory) {
+        const { data: newCategory, error: categoryError } = await supabase
+          .from('categories')
+          .insert({ name: 'Encomendas' })
+          .select()
+          .single();
+
+        if (categoryError) throw categoryError;
+        defaultCategory = newCategory;
+      }
+
+      // Criar produtos a partir dos itens da encomenda
+      const productsToCreate = orderItems.map(item => ({
+        name: item.product_name,
+        cost_price: item.cost_price,
+        sale_price: item.cost_price * 1.3, // Margem de 30% por padrão
+        quantity: item.quantity,
+        category_id: defaultCategory.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error: productsError } = await supabase
+        .from('products')
+        .insert(productsToCreate);
+
+      if (productsError) throw productsError;
+
+      // Atualizar status da encomenda para "Confirmada"
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'Confirmada' })
+        .eq('id', order.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Sucesso",
+        description: `Encomenda confirmada e ${orderItems.length} produto(s) criado(s) com sucesso!`,
+      });
+
+      fetchOrders();
+    } catch (error) {
+      console.error('Erro ao confirmar encomenda:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível confirmar a encomenda.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleOrderSaved = () => {
     fetchOrders();
   };
@@ -144,7 +226,11 @@ const OrdersPage = () => {
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.customer_name}</TableCell>
                     <TableCell>
-                      <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        order.status === 'Confirmada' 
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
                         {order.status}
                       </span>
                     </TableCell>
@@ -154,6 +240,17 @@ const OrdersPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
+                        {order.status !== 'Confirmada' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleConfirmOrder(order)}
+                            className="text-green-600 hover:bg-green-50"
+                            title="Confirmar encomenda e criar produtos"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"

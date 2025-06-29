@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, Users, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
+import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy } from 'lucide-react';
 
 interface DashboardStats {
   totalProducts: number;
@@ -11,6 +12,12 @@ interface DashboardStats {
   totalRevenue: number;
   totalCostSum: number;
   totalSaleSum: number;
+}
+
+interface TopProduct {
+  product_name: string;
+  total_quantity: number;
+  total_revenue: number;
 }
 
 const Dashboard = () => {
@@ -24,6 +31,7 @@ const Dashboard = () => {
   });
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockFilter, setStockFilter] = useState('all');
 
@@ -81,6 +89,35 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(5);
 
+      // Buscar TOP 5 produtos mais vendidos
+      const { data: topProductsData } = await supabase
+        .from('sales')
+        .select(`
+          products(name),
+          quantity,
+          total_price
+        `)
+        .not('products', 'is', null);
+
+      // Agrupar e calcular TOP 5
+      const productSales = topProductsData?.reduce((acc, sale) => {
+        const productName = sale.products?.name || 'Produto desconhecido';
+        if (!acc[productName]) {
+          acc[productName] = {
+            product_name: productName,
+            total_quantity: 0,
+            total_revenue: 0
+          };
+        }
+        acc[productName].total_quantity += sale.quantity;
+        acc[productName].total_revenue += Number(sale.total_price);
+        return acc;
+      }, {} as Record<string, TopProduct>) || {};
+
+      const top5Products = Object.values(productSales)
+        .sort((a, b) => b.total_quantity - a.total_quantity)
+        .slice(0, 5);
+
       const productsData = productsRes.data || [];
 
       setStats({
@@ -93,6 +130,7 @@ const Dashboard = () => {
       });
 
       setRecentSales(recentSalesData || []);
+      setTopProducts(top5Products);
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
     } finally {
@@ -206,8 +244,49 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Vendas recentes */}
-      <div className="grid grid-cols-1 gap-6">
+      {/* Cards de TOP 5 e Vendas Recentes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* TOP 5 Produtos Mais Vendidos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              <span>Top 5 Produtos Mais Vendidos</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topProducts.length > 0 ? (
+              <div className="space-y-3">
+                {topProducts.map((product, index) => (
+                  <div key={product.product_name} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                        index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-400' :
+                        index === 2 ? 'bg-orange-400' :
+                        'bg-blue-400'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{product.product_name}</p>
+                        <p className="text-xs text-gray-500">Qtd: {product.total_quantity}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-sm">R$ {Number(product.total_revenue).toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Receita Total</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">Nenhuma venda encontrada</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Vendas recentes */}
         <Card>
           <CardHeader>
             <CardTitle>Vendas Recentes</CardTitle>

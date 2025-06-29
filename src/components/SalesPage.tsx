@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,10 +38,6 @@ const SalesPage = () => {
   useEffect(() => {
     fetchData();
   }, []);
-
-  useEffect(() => {
-    filterSalesByMonth();
-  }, [sales, selectedMonth]);
 
   useEffect(() => {
     filterSalesBySearch();
@@ -87,21 +84,6 @@ const SalesPage = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterSalesByMonth = () => {
-    if (!selectedMonth) {
-      return;
-    }
-
-    const filtered = sales.filter(sale => {
-      const saleDate = new Date(sale.sale_date);
-      const saleMonth = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
-      return saleMonth === selectedMonth;
-    });
-
-    const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
-    setMonthlyTotal(total);
   };
 
   const filterSalesBySearch = () => {
@@ -432,15 +414,13 @@ const SalesPage = () => {
     }
   }, [selectedProduct, editingSale]);
 
-  // Agrupar produtos por categoria - FIXED: ensure non-empty keys and values
+  // Agrupar produtos por categoria
   const productsByCategory = products.reduce((acc, product) => {
-    const categoryName = product.categories?.name?.trim() || 'Sem categoria';
-    // Ensure category name is not empty and is valid for SelectItem
-    const validCategoryName = categoryName || 'Sem categoria';
-    if (!acc[validCategoryName]) {
-      acc[validCategoryName] = [];
+    const categoryName = product.categories?.name || 'Sem categoria';
+    if (!acc[categoryName]) {
+      acc[categoryName] = [];
     }
-    acc[validCategoryName].push(product);
+    acc[categoryName].push(product);
     return acc;
   }, {} as Record<string, Product[]>);
 
@@ -521,24 +501,18 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
-                      // Double check that categoryName is not empty
-                      const safeCategoryName = categoryName.trim() || 'Sem categoria';
-                      const categoryKey = `category-${safeCategoryName}`;
-                      
-                      return (
-                        <div key={categoryKey}>
-                          <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                            {safeCategoryName}
-                          </div>
-                          {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} (Estoque: {product.quantity})
-                            </SelectItem>
-                          ))}
+                    {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => (
+                      <div key={categoryName}>
+                        <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
+                          {categoryName}
                         </div>
-                      );
-                    })}
+                        {categoryProducts.filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id)).map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name} (Estoque: {product.quantity})
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
