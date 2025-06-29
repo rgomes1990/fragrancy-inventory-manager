@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp, FileText } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp, FileText, Search, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
@@ -46,6 +45,9 @@ const ProductsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ExtendedProduct | null>(null);
   const [stockFilter, setStockFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [dateFilteredSummary, setDateFilteredSummary] = useState({ count: 0, totalCost: 0, totalSale: 0 });
   const [productSummary, setProductSummary] = useState<ProductSummary>({
     totalCostPrice: 0,
     totalSalePrice: 0,
@@ -176,11 +178,46 @@ const ProductsPage = () => {
     };
   };
 
+  const filterBySearch = (products: ExtendedProduct[], search: string) => {
+    if (!search) return products;
+    
+    const searchLower = search.toLowerCase();
+    return products.filter(product =>
+      product.name.toLowerCase().includes(searchLower) ||
+      product.categories?.name?.toLowerCase().includes(searchLower) ||
+      product.cost_price.toString().includes(searchLower) ||
+      product.sale_price.toString().includes(searchLower) ||
+      product.quantity.toString().includes(searchLower)
+    );
+  };
+
+  const filterByDate = (products: ExtendedProduct[], date: string) => {
+    if (!date) return products;
+    
+    return products.filter(product => {
+      const productDate = new Date(product.created_at).toISOString().split('T')[0];
+      return productDate === date;
+    });
+  };
+
   useEffect(() => {
-    const filtered = filterProducts(products, stockFilter);
+    let filtered = filterProducts(products, stockFilter);
+    filtered = filterBySearch(filtered, searchTerm);
+    
     setFilteredProducts(filtered);
     setProductSummary(calculateSummary(products, filtered));
-  }, [products, stockFilter]);
+
+    // Calcular resumo por data se data estiver selecionada
+    if (selectedDate) {
+      const dateFiltered = filterByDate(products, selectedDate);
+      const count = dateFiltered.length;
+      const totalCost = dateFiltered.reduce((sum, p) => sum + Number(p.cost_price), 0);
+      const totalSale = dateFiltered.reduce((sum, p) => sum + Number(p.sale_price), 0);
+      setDateFilteredSummary({ count, totalCost, totalSale });
+    } else {
+      setDateFilteredSummary({ count: 0, totalCost: 0, totalSale: 0 });
+    }
+  }, [products, stockFilter, searchTerm, selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -308,6 +345,15 @@ const ProductsPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
         <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Buscar produtos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-64"
+            />
+          </div>
           <Select value={stockFilter} onValueChange={setStockFilter}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filtrar por estoque" />
@@ -335,6 +381,50 @@ const ProductsPage = () => {
           </Button>
         </div>
       </div>
+
+      {/* Filtro por data */}
+      <Card className="bg-yellow-50 border-yellow-200">
+        <CardContent className="p-4">
+          <div className="flex items-center space-x-4">
+            <Calendar className="w-5 h-5 text-yellow-600" />
+            <Label htmlFor="date-filter" className="font-medium">Filtrar por data de cadastro:</Label>
+            <Input
+              id="date-filter"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="w-48"
+            />
+            {selectedDate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedDate('')}
+              >
+                Limpar
+              </Button>
+            )}
+          </div>
+          {selectedDate && dateFilteredSummary.count > 0 && (
+            <div className="mt-3 p-3 bg-yellow-100 rounded-lg">
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Produtos cadastrados:</span>
+                  <p className="text-lg font-bold text-yellow-800">{dateFilteredSummary.count}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Soma preços de custo:</span>
+                  <p className="text-lg font-bold text-yellow-800">R$ {dateFilteredSummary.totalCost.toFixed(2)}</p>
+                </div>
+                <div>
+                  <span className="font-medium">Soma preços de venda:</span>
+                  <p className="text-lg font-bold text-yellow-800">R$ {dateFilteredSummary.totalSale.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Cards de resumo financeiro */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -511,6 +601,7 @@ const ProductsPage = () => {
                   <TableHead>Preço de Custo</TableHead>
                   <TableHead>Preço de Venda</TableHead>
                   <TableHead>Estoque</TableHead>
+                  <TableHead>Data Cadastro</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -523,6 +614,7 @@ const ProductsPage = () => {
                     <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
                     <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
                     <TableCell>{product.quantity}</TableCell>
+                    <TableCell>{new Date(product.created_at).toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell>
                       {product.quantity === 0 ? (
                         <span className="flex items-center text-red-600">

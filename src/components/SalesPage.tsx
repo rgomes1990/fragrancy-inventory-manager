@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ShoppingCart, Trash2, Edit, Calendar } from 'lucide-react';
+import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
+import SalesMultiProductForm from './SalesMultiProductForm';
 
 const SalesPage = () => {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -18,10 +19,13 @@ const SalesPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showMultiForm, setShowMultiForm] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
   const { setUserContext } = useAuth();
+  
   const [formData, setFormData] = useState({
     customer_id: '',
     product_id: '',
@@ -37,6 +41,10 @@ const SalesPage = () => {
   useEffect(() => {
     filterSalesByMonth();
   }, [sales, selectedMonth]);
+
+  useEffect(() => {
+    filterSalesBySearch();
+  }, [sales, searchTerm, selectedMonth]);
 
   const fetchData = async () => {
     try {
@@ -83,8 +91,6 @@ const SalesPage = () => {
 
   const filterSalesByMonth = () => {
     if (!selectedMonth) {
-      setFilteredSales(sales);
-      setMonthlyTotal(0);
       return;
     }
 
@@ -95,9 +101,133 @@ const SalesPage = () => {
     });
 
     const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
-    
-    setFilteredSales(filtered);
     setMonthlyTotal(total);
+  };
+
+  const filterSalesBySearch = () => {
+    let filtered = sales;
+
+    // Filtrar por mês se selecionado
+    if (selectedMonth) {
+      filtered = filtered.filter(sale => {
+        const saleDate = new Date(sale.sale_date);
+        const saleMonth = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
+        return saleMonth === selectedMonth;
+      });
+    }
+
+    // Filtrar por busca
+    if (searchTerm) {
+      filtered = filtered.filter(sale => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          sale.customers?.name?.toLowerCase().includes(searchLower) ||
+          sale.products?.name?.toLowerCase().includes(searchLower) ||
+          sale.quantity.toString().includes(searchLower) ||
+          sale.unit_price.toString().includes(searchLower) ||
+          sale.total_price.toString().includes(searchLower) ||
+          new Date(sale.sale_date).toLocaleDateString('pt-BR').includes(searchTerm)
+        );
+      });
+    }
+
+    setFilteredSales(filtered);
+    
+    if (selectedMonth) {
+      const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
+      setMonthlyTotal(total);
+    } else {
+      setMonthlyTotal(0);
+    }
+  };
+
+  const handleMultiProductSubmit = async (saleData: {
+    customer_id: string;
+    items: Array<{
+      product_id: string;
+      quantity: number;
+      unit_price: number;
+      subtotal: number;
+    }>;
+    sale_date: string;
+  }) => {
+    try {
+      await setUserContext();
+      
+      // Verificar estoque de todos os produtos antes de registrar qualquer venda
+      for (const item of saleData.items) {
+        const product = products.find(p => p.id === item.product_id);
+        if (!product) {
+          toast({
+            title: "Erro",
+            description: `Produto não encontrado.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (item.quantity > product.quantity) {
+          toast({
+            title: "Erro",
+            description: `Quantidade insuficiente em estoque para ${product.name}.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Registrar todas as vendas
+      for (const item of saleData.items) {
+        const saleRecord = {
+          customer_id: saleData.customer_id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.subtotal,
+          sale_date: saleData.sale_date + 'T00:00:00.000Z',
+        };
+
+        const { error: saleError } = await supabase
+          .from('sales')
+          .insert([saleRecord]);
+
+        if (saleError) throw saleError;
+
+        // Atualizar estoque do produto
+        const product = products.find(p => p.id === item.product_id);
+        if (product) {
+          const newQuantity = product.quantity - item.quantity;
+          const updateData: any = { quantity: newQuantity };
+
+          // Se o preço unitário foi alterado, atualizar o produto também
+          if (item.unit_price !== product.sale_price) {
+            updateData.sale_price = item.unit_price;
+          }
+
+          const { error: updateError } = await supabase
+            .from('products')
+            .update(updateData)
+            .eq('id', item.product_id);
+
+          if (updateError) throw updateError;
+        }
+      }
+
+      toast({
+        title: "Sucesso",
+        description: "Venda registrada com sucesso!",
+      });
+
+      setShowMultiForm(false);
+      fetchData();
+    } catch (error) {
+      console.error('Erro ao salvar venda:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar a venda.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -331,20 +461,39 @@ const SalesPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
-        <Button 
-          onClick={() => setShowForm(true)}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Venda
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            onClick={() => setShowForm(true)}
+            variant="outline"
+            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Venda Simples
+          </Button>
+          <Button 
+            onClick={() => setShowMultiForm(true)}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Venda Múltiplos Produtos
+          </Button>
+        </div>
       </div>
+
+      {showMultiForm && (
+        <SalesMultiProductForm
+          customers={customers}
+          products={products}
+          onSubmit={handleMultiProductSubmit}
+          onCancel={() => setShowMultiForm(false)}
+        />
+      )}
 
       {showForm && (
         <Card>
           <CardHeader>
             <CardTitle>
-              {editingSale ? 'Editar Venda' : 'Nova Venda'}
+              {editingSale ? 'Editar Venda' : 'Nova Venda Simples'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -480,13 +629,22 @@ const SalesPage = () => {
               <span>Histórico de Vendas</span>
             </CardTitle>
             <div className="flex items-center space-x-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Buscar vendas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 w-64"
+                />
+              </div>
               <Calendar className="w-4 h-4" />
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filtrar por mês" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all-months">Todos os meses</SelectItem>
+                  <SelectItem value="">Todos os meses</SelectItem>
                   {getMonthOptions().map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}

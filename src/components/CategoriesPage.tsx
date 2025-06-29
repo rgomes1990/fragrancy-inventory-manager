@@ -5,16 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Tag } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
 
 const CategoriesPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
   });
@@ -22,6 +24,10 @@ const CategoriesPage = () => {
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    filterCategories();
+  }, [categories, searchTerm]);
 
   const fetchCategories = async () => {
     try {
@@ -42,6 +48,19 @@ const CategoriesPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterCategories = () => {
+    if (!searchTerm) {
+      setFilteredCategories(categories);
+      return;
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    const filtered = categories.filter(category =>
+      category.name.toLowerCase().includes(searchLower)
+    );
+    setFilteredCategories(filtered);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,13 +152,24 @@ const CategoriesPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Categorias</h1>
-        <Button 
-          onClick={() => setShowForm(true)}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Categoria
-        </Button>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Buscar categorias..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 w-64"
+            />
+          </div>
+          <Button 
+            onClick={() => setShowForm(true)}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Categoria
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -178,6 +208,9 @@ const CategoriesPage = () => {
           <CardTitle className="flex items-center space-x-2">
             <Tag className="w-5 h-5" />
             <span>Lista de Categorias</span>
+            <span className="text-sm text-gray-500">
+              ({filteredCategories.length} categoria{filteredCategories.length !== 1 ? 's' : ''})
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -188,13 +221,15 @@ const CategoriesPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Data de Criação</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category) => (
+                {filteredCategories.map((category) => (
                   <TableRow key={category.id}>
                     <TableCell className="font-medium">{category.name}</TableCell>
+                    <TableCell>{new Date(category.created_at).toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button
