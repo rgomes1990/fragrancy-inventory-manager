@@ -70,6 +70,10 @@ const SalesPage = () => {
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
 
+      console.log('Sales data:', salesRes.data);
+      console.log('Products data:', productsRes.data);
+      console.log('Customers data:', customersRes.data);
+
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
       setCustomers(customersRes.data || []);
@@ -413,11 +417,26 @@ const SalesPage = () => {
     }
   }, [selectedProduct, editingSale]);
 
-  // Agrupar produtos por categoria
-  const productsByCategory = products.reduce((acc, product) => {
-    if (!product || !product.id) return acc;
-    
-    const categoryName = product.categories?.name || 'Sem categoria';
+  // Filtrar e validar dados antes de usar nos selects
+  const validCustomers = customers.filter(customer => 
+    customer && 
+    customer.id && 
+    customer.id.trim() !== '' && 
+    customer.name && 
+    customer.name.trim() !== ''
+  );
+
+  const validProducts = products.filter(product => 
+    product && 
+    product.id && 
+    product.id.trim() !== '' && 
+    product.name && 
+    product.name.trim() !== ''
+  );
+
+  // Agrupar produtos por categoria com validação
+  const productsByCategory = validProducts.reduce((acc, product) => {
+    const categoryName = (product.categories?.name && product.categories.name.trim()) || 'Sem categoria';
     if (!acc[categoryName]) {
       acc[categoryName] = [];
     }
@@ -437,6 +456,8 @@ const SalesPage = () => {
     }
     return options;
   };
+
+  console.log('Rendering SalesPage, validCustomers:', validCustomers.length, 'validProducts:', validProducts.length);
 
   return (
     <div className="space-y-6">
@@ -463,8 +484,8 @@ const SalesPage = () => {
 
       {showMultiForm && (
         <SalesMultiProductForm
-          customers={customers}
-          products={products}
+          customers={validCustomers}
+          products={validProducts}
           onSubmit={handleMultiProductSubmit}
           onCancel={() => setShowMultiForm(false)}
         />
@@ -486,7 +507,7 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.filter(customer => customer && customer.id && customer.name).map((customer) => (
+                    {validCustomers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
                       </SelectItem>
@@ -503,20 +524,22 @@ const SalesPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
-                      if (!categoryProducts || categoryProducts.length === 0) return null;
+                      const availableProducts = categoryProducts.filter(p => 
+                        p.quantity > 0 || (editingSale && p.id === editingSale.product_id)
+                      );
+                      
+                      if (availableProducts.length === 0) return null;
                       
                       return (
                         <div key={categoryName}>
                           <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
                             {categoryName}
                           </div>
-                          {categoryProducts
-                            .filter(p => p && p.id && p.name && (p.quantity > 0 || (editingSale && p.id === editingSale.product_id)))
-                            .map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} (Estoque: {product.quantity})
-                              </SelectItem>
-                            ))}
+                          {availableProducts.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} (Estoque: {product.quantity})
+                            </SelectItem>
+                          ))}
                         </div>
                       );
                     })}
