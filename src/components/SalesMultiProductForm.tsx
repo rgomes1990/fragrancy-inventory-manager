@@ -86,65 +86,148 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     });
   };
 
-  // Função para validar e filtrar dados com logs detalhados
+  // Função para validar e filtrar dados com logs ainda mais detalhados
   const getValidCustomers = () => {
+    console.log('=== MULTI FORM: VALIDATING CUSTOMERS ===');
     console.log('MultiForm - Raw customers data:', customers);
-    const validCustomers = customers.filter(customer => {
-      const isValid = customer && 
-        customer.id && 
-        typeof customer.id === 'string' &&
-        customer.id.trim() !== '' && 
-        customer.name && 
-        typeof customer.name === 'string' &&
-        customer.name.trim() !== '';
+    
+    if (!Array.isArray(customers)) {
+      console.error('MultiForm - Customers is not an array:', typeof customers);
+      return [];
+    }
+
+    const validCustomers = customers.filter((customer, index) => {
+      console.log(`MultiForm - Checking customer ${index}:`, customer);
       
-      if (!isValid) {
-        console.log('MultiForm - Invalid customer found:', customer);
+      if (!customer) {
+        console.log(`MultiForm - Customer ${index} is null/undefined`);
+        return false;
       }
-      return isValid;
+      
+      if (!customer.id) {
+        console.log(`MultiForm - Customer ${index} has no ID:`, customer);
+        return false;
+      }
+      
+      if (typeof customer.id !== 'string') {
+        console.log(`MultiForm - Customer ${index} ID is not a string:`, typeof customer.id, customer.id);
+        return false;
+      }
+      
+      if (customer.id.trim() === '') {
+        console.log(`MultiForm - Customer ${index} has empty ID after trim:`, customer);
+        return false;
+      }
+      
+      if (!customer.name) {
+        console.log(`MultiForm - Customer ${index} has no name:`, customer);
+        return false;
+      }
+      
+      if (typeof customer.name !== 'string') {
+        console.log(`MultiForm - Customer ${index} name is not a string:`, typeof customer.name, customer.name);
+        return false;
+      }
+      
+      if (customer.name.trim() === '') {
+        console.log(`MultiForm - Customer ${index} has empty name after trim:`, customer);
+        return false;
+      }
+      
+      console.log(`MultiForm - Customer ${index} is VALID:`, customer.id, customer.name);
+      return true;
     });
+    
+    console.log('MultiForm - Final valid customers count:', validCustomers.length);
     console.log('MultiForm - Valid customers:', validCustomers);
     return validCustomers;
   };
 
   const getValidProducts = () => {
+    console.log('=== MULTI FORM: VALIDATING PRODUCTS ===');
     console.log('MultiForm - Raw products data:', products);
-    const validProducts = products.filter(product => {
-      const isValid = product && 
-        product.id && 
-        typeof product.id === 'string' &&
-        product.id.trim() !== '' && 
-        product.name && 
-        typeof product.name === 'string' &&
-        product.name.trim() !== '' &&
-        product.quantity > 0;
+    
+    if (!Array.isArray(products)) {
+      console.error('MultiForm - Products is not an array:', typeof products);
+      return [];
+    }
+
+    const validProducts = products.filter((product, index) => {
+      console.log(`MultiForm - Checking product ${index}:`, product);
       
-      if (!isValid) {
-        console.log('MultiForm - Invalid product found:', product);
+      if (!product) {
+        console.log(`MultiForm - Product ${index} is null/undefined`);
+        return false;
       }
-      return isValid;
+      
+      if (!product.id) {
+        console.log(`MultiForm - Product ${index} has no ID:`, product);
+        return false;
+      }
+      
+      if (typeof product.id !== 'string') {
+        console.log(`MultiForm - Product ${index} ID is not a string:`, typeof product.id, product.id);
+        return false;
+      }
+      
+      if (product.id.trim() === '') {
+        console.log(`MultiForm - Product ${index} has empty ID after trim:`, product);
+        return false;
+      }
+      
+      if (!product.name) {
+        console.log(`MultiForm - Product ${index} has no name:`, product);
+        return false;
+      }
+      
+      if (typeof product.name !== 'string') {
+        console.log(`MultiForm - Product ${index} name is not a string:`, typeof product.name, product.name);
+        return false;
+      }
+      
+      if (product.name.trim() === '') {
+        console.log(`MultiForm - Product ${index} has empty name after trim:`, product);
+        return false;
+      }
+      
+      if (product.quantity <= 0) {
+        console.log(`MultiForm - Product ${index} has no stock:`, product);
+        return false;
+      }
+      
+      console.log(`MultiForm - Product ${index} is VALID:`, product.id, product.name);
+      return true;
     });
+    
+    console.log('MultiForm - Final valid products count:', validProducts.length);
     console.log('MultiForm - Valid products:', validProducts);
     return validProducts;
   };
 
   const getProductsByCategory = () => {
     const validProducts = getValidProducts();
-    return validProducts.reduce((acc, product) => {
+    console.log('=== MULTI FORM: GROUPING PRODUCTS BY CATEGORY ===');
+    
+    const grouped = validProducts.reduce((acc, product) => {
       const categoryName = (product.categories?.name && typeof product.categories.name === 'string' && product.categories.name.trim()) || 'Sem categoria';
+      console.log(`MultiForm - Product ${product.id} (${product.name}) -> Category: ${categoryName}`);
+      
       if (!acc[categoryName]) {
         acc[categoryName] = [];
       }
       acc[categoryName].push(product);
       return acc;
     }, {} as Record<string, Product[]>);
+    
+    console.log('MultiForm - Products grouped by category:', grouped);
+    return grouped;
   };
 
   const validCustomers = getValidCustomers();
   const validProducts = getValidProducts();
   const productsByCategory = getProductsByCategory();
 
-  // Log final data before rendering
+  console.log('=== MULTI FORM: FINAL RENDER DATA ===');
   console.log('MultiForm - Final valid customers for rendering:', validCustomers);
   console.log('MultiForm - Final valid products for rendering:', validProducts);
   console.log('MultiForm - Products by category for rendering:', productsByCategory);
@@ -168,12 +251,20 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                 </SelectTrigger>
                 <SelectContent>
                   {validCustomers.map((customer) => {
-                    console.log('MultiForm - Rendering customer SelectItem:', customer.id, customer.name);
-                    // Extra safety check before rendering
-                    if (!customer.id || customer.id.trim() === '') {
-                      console.error('MultiForm - Attempted to render customer with empty ID:', customer);
+                    console.log('=== MULTI FORM: RENDERING CUSTOMER SELECTITEM ===');
+                    console.log('MultiForm - Customer ID:', customer.id);
+                    console.log('MultiForm - Customer Name:', customer.name);
+                    console.log('MultiForm - ID type:', typeof customer.id);
+                    console.log('MultiForm - ID value check:', customer.id ? 'has value' : 'no value');
+                    console.log('MultiForm - ID trim check:', customer.id?.trim() ? 'not empty after trim' : 'empty after trim');
+                    
+                    // Verificação extra rigorosa antes de renderizar
+                    if (!customer.id || typeof customer.id !== 'string' || customer.id.trim() === '') {
+                      console.error('MultiForm - BLOCKED: Customer with invalid ID from rendering:', customer);
                       return null;
                     }
+                    
+                    console.log('MultiForm - RENDERING: Customer SelectItem with ID:', customer.id);
                     return (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
@@ -230,12 +321,20 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                                   {categoryName}
                                 </div>
                                 {categoryProducts.map((product) => {
-                                  console.log('MultiForm - Rendering product SelectItem:', product.id, product.name);
-                                  // Extra safety check before rendering
-                                  if (!product.id || product.id.trim() === '') {
-                                    console.error('MultiForm - Attempted to render product with empty ID:', product);
+                                  console.log('=== MULTI FORM: RENDERING PRODUCT SELECTITEM ===');
+                                  console.log('MultiForm - Product ID:', product.id);
+                                  console.log('MultiForm - Product Name:', product.name);
+                                  console.log('MultiForm - ID type:', typeof product.id);
+                                  console.log('MultiForm - ID value check:', product.id ? 'has value' : 'no value');
+                                  console.log('MultiForm - ID trim check:', product.id?.trim() ? 'not empty after trim' : 'empty after trim');
+                                  
+                                  // Verificação extra rigorosa antes de renderizar
+                                  if (!product.id || typeof product.id !== 'string' || product.id.trim() === '') {
+                                    console.error('MultiForm - BLOCKED: Product with invalid ID from rendering:', product);
                                     return null;
                                   }
+                                  
+                                  console.log('MultiForm - RENDERING: Product SelectItem with ID:', product.id);
                                   return (
                                     <SelectItem key={product.id} value={product.id}>
                                       {product.name} (Estoque: {product.quantity})
