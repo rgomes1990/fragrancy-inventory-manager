@@ -34,14 +34,6 @@ const SalesPage = () => {
     sale_date: new Date().toISOString().split('T')[0],
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth]);
-
   const fetchData = async () => {
     try {
       const [salesRes, productsRes, customersRes] = await Promise.all([
@@ -89,10 +81,17 @@ const SalesPage = () => {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    filterSalesBySearch();
+  }, [sales, searchTerm, selectedMonth]);
+
   const filterSalesBySearch = () => {
     let filtered = sales;
 
-    // Filtrar por mês se selecionado
     if (selectedMonth) {
       filtered = filtered.filter(sale => {
         const saleDate = new Date(sale.sale_date);
@@ -101,7 +100,6 @@ const SalesPage = () => {
       });
     }
 
-    // Filtrar por busca
     if (searchTerm) {
       filtered = filtered.filter(sale => {
         const searchLower = searchTerm.toLowerCase();
@@ -139,7 +137,6 @@ const SalesPage = () => {
     try {
       await setUserContext();
       
-      // Verificar estoque de todos os produtos antes de registrar qualquer venda
       for (const item of saleData.items) {
         const product = products.find(p => p.id === item.product_id);
         if (!product) {
@@ -161,7 +158,6 @@ const SalesPage = () => {
         }
       }
 
-      // Registrar todas as vendas
       for (const item of saleData.items) {
         const saleRecord = {
           customer_id: saleData.customer_id,
@@ -178,13 +174,11 @@ const SalesPage = () => {
 
         if (saleError) throw saleError;
 
-        // Atualizar estoque do produto
         const product = products.find(p => p.id === item.product_id);
         if (product) {
           const newQuantity = product.quantity - item.quantity;
           const updateData: any = { quantity: newQuantity };
 
-          // Se o preço unitário foi alterado, atualizar o produto também
           if (item.unit_price !== product.sale_price) {
             updateData.sale_price = item.unit_price;
           }
@@ -234,7 +228,6 @@ const SalesPage = () => {
       const quantity = parseInt(formData.quantity);
       const unit_price = parseFloat(formData.unit_price || product.sale_price.toString());
       
-      // Se editando, restaurar o estoque antes de verificar
       if (editingSale) {
         const oldQuantity = editingSale.quantity;
         if (quantity > (product.quantity + oldQuantity)) {
@@ -268,7 +261,6 @@ const SalesPage = () => {
       };
 
       if (editingSale) {
-        // Atualizar venda
         const { error: saleError } = await supabase
           .from('sales')
           .update(saleData)
@@ -276,7 +268,6 @@ const SalesPage = () => {
 
         if (saleError) throw saleError;
 
-        // Restaurar estoque da venda anterior e aplicar nova quantidade
         const newQuantity = product.quantity + editingSale.quantity - quantity;
         const { error: updateError } = await supabase
           .from('products')
@@ -285,7 +276,6 @@ const SalesPage = () => {
 
         if (updateError) throw updateError;
 
-        // Se o preço unitário foi alterado, atualizar o produto também
         if (unit_price !== product.sale_price) {
           const { error: priceUpdateError } = await supabase
             .from('products')
@@ -300,18 +290,15 @@ const SalesPage = () => {
           description: "Venda atualizada com sucesso!",
         });
       } else {
-        // Registrar nova venda
         const { error: saleError } = await supabase
           .from('sales')
           .insert([saleData]);
 
         if (saleError) throw saleError;
 
-        // Atualizar estoque do produto
         const newQuantity = product.quantity - quantity;
         const updateData: any = { quantity: newQuantity };
 
-        // Se o preço unitário foi alterado, atualizar o produto também
         if (unit_price !== product.sale_price) {
           updateData.sale_price = unit_price;
         }
@@ -359,7 +346,6 @@ const SalesPage = () => {
     try {
       await setUserContext();
       
-      // Restaurar estoque
       const product = products.find(p => p.id === sale.product_id);
       if (product) {
         const { error: updateError } = await supabase
@@ -370,7 +356,6 @@ const SalesPage = () => {
         if (updateError) throw updateError;
       }
 
-      // Excluir venda
       const { error } = await supabase
         .from('sales')
         .delete()
@@ -407,7 +392,6 @@ const SalesPage = () => {
 
   const selectedProduct = products.find(p => p.id === formData.product_id);
 
-  // Atualizar preço unitário quando produto for selecionado
   useEffect(() => {
     if (selectedProduct && !editingSale) {
       setFormData(prev => ({
@@ -417,34 +401,43 @@ const SalesPage = () => {
     }
   }, [selectedProduct, editingSale]);
 
-  // Filtrar e validar dados antes de usar nos selects
-  const validCustomers = customers.filter(customer => 
-    customer && 
-    customer.id && 
-    customer.id.trim() !== '' && 
-    customer.name && 
-    customer.name.trim() !== ''
-  );
+  // Função para validar e filtrar dados
+  const getValidCustomers = () => {
+    return customers.filter(customer => 
+      customer && 
+      customer.id && 
+      typeof customer.id === 'string' &&
+      customer.id.trim() !== '' && 
+      customer.name && 
+      typeof customer.name === 'string' &&
+      customer.name.trim() !== ''
+    );
+  };
 
-  const validProducts = products.filter(product => 
-    product && 
-    product.id && 
-    product.id.trim() !== '' && 
-    product.name && 
-    product.name.trim() !== ''
-  );
+  const getValidProducts = () => {
+    return products.filter(product => 
+      product && 
+      product.id && 
+      typeof product.id === 'string' &&
+      product.id.trim() !== '' && 
+      product.name && 
+      typeof product.name === 'string' &&
+      product.name.trim() !== ''
+    );
+  };
 
-  // Agrupar produtos por categoria com validação
-  const productsByCategory = validProducts.reduce((acc, product) => {
-    const categoryName = (product.categories?.name && product.categories.name.trim()) || 'Sem categoria';
-    if (!acc[categoryName]) {
-      acc[categoryName] = [];
-    }
-    acc[categoryName].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
+  const getProductsByCategory = () => {
+    const validProducts = getValidProducts();
+    return validProducts.reduce((acc, product) => {
+      const categoryName = (product.categories?.name && typeof product.categories.name === 'string' && product.categories.name.trim()) || 'Sem categoria';
+      if (!acc[categoryName]) {
+        acc[categoryName] = [];
+      }
+      acc[categoryName].push(product);
+      return acc;
+    }, {} as Record<string, Product[]>);
+  };
 
-  // Gerar opções de mês dos últimos 12 meses
   const getMonthOptions = () => {
     const options = [];
     const now = new Date();
@@ -457,7 +450,9 @@ const SalesPage = () => {
     return options;
   };
 
-  console.log('Rendering SalesPage, validCustomers:', validCustomers.length, 'validProducts:', validProducts.length);
+  const validCustomers = getValidCustomers();
+  const validProducts = getValidProducts();
+  const productsByCategory = getProductsByCategory();
 
   return (
     <div className="space-y-6">

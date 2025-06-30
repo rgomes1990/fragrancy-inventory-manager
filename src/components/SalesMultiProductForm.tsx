@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +47,6 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     
-    // Recalcular subtotal se quantidade ou preço mudaram
     if (field === 'quantity' || field === 'unit_price') {
       const quantity = typeof value === 'number' && field === 'quantity' ? value : newItems[index].quantity;
       const unitPrice = typeof value === 'number' && field === 'unit_price' ? value : newItems[index].unit_price;
@@ -88,39 +87,47 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     });
   };
 
-  // Filtrar e validar dados antes de usar
-  const validCustomers = customers.filter(customer => 
-    customer && 
-    customer.id && 
-    customer.id.trim() !== '' && 
-    customer.name && 
-    customer.name.trim() !== ''
-  );
+  // Função para validar e filtrar dados
+  const getValidCustomers = () => {
+    return customers.filter(customer => 
+      customer && 
+      customer.id && 
+      typeof customer.id === 'string' &&
+      customer.id.trim() !== '' && 
+      customer.name && 
+      typeof customer.name === 'string' &&
+      customer.name.trim() !== ''
+    );
+  };
 
-  const validProducts = products.filter(product => 
-    product && 
-    product.id && 
-    product.id.trim() !== '' && 
-    product.name && 
-    product.name.trim() !== '' &&
-    product.quantity > 0
-  );
+  const getValidProducts = () => {
+    return products.filter(product => 
+      product && 
+      product.id && 
+      typeof product.id === 'string' &&
+      product.id.trim() !== '' && 
+      product.name && 
+      typeof product.name === 'string' &&
+      product.name.trim() !== '' &&
+      product.quantity > 0
+    );
+  };
 
-  // Agrupar produtos por categoria com validação
-  const productsByCategory = validProducts.reduce((acc, product) => {
-    const categoryName = (product.categories?.name && product.categories.name.trim()) || 'Sem categoria';
-    if (!acc[categoryName]) {
-      acc[categoryName] = [];
-    }
-    acc[categoryName].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
+  const getProductsByCategory = () => {
+    const validProducts = getValidProducts();
+    return validProducts.reduce((acc, product) => {
+      const categoryName = (product.categories?.name && typeof product.categories.name === 'string' && product.categories.name.trim()) || 'Sem categoria';
+      if (!acc[categoryName]) {
+        acc[categoryName] = [];
+      }
+      acc[categoryName].push(product);
+      return acc;
+    }, {} as Record<string, Product[]>);
+  };
 
-  console.log('SalesMultiProductForm rendering:', {
-    validCustomers: validCustomers.length,
-    validProducts: validProducts.length,
-    categories: Object.keys(productsByCategory)
-  });
+  const validCustomers = getValidCustomers();
+  const validProducts = getValidProducts();
+  const productsByCategory = getProductsByCategory();
 
   return (
     <Card>
