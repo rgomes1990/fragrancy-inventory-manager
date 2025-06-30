@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,30 +86,46 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     });
   };
 
-  // Função para validar e filtrar dados
+  // Função para validar e filtrar dados com logs detalhados
   const getValidCustomers = () => {
-    return customers.filter(customer => 
-      customer && 
-      customer.id && 
-      typeof customer.id === 'string' &&
-      customer.id.trim() !== '' && 
-      customer.name && 
-      typeof customer.name === 'string' &&
-      customer.name.trim() !== ''
-    );
+    console.log('MultiForm - Raw customers data:', customers);
+    const validCustomers = customers.filter(customer => {
+      const isValid = customer && 
+        customer.id && 
+        typeof customer.id === 'string' &&
+        customer.id.trim() !== '' && 
+        customer.name && 
+        typeof customer.name === 'string' &&
+        customer.name.trim() !== '';
+      
+      if (!isValid) {
+        console.log('MultiForm - Invalid customer found:', customer);
+      }
+      return isValid;
+    });
+    console.log('MultiForm - Valid customers:', validCustomers);
+    return validCustomers;
   };
 
   const getValidProducts = () => {
-    return products.filter(product => 
-      product && 
-      product.id && 
-      typeof product.id === 'string' &&
-      product.id.trim() !== '' && 
-      product.name && 
-      typeof product.name === 'string' &&
-      product.name.trim() !== '' &&
-      product.quantity > 0
-    );
+    console.log('MultiForm - Raw products data:', products);
+    const validProducts = products.filter(product => {
+      const isValid = product && 
+        product.id && 
+        typeof product.id === 'string' &&
+        product.id.trim() !== '' && 
+        product.name && 
+        typeof product.name === 'string' &&
+        product.name.trim() !== '' &&
+        product.quantity > 0;
+      
+      if (!isValid) {
+        console.log('MultiForm - Invalid product found:', product);
+      }
+      return isValid;
+    });
+    console.log('MultiForm - Valid products:', validProducts);
+    return validProducts;
   };
 
   const getProductsByCategory = () => {
@@ -128,6 +143,11 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
   const validCustomers = getValidCustomers();
   const validProducts = getValidProducts();
   const productsByCategory = getProductsByCategory();
+
+  // Log final data before rendering
+  console.log('MultiForm - Final valid customers for rendering:', validCustomers);
+  console.log('MultiForm - Final valid products for rendering:', validProducts);
+  console.log('MultiForm - Products by category for rendering:', productsByCategory);
 
   return (
     <Card>
@@ -147,11 +167,19 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {validCustomers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </SelectItem>
-                  ))}
+                  {validCustomers.map((customer) => {
+                    console.log('MultiForm - Rendering customer SelectItem:', customer.id, customer.name);
+                    // Extra safety check before rendering
+                    if (!customer.id || customer.id.trim() === '') {
+                      console.error('MultiForm - Attempted to render customer with empty ID:', customer);
+                      return null;
+                    }
+                    return (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -201,11 +229,19 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                                 <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
                                   {categoryName}
                                 </div>
-                                {categoryProducts.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name} (Estoque: {product.quantity})
-                                  </SelectItem>
-                                ))}
+                                {categoryProducts.map((product) => {
+                                  console.log('MultiForm - Rendering product SelectItem:', product.id, product.name);
+                                  // Extra safety check before rendering
+                                  if (!product.id || product.id.trim() === '') {
+                                    console.error('MultiForm - Attempted to render product with empty ID:', product);
+                                    return null;
+                                  }
+                                  return (
+                                    <SelectItem key={product.id} value={product.id}>
+                                      {product.name} (Estoque: {product.quantity})
+                                    </SelectItem>
+                                  );
+                                })}
                               </div>
                             );
                           })}

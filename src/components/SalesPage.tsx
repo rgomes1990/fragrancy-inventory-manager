@@ -401,29 +401,45 @@ const SalesPage = () => {
     }
   }, [selectedProduct, editingSale]);
 
-  // Função para validar e filtrar dados
+  // Função para validar e filtrar dados com logs detalhados
   const getValidCustomers = () => {
-    return customers.filter(customer => 
-      customer && 
-      customer.id && 
-      typeof customer.id === 'string' &&
-      customer.id.trim() !== '' && 
-      customer.name && 
-      typeof customer.name === 'string' &&
-      customer.name.trim() !== ''
-    );
+    console.log('Raw customers data:', customers);
+    const validCustomers = customers.filter(customer => {
+      const isValid = customer && 
+        customer.id && 
+        typeof customer.id === 'string' &&
+        customer.id.trim() !== '' && 
+        customer.name && 
+        typeof customer.name === 'string' &&
+        customer.name.trim() !== '';
+      
+      if (!isValid) {
+        console.log('Invalid customer found:', customer);
+      }
+      return isValid;
+    });
+    console.log('Valid customers:', validCustomers);
+    return validCustomers;
   };
 
   const getValidProducts = () => {
-    return products.filter(product => 
-      product && 
-      product.id && 
-      typeof product.id === 'string' &&
-      product.id.trim() !== '' && 
-      product.name && 
-      typeof product.name === 'string' &&
-      product.name.trim() !== ''
-    );
+    console.log('Raw products data:', products);
+    const validProducts = products.filter(product => {
+      const isValid = product && 
+        product.id && 
+        typeof product.id === 'string' &&
+        product.id.trim() !== '' && 
+        product.name && 
+        typeof product.name === 'string' &&
+        product.name.trim() !== '';
+      
+      if (!isValid) {
+        console.log('Invalid product found:', product);
+      }
+      return isValid;
+    });
+    console.log('Valid products:', validProducts);
+    return validProducts;
   };
 
   const getProductsByCategory = () => {
@@ -453,6 +469,11 @@ const SalesPage = () => {
   const validCustomers = getValidCustomers();
   const validProducts = getValidProducts();
   const productsByCategory = getProductsByCategory();
+
+  // Log final data before rendering
+  console.log('Final valid customers for rendering:', validCustomers);
+  console.log('Final valid products for rendering:', validProducts);
+  console.log('Products by category for rendering:', productsByCategory);
 
   return (
     <div className="space-y-6">
@@ -502,11 +523,19 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {validCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
+                    {validCustomers.map((customer) => {
+                      console.log('Rendering customer SelectItem:', customer.id, customer.name);
+                      // Extra safety check before rendering
+                      if (!customer.id || customer.id.trim() === '') {
+                        console.error('Attempted to render customer with empty ID:', customer);
+                        return null;
+                      }
+                      return (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -530,11 +559,19 @@ const SalesPage = () => {
                           <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
                             {categoryName}
                           </div>
-                          {availableProducts.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} (Estoque: {product.quantity})
-                            </SelectItem>
-                          ))}
+                          {availableProducts.map((product) => {
+                            console.log('Rendering product SelectItem:', product.id, product.name);
+                            // Extra safety check before rendering
+                            if (!product.id || product.id.trim() === '') {
+                              console.error('Attempted to render product with empty ID:', product);
+                              return null;
+                            }
+                            return (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} (Estoque: {product.quantity})
+                              </SelectItem>
+                            );
+                          })}
                         </div>
                       );
                     })}
