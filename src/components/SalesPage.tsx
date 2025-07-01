@@ -62,11 +62,6 @@ const SalesPage = () => {
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
 
-      console.log('Raw data from Supabase:');
-      console.log('Sales:', salesRes.data);
-      console.log('Products:', productsRes.data);
-      console.log('Customers:', customersRes.data);
-
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
       setCustomers(customersRes.data || []);
@@ -414,56 +409,17 @@ const SalesPage = () => {
     return options;
   };
 
-  // VALIDAÇÃO ULTRA RIGOROSA - apenas dados completamente válidos
-  const safeCustomers = customers.filter(customer => {
-    const isValid = customer && 
-                   customer.id && 
-                   typeof customer.id === 'string' && 
-                   customer.id.trim().length > 0 &&
-                   customer.name && 
-                   typeof customer.name === 'string' && 
-                   customer.name.trim().length > 0;
-    
-    if (!isValid) {
-      console.log('REJEITANDO CLIENTE INVÁLIDO:', customer);
-    }
-    return isValid;
-  });
+  // FILTROS SIMPLES - apenas dados válidos
+  const validCustomers = customers.filter(c => c && c.id && c.name);
+  const validProducts = products.filter(p => p && p.id && p.name);
 
-  const safeProducts = products.filter(product => {
-    const isValid = product && 
-                   product.id && 
-                   typeof product.id === 'string' && 
-                   product.id.trim().length > 0 &&
-                   product.name && 
-                   typeof product.name === 'string' && 
-                   product.name.trim().length > 0;
-    
-    if (!isValid) {
-      console.log('REJEITANDO PRODUTO INVÁLIDO:', product);
-    }
-    return isValid;
-  });
-
-  console.log('=== VALIDAÇÃO FINAL ===');
-  console.log('Clientes seguros:', safeCustomers.length);
-  console.log('Produtos seguros:', safeProducts.length);
-
-  // Se não há dados válidos, mostrar mensagem
-  if (!loading && (safeCustomers.length === 0 || safeProducts.length === 0)) {
+  if (loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-red-600">
-              Não foi possível carregar os dados necessários. 
-              {safeCustomers.length === 0 && " Nenhum cliente válido encontrado."}
-              {safeProducts.length === 0 && " Nenhum produto válido encontrado."}
-            </p>
-            <Button onClick={fetchData} className="mt-4">
-              Tentar Novamente
-            </Button>
+            <p>Carregando dados...</p>
           </CardContent>
         </Card>
       </div>
@@ -495,8 +451,8 @@ const SalesPage = () => {
 
       {showMultiForm && (
         <SalesMultiProductForm
-          customers={safeCustomers}
-          products={safeProducts}
+          customers={validCustomers}
+          products={validProducts}
           onSubmit={handleMultiProductSubmit}
           onCancel={() => setShowMultiForm(false)}
         />
@@ -518,7 +474,7 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {safeCustomers.map((customer) => (
+                    {validCustomers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
                       </SelectItem>
@@ -534,7 +490,7 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {safeProducts
+                    {validProducts
                       .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
                       .map((product) => (
                         <SelectItem key={product.id} value={product.id}>
@@ -665,60 +621,56 @@ const SalesPage = () => {
           )}
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Carregando vendas...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Quantidade</TableHead>
-                  <TableHead>Valor Unitário</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Ações</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead>Quantidade</TableHead>
+                <TableHead>Valor Unitário</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredSales.map((sale) => (
+                <TableRow key={sale.id}>
+                  <TableCell>
+                    {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {sale.customers?.name || 'Cliente não encontrado'}
+                  </TableCell>
+                  <TableCell>
+                    {sale.products?.name || 'Produto não encontrado'}
+                  </TableCell>
+                  <TableCell>{sale.quantity}</TableCell>
+                  <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
+                  <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(sale)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(sale)}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell>
-                      {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {sale.customers?.name || 'Cliente não encontrado'}
-                    </TableCell>
-                    <TableCell>
-                      {sale.products?.name || 'Produto não encontrado'}
-                    </TableCell>
-                    <TableCell>{sale.quantity}</TableCell>
-                    <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
-                    <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(sale)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(sale)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>
