@@ -409,9 +409,29 @@ const SalesPage = () => {
     return options;
   };
 
-  // FILTROS SIMPLES - apenas dados válidos
-  const validCustomers = customers.filter(c => c && c.id && c.name);
-  const validProducts = products.filter(p => p && p.id && p.name);
+  // FILTROS MAIS RIGOROSOS - garantir que ID nunca seja vazio
+  const validCustomers = customers.filter(c => 
+    c && 
+    typeof c.id === 'string' && 
+    c.id.trim() !== '' && 
+    c.name && 
+    typeof c.name === 'string' && 
+    c.name.trim() !== ''
+  );
+  
+  const validProducts = products.filter(p => 
+    p && 
+    typeof p.id === 'string' && 
+    p.id.trim() !== '' && 
+    p.name && 
+    typeof p.name === 'string' && 
+    p.name.trim() !== ''
+  );
+
+  console.log('Customers válidos:', validCustomers.length);
+  console.log('Products válidos:', validProducts.length);
+  console.log('Primeiro customer:', validCustomers[0]);
+  console.log('Primeiro product:', validProducts[0]);
 
   if (loading) {
     return (
@@ -474,11 +494,20 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {validCustomers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                    {validCustomers.length > 0 ? (
+                      validCustomers.map((customer) => {
+                        console.log('Renderizando customer:', customer.id, customer.name);
+                        return (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.name}
+                          </SelectItem>
+                        );
+                      })
+                    ) : (
+                      <SelectItem value="no-customers" disabled>
+                        Nenhum cliente disponível
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -490,13 +519,22 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {validProducts
-                      .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
-                      .map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} (Estoque: {product.quantity})
-                        </SelectItem>
-                      ))}
+                    {validProducts.length > 0 ? (
+                      validProducts
+                        .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
+                        .map((product) => {
+                          console.log('Renderizando product:', product.id, product.name);
+                          return (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} (Estoque: {product.quantity})
+                            </SelectItem>
+                          );
+                        })
+                    ) : (
+                      <SelectItem value="no-products" disabled>
+                        Nenhum produto disponível
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

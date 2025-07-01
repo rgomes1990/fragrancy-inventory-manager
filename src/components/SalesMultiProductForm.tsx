@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,9 +32,28 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }
   ]);
 
-  // FILTROS SIMPLES - apenas dados válidos
-  const validCustomers = customers.filter(c => c && c.id && c.name);
-  const validProducts = products.filter(p => p && p.id && p.name && p.quantity > 0);
+  // FILTROS AINDA MAIS RIGOROSOS - garantir que ID nunca seja vazio
+  const validCustomers = customers.filter(c => 
+    c && 
+    typeof c.id === 'string' && 
+    c.id.trim() !== '' && 
+    c.name && 
+    typeof c.name === 'string' && 
+    c.name.trim() !== ''
+  );
+  
+  const validProducts = products.filter(p => 
+    p && 
+    typeof p.id === 'string' && 
+    p.id.trim() !== '' && 
+    p.name && 
+    typeof p.name === 'string' && 
+    p.name.trim() !== '' &&
+    p.quantity > 0
+  );
+
+  console.log('MultiForm - Customers válidos:', validCustomers.length);
+  console.log('MultiForm - Products válidos:', validProducts.length);
 
   const addItem = () => {
     setItems([...items, { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
@@ -109,11 +127,20 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {validCustomers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
+                  {validCustomers.length > 0 ? (
+                    validCustomers.map((customer) => {
+                      console.log('MultiForm - Renderizando customer:', customer.id, customer.name);
+                      return (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </SelectItem>
+                      );
+                    })
+                  ) : (
+                    <SelectItem value="no-customers" disabled>
+                      Nenhum cliente disponível
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -155,11 +182,20 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                           <SelectValue placeholder="Selecione o produto" />
                         </SelectTrigger>
                         <SelectContent>
-                          {validProducts.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} (Estoque: {product.quantity})
+                          {validProducts.length > 0 ? (
+                            validProducts.map((product) => {
+                              console.log('MultiForm - Renderizando product:', product.id, product.name);
+                              return (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name} (Estoque: {product.quantity})
+                                </SelectItem>
+                              );
+                            })
+                          ) : (
+                            <SelectItem value="no-products" disabled>
+                              Nenhum produto disponível
                             </SelectItem>
-                          ))}
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
