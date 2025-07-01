@@ -62,9 +62,10 @@ const SalesPage = () => {
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
 
-      console.log('Sales data:', salesRes.data);
-      console.log('Products data:', productsRes.data);
-      console.log('Customers data:', customersRes.data);
+      console.log('Raw data from Supabase:');
+      console.log('Sales:', salesRes.data);
+      console.log('Products:', productsRes.data);
+      console.log('Customers:', customersRes.data);
 
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
@@ -413,41 +414,61 @@ const SalesPage = () => {
     return options;
   };
 
-  // Filtragem simples e direta sem validação complexa
-  const validCustomers = customers.filter(customer => 
-    customer && 
-    customer.id && 
-    typeof customer.id === 'string' && 
-    customer.id.length > 0 &&
-    customer.name &&
-    typeof customer.name === 'string' &&
-    customer.name.length > 0
-  );
-
-  const validProducts = products.filter(product => 
-    product && 
-    product.id && 
-    typeof product.id === 'string' && 
-    product.id.length > 0 &&
-    product.name &&
-    typeof product.name === 'string' &&
-    product.name.length > 0
-  );
-
-  const productsByCategory = validProducts.reduce((acc, product) => {
-    const categoryName = (product.categories?.name && typeof product.categories.name === 'string' && product.categories.name.trim()) || 'Sem categoria';
+  // VALIDAÇÃO ULTRA RIGOROSA - apenas dados completamente válidos
+  const safeCustomers = customers.filter(customer => {
+    const isValid = customer && 
+                   customer.id && 
+                   typeof customer.id === 'string' && 
+                   customer.id.trim().length > 0 &&
+                   customer.name && 
+                   typeof customer.name === 'string' && 
+                   customer.name.trim().length > 0;
     
-    if (!acc[categoryName]) {
-      acc[categoryName] = [];
+    if (!isValid) {
+      console.log('REJEITANDO CLIENTE INVÁLIDO:', customer);
     }
-    acc[categoryName].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
+    return isValid;
+  });
 
-  console.log('=== SIMPLE VALIDATION RESULTS ===');
-  console.log('Valid customers:', validCustomers.length);
-  console.log('Valid products:', validProducts.length);
-  console.log('Products by category keys:', Object.keys(productsByCategory));
+  const safeProducts = products.filter(product => {
+    const isValid = product && 
+                   product.id && 
+                   typeof product.id === 'string' && 
+                   product.id.trim().length > 0 &&
+                   product.name && 
+                   typeof product.name === 'string' && 
+                   product.name.trim().length > 0;
+    
+    if (!isValid) {
+      console.log('REJEITANDO PRODUTO INVÁLIDO:', product);
+    }
+    return isValid;
+  });
+
+  console.log('=== VALIDAÇÃO FINAL ===');
+  console.log('Clientes seguros:', safeCustomers.length);
+  console.log('Produtos seguros:', safeProducts.length);
+
+  // Se não há dados válidos, mostrar mensagem
+  if (!loading && (safeCustomers.length === 0 || safeProducts.length === 0)) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-red-600">
+              Não foi possível carregar os dados necessários. 
+              {safeCustomers.length === 0 && " Nenhum cliente válido encontrado."}
+              {safeProducts.length === 0 && " Nenhum produto válido encontrado."}
+            </p>
+            <Button onClick={fetchData} className="mt-4">
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -474,8 +495,8 @@ const SalesPage = () => {
 
       {showMultiForm && (
         <SalesMultiProductForm
-          customers={validCustomers}
-          products={validProducts}
+          customers={safeCustomers}
+          products={safeProducts}
           onSubmit={handleMultiProductSubmit}
           onCancel={() => setShowMultiForm(false)}
         />
@@ -497,7 +518,7 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {validCustomers.map((customer) => (
+                    {safeCustomers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
                       </SelectItem>
@@ -513,26 +534,13 @@ const SalesPage = () => {
                     <SelectValue placeholder="Selecione o produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
-                      const availableProducts = categoryProducts.filter(p => 
-                        p.quantity > 0 || (editingSale && p.id === editingSale.product_id)
-                      );
-                      
-                      if (availableProducts.length === 0) return null;
-                      
-                      return (
-                        <div key={categoryName}>
-                          <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                            {categoryName}
-                          </div>
-                          {availableProducts.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} (Estoque: {product.quantity})
-                            </SelectItem>
-                          ))}
-                        </div>
-                      );
-                    })}
+                    {safeProducts
+                      .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
+                      .map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} (Estoque: {product.quantity})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

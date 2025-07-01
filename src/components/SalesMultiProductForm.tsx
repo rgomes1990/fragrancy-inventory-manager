@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,73 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }
   ]);
 
+  console.log('=== MULTI FORM DADOS RECEBIDOS ===');
+  console.log('Customers prop:', customers);
+  console.log('Products prop:', products);
+
+  // VALIDAÇÃO RIGOROSA - apenas dados 100% válidos
+  const safeCustomers = customers.filter(customer => {
+    const isValid = customer && 
+                   customer.id && 
+                   typeof customer.id === 'string' && 
+                   customer.id.trim().length > 0 &&
+                   customer.name && 
+                   typeof customer.name === 'string' && 
+                   customer.name.trim().length > 0;
+    
+    if (!isValid) {
+      console.log('MULTI FORM: REJEITANDO CLIENTE INVÁLIDO:', customer);
+    }
+    return isValid;
+  });
+
+  const safeProducts = products.filter(product => {
+    const isValid = product && 
+                   product.id && 
+                   typeof product.id === 'string' && 
+                   product.id.trim().length > 0 &&
+                   product.name && 
+                   typeof product.name === 'string' && 
+                   product.name.trim().length > 0 &&
+                   typeof product.quantity === 'number' &&
+                   product.quantity > 0;
+    
+    if (!isValid) {
+      console.log('MULTI FORM: REJEITANDO PRODUTO INVÁLIDO:', product);
+    }
+    return isValid;
+  });
+
+  console.log('=== MULTI FORM VALIDAÇÃO FINAL ===');
+  console.log('Clientes seguros:', safeCustomers.length);
+  console.log('Produtos seguros:', safeProducts.length);
+
+  // Se não há dados válidos, não renderizar o formulário
+  if (safeCustomers.length === 0 || safeProducts.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <ShoppingCart className="w-5 h-5" />
+            <span>Nova Venda (Múltiplos Produtos)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="p-8 text-center">
+            <p className="text-red-600">
+              Não foi possível carregar os dados necessários para criar uma venda.
+              {safeCustomers.length === 0 && " Nenhum cliente válido encontrado."}
+              {safeProducts.length === 0 && " Nenhum produto válido encontrado."}
+            </p>
+            <Button onClick={onCancel} className="mt-4">
+              Fechar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const addItem = () => {
     setItems([...items, { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
   };
@@ -56,7 +124,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
   };
 
   const handleProductChange = (index: number, productId: string) => {
-    const product = products.find(p => p && p.id === productId);
+    const product = safeProducts.find(p => p.id === productId);
     if (product) {
       updateItem(index, 'product_id', productId);
       updateItem(index, 'unit_price', product.sale_price);
@@ -86,43 +154,6 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     });
   };
 
-  // Filtragem simples e direta sem validação complexa
-  const validCustomers = customers.filter(customer => 
-    customer && 
-    customer.id && 
-    typeof customer.id === 'string' && 
-    customer.id.length > 0 &&
-    customer.name &&
-    typeof customer.name === 'string' &&
-    customer.name.length > 0
-  );
-
-  const validProducts = products.filter(product => 
-    product && 
-    product.id && 
-    typeof product.id === 'string' && 
-    product.id.length > 0 &&
-    product.name &&
-    typeof product.name === 'string' &&
-    product.name.length > 0 &&
-    product.quantity > 0
-  );
-
-  const productsByCategory = validProducts.reduce((acc, product) => {
-    const categoryName = (product.categories?.name && typeof product.categories.name === 'string' && product.categories.name.trim()) || 'Sem categoria';
-    
-    if (!acc[categoryName]) {
-      acc[categoryName] = [];
-    }
-    acc[categoryName].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
-
-  console.log('=== MULTI FORM: SIMPLE VALIDATION RESULTS ===');
-  console.log('MultiForm - Valid customers:', validCustomers.length);
-  console.log('MultiForm - Valid products:', validProducts.length);
-  console.log('MultiForm - Products by category keys:', Object.keys(productsByCategory));
-
   return (
     <Card>
       <CardHeader>
@@ -141,7 +172,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {validCustomers.map((customer) => (
+                  {safeCustomers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
                     </SelectItem>
@@ -173,7 +204,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
 
             <div className="space-y-4">
               {items.map((item, index) => {
-                const selectedProduct = validProducts.find(p => p.id === item.product_id);
+                const selectedProduct = safeProducts.find(p => p.id === item.product_id);
                 
                 return (
                   <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border rounded-lg">
@@ -187,22 +218,11 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                           <SelectValue placeholder="Selecione o produto" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(productsByCategory).map(([categoryName, categoryProducts]) => {
-                            if (!categoryProducts || categoryProducts.length === 0) return null;
-                            
-                            return (
-                              <div key={categoryName}>
-                                <div className="px-2 py-1 text-xs font-semibold text-gray-500 bg-gray-100">
-                                  {categoryName}
-                                </div>
-                                {categoryProducts.map((product) => (
-                                  <SelectItem key={product.id} value={product.id}>
-                                    {product.name} (Estoque: {product.quantity})
-                                  </SelectItem>
-                                ))}
-                              </div>
-                            );
-                          })}
+                          {safeProducts.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} (Estoque: {product.quantity})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
