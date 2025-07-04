@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportToExcel, formatProductsForExport } from '@/utils/excelExporter';
+import ImageModal from './ImageModal';
 
 // Extended Product type with all required fields
 interface ExtendedProduct {
@@ -57,6 +58,7 @@ const ProductsPage = () => {
     filteredSalePrice: 0,
   });
   const { setUserContext } = useAuth();
+  const [imageModal, setImageModal] = useState({ isOpen: false, imageUrl: '', productName: '' });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -377,6 +379,14 @@ const ProductsPage = () => {
     setShowForm(false);
   };
 
+  const openImageModal = (imageUrl: string, productName: string) => {
+    setImageModal({ isOpen: true, imageUrl, productName });
+  };
+
+  const closeImageModal = () => {
+    setImageModal({ isOpen: false, imageUrl: '', productName: '' });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -662,87 +672,85 @@ const ProductsPage = () => {
           <CardTitle className="flex items-center space-x-2">
             <Package className="w-5 h-5" />
             <span>Lista de Produtos</span>
-            <span className="text-sm text-gray-500">
-              ({filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''})
-            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Carregando produtos...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Foto</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Preço de Custo</TableHead>
-                  <TableHead>Preço de Venda</TableHead>
-                  <TableHead>Estoque</TableHead>
-                  <TableHead>Data Cadastro</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      {product.image_url ? (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name}
-                          className="w-12 h-12 object-cover rounded border"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 bg-gray-100 rounded border flex items-center justify-center">
-                          <Image className="w-6 h-6 text-gray-400" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
-                    <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
-                    <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
-                    <TableCell>{product.quantity}</TableCell>
-                    <TableCell>{new Date(product.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell>
-                      {product.quantity === 0 ? (
-                        <span className="flex items-center text-red-600">
-                          <AlertTriangle className="w-4 h-4 mr-1" />
-                          Sem estoque
-                        </span>
-                      ) : (
-                        <span className="text-green-600">Disponível</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(product)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(product.id)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Imagem</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Preço de Custo</TableHead>
+                <TableHead>Preço de Venda</TableHead>
+                <TableHead>Estoque</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {products.map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell>
+                    {product.image_url ? (
+                      <img 
+                        src={product.image_url} 
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => openImageModal(product.image_url!, product.name)}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                        <Package className="w-6 h-6 text-gray-400" />
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
+                  <TableCell>R$ {product.cost_price.toFixed(2)}</TableCell>
+                  <TableCell>R$ {product.sale_price.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded text-sm ${
+                      product.quantity === 0 
+                        ? 'bg-red-100 text-red-800' 
+                        : product.quantity <= 5 
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {product.quantity}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(product)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(product.id)}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
+
+      <ImageModal
+        imageUrl={imageModal.imageUrl}
+        isOpen={imageModal.isOpen}
+        onClose={closeImageModal}
+        productName={imageModal.productName}
+      />
     </div>
   );
 };

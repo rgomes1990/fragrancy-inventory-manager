@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy } from 'lucide-react';
+import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown } from 'lucide-react';
 
 interface DashboardStats {
   totalProducts: number;
@@ -20,6 +19,12 @@ interface TopProduct {
   total_revenue: number;
 }
 
+interface TopCustomer {
+  customer_name: string;
+  total_purchases: number;
+  total_spent: number;
+}
+
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
@@ -32,6 +37,7 @@ const Dashboard = () => {
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockFilter, setStockFilter] = useState('all');
 
@@ -41,7 +47,6 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Buscar produtos com filtro de estoque se aplicável
       let productsQuery = supabase.from('products').select('id, cost_price, sale_price, quantity');
       if (stockFilter === 'in-stock') {
         productsQuery = productsQuery.gt('quantity', 0);
@@ -49,36 +54,30 @@ const Dashboard = () => {
         productsQuery = productsQuery.eq('quantity', 0);
       }
 
-      // Buscar estatísticas base
       const [productsRes, customersRes, salesRes] = await Promise.all([
         productsQuery,
         supabase.from('customers').select('id', { count: 'exact' }),
         supabase.from('sales').select('total_price', { count: 'exact' })
       ]);
 
-      // Calcular receita total
       const { data: salesData } = await supabase
         .from('sales')
         .select('total_price');
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
 
-      // Buscar TODOS os produtos para calcular a soma total (sempre todos, independente do filtro)
       const { data: allProductsData } = await supabase
         .from('products')
         .select('cost_price, sale_price, quantity');
       
-      // Soma Total dos Preços de Custo: soma simples de cost_price de TODOS os produtos
       const totalCostSum = allProductsData?.reduce((sum, product) => {
         return sum + Number(product.cost_price);
       }, 0) || 0;
       
-      // Soma Total dos Preços de Venda: soma simples de sale_price de TODOS os produtos
       const totalSaleSum = allProductsData?.reduce((sum, product) => {
         return sum + Number(product.sale_price);
       }, 0) || 0;
 
-      // Buscar vendas recentes
       const { data: recentSalesData } = await supabase
         .from('sales')
         .select(`
@@ -89,7 +88,6 @@ const Dashboard = () => {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      // Buscar TOP 5 produtos mais vendidos
       const { data: topProductsData } = await supabase
         .from('sales')
         .select(`
@@ -99,7 +97,15 @@ const Dashboard = () => {
         `)
         .not('products', 'is', null);
 
-      // Agrupar e calcular TOP 5
+      const { data: topCustomersData } = await supabase
+        .from('sales')
+        .select(`
+          customers(name),
+          quantity,
+          total_price
+        `)
+        .not('customers', 'is', null);
+
       const productSales = topProductsData?.reduce((acc, sale) => {
         const productName = sale.products?.name || 'Produto desconhecido';
         if (!acc[productName]) {
@@ -114,8 +120,26 @@ const Dashboard = () => {
         return acc;
       }, {} as Record<string, TopProduct>) || {};
 
+      const customerPurchases = topCustomersData?.reduce((acc, sale) => {
+        const customerName = sale.customers?.name || 'Cliente desconhecido';
+        if (!acc[customerName]) {
+          acc[customerName] = {
+            customer_name: customerName,
+            total_purchases: 0,
+            total_spent: 0
+          };
+        }
+        acc[customerName].total_purchases += sale.quantity;
+        acc[customerName].total_spent += Number(sale.total_price);
+        return acc;
+      }, {} as Record<string, TopCustomer>) || {};
+
       const top5Products = Object.values(productSales)
         .sort((a, b) => b.total_quantity - a.total_quantity)
+        .slice(0, 5);
+
+      const top5Customers = Object.values(customerPurchases)
+        .sort((a, b) => b.total_spent - a.total_spent)
         .slice(0, 5);
 
       const productsData = productsRes.data || [];
@@ -131,6 +155,7 @@ const Dashboard = () => {
 
       setRecentSales(recentSalesData || []);
       setTopProducts(top5Products);
+      setTopCustomers(top5Customers);
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
     } finally {
@@ -244,8 +269,8 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Cards de TOP 5 e Vendas Recentes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Cards de TOP 5 e Rankings */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* TOP 5 Produtos Mais Vendidos */}
         <Card>
           <CardHeader>
@@ -282,6 +307,46 @@ const Dashboard = () => {
               </div>
             ) : (
               <p className="text-gray-500">Nenhuma venda encontrada</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* TOP 5 Clientes que Mais Compram */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Crown className="w-5 h-5 text-purple-500" />
+              <span>Top 5 Clientes que Mais Compram</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topCustomers.length > 0 ? (
+              <div className="space-y-3">
+                {topCustomers.map((customer, index) => (
+                  <div key={customer.customer_name} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                        index === 0 ? 'bg-purple-500' :
+                        index === 1 ? 'bg-pink-400' :
+                        index === 2 ? 'bg-indigo-400' :
+                        'bg-cyan-400'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{customer.customer_name}</p>
+                        <p className="text-xs text-gray-500">Compras: {customer.total_purchases}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-sm">R$ {Number(customer.total_spent).toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">Total Gasto</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">Nenhuma compra encontrada</p>
             )}
           </CardContent>
         </Card>

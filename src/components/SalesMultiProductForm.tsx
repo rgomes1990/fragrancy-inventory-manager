@@ -58,8 +58,14 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
   const handleProductChange = (index: number, productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
-      updateItem(index, 'product_id', productId);
-      updateItem(index, 'unit_price', product.sale_price);
+      const newItems = [...items];
+      newItems[index] = {
+        ...newItems[index],
+        product_id: productId,
+        unit_price: product.sale_price,
+        subtotal: newItems[index].quantity * product.sale_price
+      };
+      setItems(newItems);
     }
   };
 
@@ -86,6 +92,10 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
     });
   };
 
+  const isFormValid = () => {
+    return customerID && items.some(item => item.product_id && item.quantity > 0 && item.unit_price > 0);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -106,7 +116,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                 required
               >
                 <option value="">Selecione o cliente</option>
-                {customers.map((customer) => (
+                {customers.filter(c => c?.id && c?.name).map((customer) => (
                   <option key={customer.id} value={customer.id}>
                     {customer.name}
                   </option>
@@ -149,7 +159,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                         className="w-full p-2 border rounded-md"
                       >
                         <option value="">Selecione o produto</option>
-                        {products.map((product) => (
+                        {products.filter(p => p?.id && p?.name).map((product) => (
                           <option key={product.id} value={product.id}>
                             {product.name} (Estoque: {product.quantity})
                           </option>
@@ -231,7 +241,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
             <Button 
               type="submit" 
               className="bg-gradient-to-r from-purple-600 to-pink-600"
-              disabled={!customerID || items.every(item => !item.product_id)}
+              disabled={!isFormValid()}
             >
               Registrar Venda
             </Button>
