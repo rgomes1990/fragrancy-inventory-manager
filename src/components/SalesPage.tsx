@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -409,29 +408,9 @@ const SalesPage = () => {
     return options;
   };
 
-  // FILTROS MAIS RIGOROSOS - garantir que ID nunca seja vazio
-  const validCustomers = customers.filter(c => 
-    c && 
-    typeof c.id === 'string' && 
-    c.id.trim() !== '' && 
-    c.name && 
-    typeof c.name === 'string' && 
-    c.name.trim() !== ''
-  );
-  
-  const validProducts = products.filter(p => 
-    p && 
-    typeof p.id === 'string' && 
-    p.id.trim() !== '' && 
-    p.name && 
-    typeof p.name === 'string' && 
-    p.name.trim() !== ''
-  );
-
-  console.log('Customers válidos:', validCustomers.length);
-  console.log('Products válidos:', validProducts.length);
-  console.log('Primeiro customer:', validCustomers[0]);
-  console.log('Primeiro product:', validProducts[0]);
+  // Filtrar dados válidos de forma mais rigorosa
+  const validCustomers = customers.filter(c => c?.id && c?.name);
+  const validProducts = products.filter(p => p?.id && p?.name);
 
   if (loading) {
     return (
@@ -489,54 +468,38 @@ const SalesPage = () => {
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="customer">Cliente</Label>
-                <Select value={formData.customer_id} onValueChange={(value) => setFormData({...formData, customer_id: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {validCustomers.length > 0 ? (
-                      validCustomers.map((customer) => {
-                        console.log('Renderizando customer:', customer.id, customer.name);
-                        return (
-                          <SelectItem key={customer.id} value={customer.id}>
-                            {customer.name}
-                          </SelectItem>
-                        );
-                      })
-                    ) : (
-                      <SelectItem value="no-customers" disabled>
-                        Nenhum cliente disponível
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <select 
+                  value={formData.customer_id} 
+                  onChange={(e) => setFormData({...formData, customer_id: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                  required
+                >
+                  <option value="">Selecione o cliente</option>
+                  {validCustomers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div>
                 <Label htmlFor="product">Produto</Label>
-                <Select value={formData.product_id} onValueChange={(value) => setFormData({...formData, product_id: value})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o produto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {validProducts.length > 0 ? (
-                      validProducts
-                        .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
-                        .map((product) => {
-                          console.log('Renderizando product:', product.id, product.name);
-                          return (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} (Estoque: {product.quantity})
-                            </SelectItem>
-                          );
-                        })
-                    ) : (
-                      <SelectItem value="no-products" disabled>
-                        Nenhum produto disponível
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <select 
+                  value={formData.product_id} 
+                  onChange={(e) => setFormData({...formData, product_id: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                  required
+                >
+                  <option value="">Selecione o produto</option>
+                  {validProducts
+                    .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
+                    .map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} (Estoque: {product.quantity})
+                      </option>
+                    ))}
+                </select>
               </div>
               
               <div>
@@ -635,19 +598,18 @@ const SalesPage = () => {
                 />
               </div>
               <Calendar className="w-4 h-4" />
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filtrar por mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Todos os meses</SelectItem>
-                  {getMonthOptions().map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="p-2 border rounded-md w-48"
+              >
+                <option value="">Todos os meses</option>
+                {getMonthOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           {selectedMonth && (
