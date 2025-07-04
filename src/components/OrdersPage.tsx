@@ -6,12 +6,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, ShoppingBag, Trash2, Edit, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Order } from '@/types/database';
+import { Order, OrderItem } from '@/types/database';
 import OrderFormDialog from './OrderFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface OrderWithItems extends Order {
+  order_items: OrderItem[];
+}
+
 const OrdersPage = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -174,6 +178,14 @@ const OrdersPage = () => {
     return orders.reduce((total, order) => total + order.total_amount, 0);
   };
 
+  const getOrderItemsDisplay = (orderItems: OrderItem[]) => {
+    if (!orderItems || orderItems.length === 0) return 'Nenhum item';
+    
+    return orderItems.map(item => 
+      `${item.product_name} (${item.quantity})`
+    ).join(', ');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -215,6 +227,7 @@ const OrdersPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Produtos</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Data</TableHead>
@@ -225,6 +238,11 @@ const OrdersPage = () => {
                 {orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-medium">{order.customer_name}</TableCell>
+                    <TableCell className="max-w-xs">
+                      <div className="text-sm text-gray-600 truncate" title={getOrderItemsDisplay(order.order_items)}>
+                        {getOrderItemsDisplay(order.order_items)}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
                         order.status === 'Confirmada' 

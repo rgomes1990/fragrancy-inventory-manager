@@ -159,7 +159,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                         className="w-full p-2 border rounded-md"
                       >
                         <option value="">Selecione o produto</option>
-                        {products.filter(p => p?.id && p?.name).map((product) => (
+                        {products.filter(p => p?.id && p?.name && p.quantity > 0).map((product) => (
                           <option key={product.id} value={product.id}>
                             {product.name} (Estoque: {product.quantity})
                           </option>
