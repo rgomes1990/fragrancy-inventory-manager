@@ -494,7 +494,7 @@ const SalesPage = () => {
                   required
                 >
                   <option value="">Selecione o produto</option>
-                  {availableProducts
+                  {validProducts
                     .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
                     .map((product) => (
                       <option key={product.id} value={product.id}>

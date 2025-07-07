@@ -688,7 +688,7 @@ const ProductsPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
                     {product.image_url ? (
