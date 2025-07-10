@@ -9,6 +9,7 @@ import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
+import { useAuth } from '@/contexts/AuthContext';
 
 const CustomersPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -20,6 +21,10 @@ const CustomersPage = () => {
     whatsapp: '',
     email: '',
   });
+  const { currentUser } = useAuth();
+
+  // Verificar se o usuário atual é Danilo
+  const isDanilo = currentUser?.username === 'Danilo';
 
   useEffect(() => {
     fetchCustomers();
@@ -52,7 +57,7 @@ const CustomersPage = () => {
     try {
       const customerData = {
         name: formData.name,
-        whatsapp: formData.whatsapp || null,
+        whatsapp: isDanilo ? null : (formData.whatsapp || null),
         email: formData.email || null,
       };
 
@@ -168,16 +173,18 @@ const CustomersPage = () => {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="whatsapp">WhatsApp</Label>
-                <Input
-                  id="whatsapp"
-                  value={formData.whatsapp}
-                  onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div>
+              {!isDanilo && (
+                <div>
+                  <Label htmlFor="whatsapp">WhatsApp</Label>
+                  <Input
+                    id="whatsapp"
+                    value={formData.whatsapp}
+                    onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+              )}
+              <div className={isDanilo ? 'md:col-span-2' : ''}>
                 <Label htmlFor="email">E-mail</Label>
                 <Input
                   id="email"
@@ -215,7 +222,7 @@ const CustomersPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead>WhatsApp</TableHead>
+                  {!isDanilo && <TableHead>WhatsApp</TableHead>}
                   <TableHead>E-mail</TableHead>
                   <TableHead>Data de Cadastro</TableHead>
                   <TableHead>Ações</TableHead>
@@ -225,7 +232,7 @@ const CustomersPage = () => {
                 {customers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.whatsapp || '-'}</TableCell>
+                    {!isDanilo && <TableCell>{customer.whatsapp || '-'}</TableCell>}
                     <TableCell>{customer.email || '-'}</TableCell>
                     <TableCell>
                       {new Date(customer.created_at).toLocaleDateString('pt-BR')}
