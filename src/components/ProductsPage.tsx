@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { exportToExcel, formatProductsForExport } from '@/utils/excelExporter';
 import ImageModal from './ImageModal';
 
-// Extended Product type with all required fields
+// Extended Product type with all required fields including is_order_product
 interface ExtendedProduct {
   id: string;
   name: string;
@@ -22,6 +23,7 @@ interface ExtendedProduct {
   sale_price: number;
   quantity: number;
   image_url: string | null;
+  is_order_product: boolean;
   created_at: string;
   updated_at: string;
   categories?: {
