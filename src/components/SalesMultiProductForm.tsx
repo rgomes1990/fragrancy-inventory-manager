@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -159,7 +158,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                         className="w-full p-2 border rounded-md"
                       >
                         <option value="">Selecione o produto</option>
-                        {products.filter(p => p?.id && p?.name && p.quantity > 0).map((product) => (
+                        {products.filter(p => p?.id && p?.name && p.quantity > 0 && !p.is_order_product).map((product) => (
                           <option key={product.id} value={product.id}>
                             {product.name} (Estoque: {product.quantity})
                           </option>

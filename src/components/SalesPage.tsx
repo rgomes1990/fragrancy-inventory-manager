@@ -411,8 +411,8 @@ const SalesPage = () => {
   // Filtrar dados válidos de forma mais rigorosa
   const validCustomers = customers.filter(c => c?.id && c?.name);
   const validProducts = products.filter(p => p?.id && p?.name);
-  // Filtrar produtos com estoque maior que 0 para os selects
-  const availableProducts = validProducts.filter(p => p.quantity > 0);
+  // Filtrar produtos com estoque maior que 0 e que NÃO sejam produtos de encomenda para os selects
+  const availableProducts = validProducts.filter(p => p.quantity > 0 && !p.is_order_product);
 
   if (loading) {
     return (

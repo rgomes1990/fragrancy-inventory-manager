@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -8,6 +9,7 @@ export interface Product {
   image_url?: string;
   created_at: string;
   updated_at: string;
+  is_order_product: boolean;
   categories?: {
     id: string;
     name: string;

@@ -67,6 +67,7 @@ const ProductsPage = () => {
     sale_price: '',
     quantity: '',
     image_url: null as string | null,
+    is_order_product: false,
   });
 
   useEffect(() => {
@@ -266,6 +267,7 @@ const ProductsPage = () => {
         sale_price: parseFloat(formData.sale_price),
         quantity: parseInt(formData.quantity),
         image_url: formData.image_url,
+        is_order_product: formData.is_order_product,
       };
 
       await setUserContext();
@@ -314,6 +316,7 @@ const ProductsPage = () => {
       sale_price: String(product.sale_price),
       quantity: String(product.quantity),
       image_url: product.image_url,
+      is_order_product: product.is_order_product || false,
     });
     setShowForm(true);
   };
@@ -374,6 +377,7 @@ const ProductsPage = () => {
       sale_price: '',
       quantity: '',
       image_url: null,
+      is_order_product: false,
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -654,6 +658,28 @@ const ProductsPage = () => {
                   </div>
                 </div>
               </div>
+              
+              <div className="flex items-center space-x-2 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="is_order_product"
+                  checked={formData.is_order_product}
+                  onChange={(e) => setFormData({...formData, is_order_product: e.target.checked})}
+                  className="w-4 h-4 text-orange-600 rounded"
+                />
+                <Label htmlFor="is_order_product" className="text-orange-800 font-medium">
+                  Este é um produto de encomenda
+                </Label>
+              </div>
+              
+              {formData.is_order_product && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Produto de encomenda:</strong> Este produto não aparecerá nas opções de venda até que você desmarque esta opção após receber o produto.
+                  </p>
+                </div>
+              )}
+
               <div className="flex space-x-2">
                 <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600" disabled={uploadingImage}>
                   {editingProduct ? 'Atualizar' : 'Cadastrar'}
