@@ -89,6 +89,7 @@ const ProductsPage = () => {
           sale_price,
           quantity,
           image_url,
+          is_order_product,
           created_at,
           updated_at,
           categories (
