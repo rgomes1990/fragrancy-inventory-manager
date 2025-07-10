@@ -713,7 +713,6 @@ const ProductsPage = () => {
                 <TableHead>Preço de Custo</TableHead>
                 <TableHead>Preço de Venda</TableHead>
                 <TableHead>Estoque</TableHead>
-                <TableHead>Tipo</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -748,17 +747,6 @@ const ProductsPage = () => {
                     }`}>
                       {product.quantity}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    {product.is_order_product ? (
-                      <span className="px-2 py-1 rounded text-xs bg-orange-100 text-orange-800 font-medium">
-                        Encomenda
-                      </span>
-                    ) : (
-                      <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 font-medium">
-                        Normal
-                      </span>
-                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
