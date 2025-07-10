@@ -23,8 +23,8 @@ const CustomersPage = () => {
   });
   const { currentUser } = useAuth();
 
-  // Verificar se o usuário atual é Danilo
-  const isDanilo = currentUser?.username === 'Danilo';
+  // Verificar se o usuário atual é Danilo (currentUser é uma string com o username)
+  const isDanilo = currentUser === 'Danilo';
 
   useEffect(() => {
     fetchCustomers();
