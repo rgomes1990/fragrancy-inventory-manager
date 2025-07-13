@@ -123,12 +123,10 @@ const Dashboard = () => {
         `)
         .not('customers', 'is', null);
 
-      // Buscar vendas por usuário do audit_log
-      const { data: auditData } = await supabase
-        .from('audit_log')
-        .select('user_name, new_values')
-        .eq('table_name', 'sales')
-        .eq('operation', 'INSERT');
+      // Buscar vendas por vendedor diretamente da tabela sales
+      const { data: salesBySellerData } = await supabase
+        .from('sales')
+        .select('seller, total_price');
 
       let anaPaulaSales = 0;
       let anaPaulaRevenue = 0;
@@ -137,21 +135,18 @@ const Dashboard = () => {
       let rogerioSales = 0;
       let rogerioRevenue = 0;
 
-      auditData?.forEach((audit) => {
-        if (audit.new_values && typeof audit.new_values === 'object') {
-          const newValues = audit.new_values as any;
-          const revenue = Number(newValues.total_price) || 0;
-          
-          if (audit.user_name === 'Ana Paula') {
-            anaPaulaSales += 1;
-            anaPaulaRevenue += revenue;
-          } else if (audit.user_name === 'Danilo') {
-            daniloSales += 1;
-            daniloRevenue += revenue;
-          } else if (audit.user_name === 'Rogério') {
-            rogerioSales += 1;
-            rogerioRevenue += revenue;
-          }
+      salesBySellerData?.forEach((sale) => {
+        const revenue = Number(sale.total_price) || 0;
+        
+        if (sale.seller === 'Ana Paula') {
+          anaPaulaSales += 1;
+          anaPaulaRevenue += revenue;
+        } else if (sale.seller === 'Danilo') {
+          daniloSales += 1;
+          daniloRevenue += revenue;
+        } else if (sale.seller === 'Rogério') {
+          rogerioSales += 1;
+          rogerioRevenue += revenue;
         }
       });
 

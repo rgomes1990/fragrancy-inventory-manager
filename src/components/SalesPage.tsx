@@ -173,6 +173,7 @@ const SalesPage = () => {
           unit_price: item.unit_price,
           total_price: item.subtotal,
           sale_date: saleData.sale_date + 'T00:00:00.000Z',
+          seller: saleData.seller,
         };
 
         const { error: saleError } = await supabase
@@ -271,6 +272,7 @@ const SalesPage = () => {
         unit_price,
         total_price,
         sale_date: formData.sale_date + 'T00:00:00.000Z',
+        seller: formData.seller,
       };
 
       if (editingSale) {
@@ -349,7 +351,7 @@ const SalesPage = () => {
       quantity: sale.quantity.toString(),
       unit_price: sale.unit_price.toString(),
       sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
-      seller: '',
+      seller: sale.seller || '',
     });
     setShowForm(true);
   };
@@ -670,6 +672,7 @@ const SalesPage = () => {
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Valor Unitário</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Vendedor</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -688,6 +691,7 @@ const SalesPage = () => {
                   <TableCell>{sale.quantity}</TableCell>
                   <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
                   <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
+                  <TableCell>{sale.seller || '-'}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button

@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   name: string;
@@ -35,6 +34,7 @@ export interface Sale {
   unit_price: number;
   total_price: number;
   sale_date: string;
+  seller?: string;
   created_at: string;
   customers?: {
     id: string;
