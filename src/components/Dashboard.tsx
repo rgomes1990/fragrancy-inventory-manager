@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown } from 'lucide-react';
+import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown, UserCheck } from 'lucide-react';
 
 interface DashboardStats {
   totalProducts: number;
@@ -25,6 +26,13 @@ interface TopCustomer {
   total_spent: number;
 }
 
+interface UserSales {
+  ana_paula_sales: number;
+  ana_paula_revenue: number;
+  danilo_sales: number;
+  danilo_revenue: number;
+}
+
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
@@ -38,6 +46,12 @@ const Dashboard = () => {
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
+  const [userSales, setUserSales] = useState<UserSales>({
+    ana_paula_sales: 0,
+    ana_paula_revenue: 0,
+    danilo_sales: 0,
+    danilo_revenue: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [stockFilter, setStockFilter] = useState('all');
 
@@ -106,6 +120,33 @@ const Dashboard = () => {
         `)
         .not('customers', 'is', null);
 
+      // Buscar vendas por usuário do audit_log
+      const { data: auditData } = await supabase
+        .from('audit_log')
+        .select('user_name, new_values')
+        .eq('table_name', 'sales')
+        .eq('operation', 'INSERT');
+
+      let anaPaulaSales = 0;
+      let anaPaulaRevenue = 0;
+      let daniloSales = 0;
+      let daniloRevenue = 0;
+
+      auditData?.forEach((audit) => {
+        if (audit.new_values && typeof audit.new_values === 'object') {
+          const newValues = audit.new_values as any;
+          const revenue = Number(newValues.total_price) || 0;
+          
+          if (audit.user_name === 'Ana Paula') {
+            anaPaulaSales += 1;
+            anaPaulaRevenue += revenue;
+          } else if (audit.user_name === 'Danilo') {
+            daniloSales += 1;
+            daniloRevenue += revenue;
+          }
+        }
+      });
+
       const productSales = topProductsData?.reduce((acc, sale) => {
         const productName = sale.products?.name || 'Produto desconhecido';
         if (!acc[productName]) {
@@ -156,6 +197,12 @@ const Dashboard = () => {
       setRecentSales(recentSalesData || []);
       setTopProducts(top5Products);
       setTopCustomers(top5Customers);
+      setUserSales({
+        ana_paula_sales: anaPaulaSales,
+        ana_paula_revenue: anaPaulaRevenue,
+        danilo_sales: daniloSales,
+        danilo_revenue: daniloRevenue,
+      });
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
     } finally {
@@ -269,14 +316,59 @@ const Dashboard = () => {
         })}
       </div>
 
+      {/* Cards de vendas por usuário */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="bg-pink-50 border-0 shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <UserCheck className="w-5 h-5 text-pink-500" />
+              <span>Vendas - Ana Paula</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Total de Vendas:</span>
+                <span className="font-bold">{userSales.ana_paula_sales}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Receita Total:</span>
+                <span className="font-bold">R$ {userSales.ana_paula_revenue.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-blue-50 border-0 shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <UserCheck className="w-5 h-5 text-blue-500" />
+              <span>Vendas - Danilo</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Total de Vendas:</span>
+                <span className="font-bold">{userSales.danilo_sales}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Receita Total:</span>
+                <span className="font-bold">R$ {userSales.danilo_revenue.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Cards de TOP 5 e Rankings */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* TOP 5 Produtos Mais Vendidos */}
+        {/* TOP 5 Produtos */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Trophy className="w-5 h-5 text-yellow-500" />
-              <span>Top 5 Produtos Mais Vendidos</span>
+              <span>Top 5 Produtos</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -311,12 +403,12 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* TOP 5 Clientes que Mais Compram */}
+        {/* TOP 5 Clientes */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Crown className="w-5 h-5 text-purple-500" />
-              <span>Top 5 Clientes que Mais Compram</span>
+              <span>Top 5 Clientes</span>
             </CardTitle>
           </CardHeader>
           <CardContent>

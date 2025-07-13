@@ -10,7 +10,6 @@ import {
   BarChart3, 
   LogOut,
   FolderOpen,
-  ClipboardList,
   FileText,
   TrendingUp
 } from 'lucide-react';
@@ -41,7 +40,6 @@ const AppSidebar = ({ currentPage, onPageChange }: AppSidebarProps) => {
     { id: 'categories', label: 'Categorias', icon: FolderOpen },
     { id: 'customers', label: 'Clientes', icon: Users },
     { id: 'sales', label: 'Vendas', icon: ShoppingCart },
-    { id: 'orders', label: 'Encomendas', icon: ClipboardList },
     { id: 'reports', label: 'Relatórios', icon: BarChart3 },
     { id: 'profit-report', label: 'Lucro vs Investimento', icon: TrendingUp },
     { id: 'audit', label: 'Auditoria', icon: FileText },

@@ -13,7 +13,6 @@ import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
 import ReportsPage from '@/components/ReportsPage';
 import CategoriesPage from '@/components/CategoriesPage';
-import OrdersPage from '@/components/OrdersPage';
 import AuditLogPage from '@/components/AuditLogPage';
 import ProfitReportPage from '@/components/ProfitReportPage';
 
@@ -47,8 +46,6 @@ const AppContent = () => {
         return <CustomersPage />;
       case 'sales':
         return <SalesPage />;
-      case 'orders':
-        return <OrdersPage />;
       case 'reports':
         return <ReportsPage />;
       case 'profit-report':
