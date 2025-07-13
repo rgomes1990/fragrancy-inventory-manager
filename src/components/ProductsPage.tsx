@@ -1,115 +1,65 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Package, AlertTriangle, DollarSign, TrendingUp, FileText, Search, Calendar, Upload, Image } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Package, Trash2, Edit, Upload, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Category } from '@/types/database';
+import { Product, Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
-import { exportToExcel, formatProductsForExport } from '@/utils/excelExporter';
+import OrderProductsPDFReport from './OrderProductsPDFReport';
 import ImageModal from './ImageModal';
 
-// Extended Product type with all required fields including is_order_product
-interface ExtendedProduct {
-  id: string;
-  name: string;
-  category_id: string | null;
-  cost_price: number;
-  sale_price: number;
-  quantity: number;
-  image_url: string | null;
-  is_order_product: boolean;
-  created_at: string;
-  updated_at: string;
-  categories?: {
-    id: string;
-    name: string;
-    created_at: string;
-    updated_at: string;
-  } | null;
-}
-
-interface ProductSummary {
-  totalCostPrice: number;
-  totalSalePrice: number;
-  filteredCostPrice: number;
-  filteredSalePrice: number;
-}
-
 const ProductsPage = () => {
-  const [products, setProducts] = useState<ExtendedProduct[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ExtendedProduct[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ExtendedProduct | null>(null);
-  const [stockFilter, setStockFilter] = useState('all');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [dateFilteredSummary, setDateFilteredSummary] = useState({ count: 0, totalCost: 0, totalSale: 0 });
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [productSummary, setProductSummary] = useState<ProductSummary>({
-    totalCostPrice: 0,
-    totalSalePrice: 0,
-    filteredCostPrice: 0,
-    filteredSalePrice: 0,
-  });
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { setUserContext } = useAuth();
-  const [imageModal, setImageModal] = useState({ isOpen: false, imageUrl: '', productName: '' });
-
+  
   const [formData, setFormData] = useState({
     name: '',
-    category_id: null as string | null,
     cost_price: '',
     sale_price: '',
     quantity: '',
-    image_url: null as string | null,
+    category_id: '',
     is_order_product: false,
+    image_url: '',
   });
 
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          category_id,
-          cost_price,
-          sale_price,
-          quantity,
-          image_url,
-          is_order_product,
-          created_at,
-          updated_at,
-          categories (
-            id,
-            name,
-            created_at,
-            updated_at
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const [productsRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select(`
+            *,
+            categories(id, name, created_at, updated_at)
+          `)
+          .order('name'),
+        supabase
+          .from('categories')
+          .select('*')
+          .order('name')
+      ]);
 
-      if (error) throw error;
-      console.log('Total de produtos buscados:', data?.length || 0);
-      console.log('Produtos:', data);
-      setProducts(data || []);
+      if (productsRes.error) throw productsRes.error;
+      if (categoriesRes.error) throw categoriesRes.error;
+
+      setProducts(productsRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (error) {
-      console.error('Erro ao buscar produtos:', error);
+      console.error('Erro ao buscar dados:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os produtos.",
+        description: "Não foi possível carregar os dados.",
         variant: "destructive",
       });
     } finally {
@@ -117,123 +67,151 @@ const ProductsPage = () => {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name', { ascending: true });
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-      if (error) throw error;
-      setCategories(data || []);
+  useEffect(() => {
+    filterProducts();
+  }, [products, searchTerm]);
+
+  const filterProducts = () => {
+    if (!searchTerm) {
+      setFilteredProducts(products);
+      return;
+    }
+
+    const filtered = products.filter(product => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        product.name.toLowerCase().includes(searchLower) ||
+        product.categories?.name?.toLowerCase().includes(searchLower) ||
+        product.cost_price.toString().includes(searchLower) ||
+        product.sale_price.toString().includes(searchLower) ||
+        product.quantity.toString().includes(searchLower)
+      );
+    });
+
+    setFilteredProducts(filtered);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      await setUserContext();
+      
+      const productData = {
+        name: formData.name,
+        cost_price: parseFloat(formData.cost_price),
+        sale_price: parseFloat(formData.sale_price),
+        quantity: parseInt(formData.quantity),
+        category_id: formData.category_id || null,
+        is_order_product: formData.is_order_product,
+        image_url: formData.image_url || null,
+      };
+
+      if (editingProduct) {
+        const { error } = await supabase
+          .from('products')
+          .update(productData)
+          .eq('id', editingProduct.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Sucesso",
+          description: "Produto atualizado com sucesso!",
+        });
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .insert([productData]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Sucesso",
+          description: "Produto criado com sucesso!",
+        });
+      }
+
+      resetForm();
+      fetchData();
     } catch (error) {
-      console.error('Erro ao buscar categorias:', error);
+      console.error('Erro ao salvar produto:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as categorias.",
+        description: "Não foi possível salvar o produto.",
         variant: "destructive",
       });
     }
   };
 
-  const filterProducts = (products: ExtendedProduct[], filter: string) => {
-    switch (filter) {
-      case 'in-stock':
-        return products.filter(product => product.quantity > 0);
-      case 'out-of-stock':
-        return products.filter(product => product.quantity === 0);
-      default:
-        return products;
-    }
-  };
-
-  const calculateSummary = (allProducts: ExtendedProduct[], filtered: ExtendedProduct[]) => {
-    console.log('=== CALCULANDO RESUMO ===');
-    console.log('Total de produtos para cálculo:', allProducts.length);
-    console.log('Produtos filtrados:', filtered.length);
-    
-    const totalCostPrice = allProducts.reduce((sum, product) => {
-      const costValue = Number(product.cost_price);
-      console.log(`Produto: ${product.name} | Custo: ${product.cost_price}`);
-      return sum + costValue;
-    }, 0);
-
-    const totalSalePrice = allProducts.reduce((sum, product) => {
-      const saleValue = Number(product.sale_price);
-      console.log(`Produto: ${product.name} | Venda: ${product.sale_price}`);
-      return sum + saleValue;
-    }, 0);
-
-    const filteredCostPrice = filtered.reduce((sum, product) => {
-      return sum + Number(product.cost_price);
-    }, 0);
-
-    const filteredSalePrice = filtered.reduce((sum, product) => {
-      return sum + Number(product.sale_price);
-    }, 0);
-
-    console.log('=== RESULTADO FINAL ===');
-    console.log('Soma Total Preços de Custo:', totalCostPrice);
-    console.log('Soma Total Preços de Venda:', totalSalePrice);
-    console.log('Soma Filtrada Preços de Custo:', filteredCostPrice);
-    console.log('Soma Filtrada Preços de Venda:', filteredSalePrice);
-
-    return {
-      totalCostPrice,
-      totalSalePrice,
-      filteredCostPrice,
-      filteredSalePrice,
-    };
-  };
-
-  const filterBySearch = (products: ExtendedProduct[], search: string) => {
-    if (!search) return products;
-    
-    const searchLower = search.toLowerCase();
-    return products.filter(product =>
-      product.name.toLowerCase().includes(searchLower) ||
-      product.categories?.name?.toLowerCase().includes(searchLower) ||
-      product.cost_price.toString().includes(searchLower) ||
-      product.sale_price.toString().includes(searchLower) ||
-      product.quantity.toString().includes(searchLower)
-    );
-  };
-
-  const filterByDate = (products: ExtendedProduct[], date: string) => {
-    if (!date) return products;
-    
-    return products.filter(product => {
-      const productDate = new Date(product.created_at).toISOString().split('T')[0];
-      return productDate === date;
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      cost_price: product.cost_price.toString(),
+      sale_price: product.sale_price.toString(),
+      quantity: product.quantity.toString(),
+      category_id: product.category_id || '',
+      is_order_product: product.is_order_product,
+      image_url: product.image_url || '',
     });
+    setShowForm(true);
   };
 
-  useEffect(() => {
-    let filtered = filterProducts(products, stockFilter);
-    filtered = filterBySearch(filtered, searchTerm);
-    
-    setFilteredProducts(filtered);
-    setProductSummary(calculateSummary(products, filtered));
+  const handleDelete = async (product: Product) => {
+    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
 
-    if (selectedDate) {
-      const dateFiltered = filterByDate(products, selectedDate);
-      const count = dateFiltered.length;
-      const totalCost = dateFiltered.reduce((sum, p) => sum + Number(p.cost_price), 0);
-      const totalSale = dateFiltered.reduce((sum, p) => sum + Number(p.sale_price), 0);
-      setDateFilteredSummary({ count, totalCost, totalSale });
-    } else {
-      setDateFilteredSummary({ count: 0, totalCost: 0, totalSale: 0 });
+    try {
+      await setUserContext();
+      
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', product.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Produto excluído com sucesso!",
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o produto.",
+        variant: "destructive",
+      });
     }
-  }, [products, stockFilter, searchTerm, selectedDate]);
+  };
 
-  const handleImageUpload = async (file: File) => {
-    if (!file) return null;
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      cost_price: '',
+      sale_price: '',
+      quantity: '',
+      category_id: '',
+      is_order_product: false,
+      image_url: '',
+    });
+    setEditingProduct(null);
+    setShowForm(false);
+  };
 
-    setUploadingImage(true);
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `product-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('product-images')
@@ -245,7 +223,12 @@ const ProductsPage = () => {
         .from('product-images')
         .getPublicUrl(filePath);
 
-      return publicUrl;
+      setFormData(prev => ({ ...prev, image_url: publicUrl }));
+
+      toast({
+        title: "Sucesso",
+        description: "Imagem carregada com sucesso!",
+      });
     } catch (error) {
       console.error('Erro ao fazer upload da imagem:', error);
       toast({
@@ -253,298 +236,33 @@ const ProductsPage = () => {
         description: "Não foi possível fazer upload da imagem.",
         variant: "destructive",
       });
-      return null;
-    } finally {
-      setUploadingImage(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      const productData = {
-        name: formData.name,
-        category_id: formData.category_id === "none" ? null : formData.category_id,
-        cost_price: parseFloat(formData.cost_price),
-        sale_price: parseFloat(formData.sale_price),
-        quantity: parseInt(formData.quantity),
-        image_url: formData.image_url,
-        is_order_product: formData.is_order_product,
-      };
-
-      await setUserContext();
-
-      if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id);
-
-        if (error) throw error;
-        toast({
-          title: "Sucesso",
-          description: "Produto atualizado com sucesso!",
-        });
-      } else {
-        const { error } = await supabase
-          .from('products')
-          .insert([productData]);
-
-        if (error) throw error;
-        toast({
-          title: "Sucesso",
-          description: "Produto cadastrado com sucesso!",
-        });
-      }
-
-      resetForm();
-      fetchProducts();
-    } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o produto.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleEdit = (product: ExtendedProduct) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      category_id: product.category_id || null,
-      cost_price: String(product.cost_price),
-      sale_price: String(product.sale_price),
-      quantity: String(product.quantity),
-      image_url: product.image_url,
-      is_order_product: product.is_order_product || false,
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
-
-    try {
-      await setUserContext();
-
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Produto excluído com sucesso!",
-      });
-      fetchProducts();
-    } catch (error) {
-      console.error('Erro ao excluir produto:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o produto.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleExportToExcel = () => {
-    try {
-      const formattedData = formatProductsForExport(filteredProducts);
-      const fileName = `produtos_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`;
-      exportToExcel(formattedData, fileName, 'Produtos');
-      
-      toast({
-        title: "Sucesso",
-        description: "Produtos exportados para Excel com sucesso!",
-      });
-    } catch (error) {
-      console.error('Erro ao exportar para Excel:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível exportar os produtos para Excel.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      category_id: null,
-      cost_price: '',
-      sale_price: '',
-      quantity: '',
-      image_url: null,
-      is_order_product: false,
-    });
-    setEditingProduct(null);
-    setShowForm(false);
-  };
-
-  const openImageModal = (imageUrl: string, productName: string) => {
-    setImageModal({ isOpen: true, imageUrl, productName });
-  };
-
-  const closeImageModal = () => {
-    setImageModal({ isOpen: false, imageUrl: '', productName: '' });
-  };
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p>Carregando produtos...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Buscar produtos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-64"
-            />
-          </div>
-          <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filtrar por estoque" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os produtos</SelectItem>
-              <SelectItem value="in-stock">Com estoque</SelectItem>
-              <SelectItem value="out-of-stock">Sem estoque</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button 
-            onClick={handleExportToExcel}
-            variant="outline"
-            className="border-green-600 text-green-600 hover:bg-green-50"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Exportar Excel
-          </Button>
-          <Button 
-            onClick={() => setShowForm(true)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-          >
+        <div className="flex space-x-2">
+          <OrderProductsPDFReport />
+          <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Novo Produto
           </Button>
         </div>
-      </div>
-
-      <Card className="bg-yellow-50 border-yellow-200">
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-4">
-            <Calendar className="w-5 h-5 text-yellow-600" />
-            <Label htmlFor="date-filter" className="font-medium">Filtrar por data de cadastro:</Label>
-            <Input
-              id="date-filter"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-48"
-            />
-            {selectedDate && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedDate('')}
-              >
-                Limpar
-              </Button>
-            )}
-          </div>
-          {selectedDate && dateFilteredSummary.count > 0 && (
-            <div className="mt-3 p-3 bg-yellow-100 rounded-lg">
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Produtos cadastrados:</span>
-                  <p className="text-lg font-bold text-yellow-800">{dateFilteredSummary.count}</p>
-                </div>
-                <div>
-                  <span className="font-medium">Soma preços de custo:</span>
-                  <p className="text-lg font-bold text-yellow-800">R$ {dateFilteredSummary.totalCost.toFixed(2)}</p>
-                </div>
-                <div>
-                  <span className="font-medium">Soma preços de venda:</span>
-                  <p className="text-lg font-bold text-yellow-800">R$ {dateFilteredSummary.totalSale.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-blue-50 border-0 shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Soma Preços de Custo</p>
-                <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalCostPrice.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Todos os produtos ({products.length})</p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-green-50 border-0 shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Soma Preços de Venda</p>
-                <p className="text-lg font-bold text-gray-900">R$ {productSummary.totalSalePrice.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Todos os produtos ({products.length})</p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-purple-50 border-0 shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Custo Filtrado</p>
-                <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredCostPrice.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">
-                  {stockFilter === 'all' ? 'Todos' : 
-                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'} ({filteredProducts.length})
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-indigo-50 border-0 shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Venda Filtrado</p>
-                <p className="text-lg font-bold text-gray-900">R$ {productSummary.filteredSalePrice.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">
-                  {stockFilter === 'all' ? 'Todos' : 
-                   stockFilter === 'in-stock' ? 'Com estoque' : 'Sem estoque'} ({filteredProducts.length})
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {showForm && (
@@ -555,137 +273,110 @@ const ProductsPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Nome do Produto</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Categoria</Label>
-                  <Select
-                    value={formData.category_id || "none"}
-                    onValueChange={(value) => setFormData({...formData, category_id: value === "none" ? null : value})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sem categoria</SelectItem>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="cost_price">Preço de Custo</Label>
-                  <Input
-                    id="cost_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="sale_price">Preço de Venda</Label>
-                  <Input
-                    id="sale_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.sale_price}
-                    onChange={(e) => setFormData({...formData, sale_price: e.target.value})}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="quantity">Quantidade</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="image">Foto do Produto</Label>
-                  <div className="space-y-2">
-                    <Input
-                      id="image"
-                      type="file"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const imageUrl = await handleImageUpload(file);
-                          if (imageUrl) {
-                            setFormData({...formData, image_url: imageUrl});
-                          }
-                        }
-                      }}
-                      disabled={uploadingImage}
-                    />
-                    {uploadingImage && (
-                      <p className="text-sm text-gray-500 flex items-center">
-                        <Upload className="w-4 h-4 mr-1 animate-spin" />
-                        Fazendo upload...
-                      </p>
-                    )}
-                    {formData.image_url && (
-                      <div className="flex items-center space-x-2">
-                        <img 
-                          src={formData.image_url} 
-                          alt="Preview" 
-                          className="w-20 h-20 object-cover rounded border"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setFormData({...formData, image_url: null})}
-                        >
-                          Remover
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="name">Nome</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  required
+                />
               </div>
-              
-              <div className="flex items-center space-x-2 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+
+              <div>
+                <Label htmlFor="category">Categoria</Label>
+                <select 
+                  value={formData.category_id} 
+                  onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="cost_price">Preço de Custo</Label>
+                <Input
+                  id="cost_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.cost_price}
+                  onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="sale_price">Preço de Venda</Label>
+                <Input
+                  id="sale_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.sale_price}
+                  onChange={(e) => setFormData({...formData, sale_price: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="quantity">Quantidade</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
                   id="is_order_product"
                   checked={formData.is_order_product}
                   onChange={(e) => setFormData({...formData, is_order_product: e.target.checked})}
-                  className="w-4 h-4 text-orange-600 rounded"
                 />
-                <Label htmlFor="is_order_product" className="text-orange-800 font-medium">
-                  Este é um produto de encomenda
-                </Label>
+                <Label htmlFor="is_order_product">Produto de Encomenda</Label>
               </div>
-              
-              {formData.is_order_product && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Produto de encomenda:</strong> Este produto não aparecerá nas opções de venda até que você desmarque esta opção após receber o produto.
-                  </p>
-                </div>
-              )}
 
-              <div className="flex space-x-2">
-                <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600" disabled={uploadingImage}>
-                  {editingProduct ? 'Atualizar' : 'Cadastrar'}
+              <div className="md:col-span-2 lg:col-span-3">
+                <Label htmlFor="image">Imagem do Produto</Label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    id="image"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => document.getElementById('image')?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Carregar Imagem
+                  </Button>
+                  {formData.image_url && (
+                    <img 
+                      src={formData.image_url} 
+                      alt="Preview" 
+                      className="w-20 h-20 object-cover rounded cursor-pointer"
+                      onClick={() => setSelectedImage(formData.image_url)}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="md:col-span-2 lg:col-span-3 flex space-x-2">
+                <Button type="submit">
+                  {editingProduct ? 'Atualizar Produto' : 'Criar Produto'}
                 </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancelar
@@ -698,10 +389,21 @@ const ProductsPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Package className="w-5 h-5" />
-            <span>Lista de Produtos</span>
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5" />
+              <span>Lista de Produtos</span>
+            </CardTitle>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Buscar produtos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 w-64"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -710,9 +412,10 @@ const ProductsPage = () => {
                 <TableHead>Imagem</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Categoria</TableHead>
-                <TableHead>Preço de Custo</TableHead>
-                <TableHead>Preço de Venda</TableHead>
-                <TableHead>Estoque</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Preço Custo</TableHead>
+                <TableHead>Preço Venda</TableHead>
+                <TableHead>Quantidade</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -724,8 +427,8 @@ const ProductsPage = () => {
                       <img 
                         src={product.image_url} 
                         alt={product.name}
-                        className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => openImageModal(product.image_url!, product.name)}
+                        className="w-12 h-12 object-cover rounded cursor-pointer"
+                        onClick={() => setSelectedImage(product.image_url)}
                       />
                     ) : (
                       <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
@@ -734,20 +437,17 @@ const ProductsPage = () => {
                     )}
                   </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
+                  <TableCell>
+                    {product.categories?.name || 'Sem categoria'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={product.is_order_product ? "secondary" : "default"}>
+                      {product.is_order_product ? 'Encomenda' : 'Estoque'}
+                    </Badge>
+                  </TableCell>
                   <TableCell>R$ {product.cost_price.toFixed(2)}</TableCell>
                   <TableCell>R$ {product.sale_price.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded text-sm ${
-                      product.quantity === 0 
-                        ? 'bg-red-100 text-red-800' 
-                        : product.quantity <= 5 
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {product.quantity}
-                    </span>
-                  </TableCell>
+                  <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
@@ -760,7 +460,7 @@ const ProductsPage = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDelete(product.id)}
+                        onClick={() => handleDelete(product)}
                         className="text-red-600 hover:bg-red-50"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -774,12 +474,12 @@ const ProductsPage = () => {
         </CardContent>
       </Card>
 
-      <ImageModal
-        imageUrl={imageModal.imageUrl}
-        isOpen={imageModal.isOpen}
-        onClose={closeImageModal}
-        productName={imageModal.productName}
-      />
+      {selectedImage && (
+        <ImageModal
+          imageUrl={selectedImage}
+          onClose={() => setSelectedImage(null)}
+        />
+      )}
     </div>
   );
 };

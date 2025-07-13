@@ -31,7 +31,10 @@ const SalesPage = () => {
     quantity: '',
     unit_price: '',
     sale_date: new Date().toISOString().split('T')[0],
+    seller: '',
   });
+
+  const sellers = ['Ana Paula', 'Rogério', 'Danilo'];
 
   const fetchData = async () => {
     try {
@@ -128,6 +131,7 @@ const SalesPage = () => {
       subtotal: number;
     }>;
     sale_date: string;
+    seller: string;
   }) => {
     try {
       await setUserContext();
@@ -152,6 +156,14 @@ const SalesPage = () => {
           return;
         }
       }
+
+      // Definir o nome do usuário baseado no vendedor selecionado
+      const userContext = saleData.seller;
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user',
+        setting_value: userContext,
+        is_local: false
+      });
 
       for (const item of saleData.items) {
         const saleRecord = {
@@ -208,7 +220,13 @@ const SalesPage = () => {
     e.preventDefault();
     
     try {
-      await setUserContext();
+      // Definir o nome do usuário baseado no vendedor selecionado
+      const userContext = formData.seller;
+      await supabase.rpc('set_config', {
+        setting_name: 'app.current_user',
+        setting_value: userContext,
+        is_local: false
+      });
       
       const product = products.find(p => p.id === formData.product_id);
       if (!product) {
@@ -331,6 +349,7 @@ const SalesPage = () => {
       quantity: sale.quantity.toString(),
       unit_price: sale.unit_price.toString(),
       sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
+      seller: '',
     });
     setShowForm(true);
   };
@@ -380,6 +399,7 @@ const SalesPage = () => {
       quantity: '',
       unit_price: '',
       sale_date: new Date().toISOString().split('T')[0],
+      seller: '',
     });
     setEditingSale(null);
     setShowForm(false);
@@ -456,6 +476,7 @@ const SalesPage = () => {
           products={availableProducts}
           onSubmit={handleMultiProductSubmit}
           onCancel={() => setShowMultiForm(false)}
+          sellers={sellers}
         />
       )}
 
@@ -538,6 +559,23 @@ const SalesPage = () => {
                   required
                 />
               </div>
+
+              <div>
+                <Label htmlFor="seller">Vendedor</Label>
+                <select 
+                  value={formData.seller} 
+                  onChange={(e) => setFormData({...formData, seller: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                  required
+                >
+                  <option value="">Selecione o vendedor</option>
+                  {sellers.map((seller) => (
+                    <option key={seller} value={seller}>
+                      {seller}
+                    </option>
+                  ))}
+                </select>
+              </div>
               
               {selectedProduct && formData.quantity && formData.unit_price && (
                 <div className="lg:col-span-4 p-4 bg-gray-50 rounded-lg">
@@ -569,7 +607,7 @@ const SalesPage = () => {
                 <Button 
                   type="submit" 
                   className="bg-gradient-to-r from-purple-600 to-pink-600"
-                  disabled={!formData.customer_id || !formData.product_id || !formData.quantity || !formData.unit_price}
+                  disabled={!formData.customer_id || !formData.product_id || !formData.quantity || !formData.unit_price || !formData.seller}
                 >
                   {editingSale ? 'Atualizar Venda' : 'Registrar Venda'}
                 </Button>

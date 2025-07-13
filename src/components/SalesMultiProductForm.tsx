@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,17 +17,20 @@ interface SaleItem {
 interface SalesMultiProductFormProps {
   customers: Customer[];
   products: Product[];
+  sellers: string[];
   onSubmit: (saleData: {
     customer_id: string;
     items: SaleItem[];
     sale_date: string;
+    seller: string;
   }) => Promise<void>;
   onCancel: () => void;
 }
 
-const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: SalesMultiProductFormProps) => {
+const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCancel }: SalesMultiProductFormProps) => {
   const [customerID, setCustomerID] = useState('');
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [seller, setSeller] = useState('');
   const [items, setItems] = useState<SaleItem[]>([
     { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }
   ]);
@@ -84,15 +88,21 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
       return;
     }
 
+    if (!seller) {
+      alert('Selecione um vendedor');
+      return;
+    }
+
     await onSubmit({
       customer_id: customerID,
       items: validItems,
       sale_date: saleDate,
+      seller: seller,
     });
   };
 
   const isFormValid = () => {
-    return customerID && items.some(item => item.product_id && item.quantity > 0 && item.unit_price > 0);
+    return customerID && seller && items.some(item => item.product_id && item.quantity > 0 && item.unit_price > 0);
   };
 
   return (
@@ -105,7 +115,7 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="customer">Cliente</Label>
               <select 
@@ -132,6 +142,23 @@ const SalesMultiProductForm = ({ customers, products, onSubmit, onCancel }: Sale
                 onChange={(e) => setSaleDate(e.target.value)}
                 required
               />
+            </div>
+
+            <div>
+              <Label htmlFor="seller">Vendedor</Label>
+              <select 
+                value={seller} 
+                onChange={(e) => setSeller(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                required
+              >
+                <option value="">Selecione o vendedor</option>
+                {sellers.map((sellerOption) => (
+                  <option key={sellerOption} value={sellerOption}>
+                    {sellerOption}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

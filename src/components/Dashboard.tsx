@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +30,8 @@ interface UserSales {
   ana_paula_revenue: number;
   danilo_sales: number;
   danilo_revenue: number;
+  rogerio_sales: number;
+  rogerio_revenue: number;
 }
 
 const Dashboard = () => {
@@ -51,6 +52,8 @@ const Dashboard = () => {
     ana_paula_revenue: 0,
     danilo_sales: 0,
     danilo_revenue: 0,
+    rogerio_sales: 0,
+    rogerio_revenue: 0,
   });
   const [loading, setLoading] = useState(true);
   const [stockFilter, setStockFilter] = useState('all');
@@ -131,6 +134,8 @@ const Dashboard = () => {
       let anaPaulaRevenue = 0;
       let daniloSales = 0;
       let daniloRevenue = 0;
+      let rogerioSales = 0;
+      let rogerioRevenue = 0;
 
       auditData?.forEach((audit) => {
         if (audit.new_values && typeof audit.new_values === 'object') {
@@ -143,6 +148,9 @@ const Dashboard = () => {
           } else if (audit.user_name === 'Danilo') {
             daniloSales += 1;
             daniloRevenue += revenue;
+          } else if (audit.user_name === 'Rogério') {
+            rogerioSales += 1;
+            rogerioRevenue += revenue;
           }
         }
       });
@@ -202,6 +210,8 @@ const Dashboard = () => {
         ana_paula_revenue: anaPaulaRevenue,
         danilo_sales: daniloSales,
         danilo_revenue: daniloRevenue,
+        rogerio_sales: rogerioSales,
+        rogerio_revenue: rogerioRevenue,
       });
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
@@ -317,7 +327,7 @@ const Dashboard = () => {
       </div>
 
       {/* Cards de vendas por usuário */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-pink-50 border-0 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -355,6 +365,27 @@ const Dashboard = () => {
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Receita Total:</span>
                 <span className="font-bold">R$ {userSales.danilo_revenue.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-50 border-0 shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <UserCheck className="w-5 h-5 text-green-500" />
+              <span>Vendas - Rogério</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Total de Vendas:</span>
+                <span className="font-bold">{userSales.rogerio_sales}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Receita Total:</span>
+                <span className="font-bold">R$ {userSales.rogerio_revenue.toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
