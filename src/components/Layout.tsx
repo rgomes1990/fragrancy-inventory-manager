@@ -1,5 +1,6 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import AppSidebar from './AppSidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -12,6 +13,14 @@ interface LayoutProps {
 
 const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
   const isMobile = useIsMobile();
+  const location = useLocation();
+
+  // Update current page based on location
+  useEffect(() => {
+    const path = location.pathname;
+    const page = path === '/' ? 'dashboard' : path.slice(1).replace('/', '-');
+    onPageChange(page);
+  }, [location.pathname, onPageChange]);
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
@@ -47,9 +56,12 @@ const getPageTitle = (page: string) => {
     customers: 'Clientes',
     sales: 'Vendas',
     orders: 'Encomendas',
+    'product-order-requests': 'Solicitações de Encomenda',
     reports: 'Relatórios',
     'profit-report': 'Lucro vs Investimento',
+    'order-products-report': 'Relatório de Encomendas',
     audit: 'Auditoria',
+    'audit-log': 'Auditoria',
   };
   return titles[page as keyof typeof titles] || 'Dashboard';
 };

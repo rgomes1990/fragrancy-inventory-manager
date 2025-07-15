@@ -1,29 +1,38 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Toaster } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthProvider } from '@/contexts/AuthContext';
-import { QueryClient } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import Layout from '@/components/Layout';
-import Dashboard from '@/pages/Dashboard';
+import { Dashboard } from '@/components/Dashboard';
 import ProductsPage from '@/components/ProductsPage';
 import CategoriesPage from '@/components/CategoriesPage';
 import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
 import OrdersPage from '@/components/OrdersPage';
-import ReportsPage from '@/pages/ReportsPage';
-import ProfitReportPage from '@/pages/ProfitReportPage';
+import { ReportsPage } from '@/components/ReportsPage';
+import { ProfitReportPage } from '@/components/ProfitReportPage';
 import OrderProductsReportPage from '@/pages/OrderProductsReportPage';
-import AuditLogPage from '@/pages/AuditLogPage';
+import { AuditLogPage } from '@/components/AuditLogPage';
 import NotFound from '@/pages/NotFound';
 import LoginForm from '@/components/LoginForm';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
 
+const queryClient = new QueryClient();
+
 const App = () => {
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  const handlePageChange = (page: string) => {
+    setCurrentPage(page);
+  };
+
   return (
-    <QueryClient>
+    <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <BrowserRouter>
@@ -34,7 +43,7 @@ const App = () => {
                 path="/*"
                 element={
                   <ProtectedRoute>
-                    <Layout>
+                    <Layout currentPage={currentPage} onPageChange={handlePageChange}>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/products" element={<ProductsPage />} />
@@ -57,7 +66,7 @@ const App = () => {
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
-    </QueryClient>
+    </QueryClientProvider>
   );
 };
 
