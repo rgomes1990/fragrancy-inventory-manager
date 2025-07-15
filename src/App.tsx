@@ -1,85 +1,64 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from '@/hooks/use-toast';
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { AuthProvider } from '@/contexts/AuthContext';
+import { QueryClient } from 'react-query';
 
-import React, { useState } from 'react';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import LoginForm from '@/components/LoginForm';
 import Layout from '@/components/Layout';
-import Dashboard from '@/components/Dashboard';
+import Dashboard from '@/pages/Dashboard';
 import ProductsPage from '@/components/ProductsPage';
+import CategoriesPage from '@/components/CategoriesPage';
 import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
-import ReportsPage from '@/components/ReportsPage';
-import CategoriesPage from '@/components/CategoriesPage';
-import AuditLogPage from '@/components/AuditLogPage';
-import ProfitReportPage from '@/components/ProfitReportPage';
-import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
+import OrdersPage from '@/components/OrdersPage';
+import ReportsPage from '@/pages/ReportsPage';
+import ProfitReportPage from '@/pages/ProfitReportPage';
 import OrderProductsReportPage from '@/pages/OrderProductsReportPage';
+import AuditLogPage from '@/pages/AuditLogPage';
+import NotFound from '@/pages/NotFound';
+import LoginForm from '@/components/LoginForm';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
 
-const queryClient = new QueryClient();
-
-const AppContent = () => {
-  const { isAuthenticated, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-purple-700 to-pink-600">
-        <div className="text-white text-xl">Carregando...</div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginForm />;
-  }
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'products':
-        return <ProductsPage />;
-      case 'categories':
-        return <CategoriesPage />;
-      case 'customers':
-        return <CustomersPage />;
-      case 'sales':
-        return <SalesPage />;
-      case 'reports':
-        return <ReportsPage />;
-      case 'profit-report':
-        return <ProfitReportPage />;
-      case 'audit':
-        return <AuditLogPage />;
-      case 'product-order-requests':
-        return <ProductOrderRequestsPage />;
-      case 'order-products-report':
-        return <OrderProductsReportPage />;
-      default:
-        return <Dashboard />;
-    }
-  };
-
+const App = () => {
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderPage()}
-    </Layout>
+    <QueryClient>
+      <TooltipProvider>
+        <Toaster />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<LoginForm />} />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/products" element={<ProductsPage />} />
+                        <Route path="/categories" element={<CategoriesPage />} />
+                        <Route path="/customers" element={<CustomersPage />} />
+                        <Route path="/sales" element={<SalesPage />} />
+                        <Route path="/orders" element={<OrdersPage />} />
+                        <Route path="/product-order-requests" element={<ProductOrderRequestsPage />} />
+                        <Route path="/reports" element={<ReportsPage />} />
+                        <Route path="/profit-report" element={<ProfitReportPage />} />
+                        <Route path="/order-products-report" element={<OrderProductsReportPage />} />
+                        <Route path="/audit-log" element={<AuditLogPage />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClient>
   );
 };
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <AppContent />
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
 
 export default App;

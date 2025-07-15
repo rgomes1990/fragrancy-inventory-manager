@@ -26,6 +26,8 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
   const [formData, setFormData] = useState({
     customer_name: '',
     requested_quantity: '',
+    cost_price: product.cost_price.toString(),
+    sale_price: product.sale_price.toString(),
     notes: '',
   });
 
@@ -40,6 +42,8 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
         product_id: product.id,
         customer_name: formData.customer_name,
         requested_quantity: parseInt(formData.requested_quantity),
+        cost_price: parseFloat(formData.cost_price),
+        sale_price: parseFloat(formData.sale_price),
         notes: formData.notes || null,
         status: 'Pendente',
       };
@@ -59,6 +63,8 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
       setFormData({
         customer_name: '',
         requested_quantity: '',
+        cost_price: product.cost_price.toString(),
+        sale_price: product.sale_price.toString(),
         notes: '',
       });
       
@@ -107,6 +113,30 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
               min="1"
               value={formData.requested_quantity}
               onChange={(e) => setFormData({...formData, requested_quantity: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="cost_price">Preço de Custo</Label>
+            <Input
+              id="cost_price"
+              type="number"
+              step="0.01"
+              value={formData.cost_price}
+              onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="sale_price">Preço de Venda</Label>
+            <Input
+              id="sale_price"
+              type="number"
+              step="0.01"
+              value={formData.sale_price}
+              onChange={(e) => setFormData({...formData, sale_price: e.target.value})}
               required
             />
           </div>

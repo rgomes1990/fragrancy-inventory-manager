@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ShoppingCart, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, ShoppingCart, Edit, Trash2, Search, Calculator } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ProductOrderRequest, Product } from '@/types/database';
@@ -26,9 +26,17 @@ const ProductOrderRequestsPage = () => {
     product_id: '',
     customer_name: '',
     requested_quantity: '',
+    cost_price: '',
+    sale_price: '',
     notes: '',
     status: 'Pendente',
   });
+
+  // Calcular soma total do preço de custo
+  const totalCostPrice = filteredRequests.reduce((total, request) => {
+    const costPrice = request.cost_price || request.products?.cost_price || 0;
+    return total + (costPrice * request.requested_quantity);
+  }, 0);
 
   const fetchData = async () => {
     try {
@@ -104,6 +112,8 @@ const ProductOrderRequestsPage = () => {
         product_id: formData.product_id,
         customer_name: formData.customer_name,
         requested_quantity: parseInt(formData.requested_quantity),
+        cost_price: parseFloat(formData.cost_price) || null,
+        sale_price: parseFloat(formData.sale_price) || null,
         notes: formData.notes || null,
         status: formData.status,
       };
@@ -151,6 +161,8 @@ const ProductOrderRequestsPage = () => {
       product_id: request.product_id,
       customer_name: request.customer_name,
       requested_quantity: request.requested_quantity.toString(),
+      cost_price: request.cost_price?.toString() || request.products?.cost_price?.toString() || '',
+      sale_price: request.sale_price?.toString() || request.products?.sale_price?.toString() || '',
       notes: request.notes || '',
       status: request.status,
     });
@@ -190,6 +202,8 @@ const ProductOrderRequestsPage = () => {
       product_id: '',
       customer_name: '',
       requested_quantity: '',
+      cost_price: '',
+      sale_price: '',
       notes: '',
       status: 'Pendente',
     });
@@ -235,6 +249,24 @@ const ProductOrderRequestsPage = () => {
         </Button>
       </div>
 
+      {/* Card com resumo financeiro */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Calculator className="w-5 h-5" />
+            <span>Resumo Financeiro</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-600">
+            Total Preço de Custo: R$ {totalCostPrice.toFixed(2)}
+          </div>
+          <p className="text-sm text-gray-600 mt-1">
+            Baseado em {filteredRequests.length} solicitação(ões) filtrada(s)
+          </p>
+        </CardContent>
+      </Card>
+
       {showForm && (
         <Card>
           <CardHeader>
@@ -248,7 +280,15 @@ const ProductOrderRequestsPage = () => {
                 <Label htmlFor="product">Produto</Label>
                 <select 
                   value={formData.product_id} 
-                  onChange={(e) => setFormData({...formData, product_id: e.target.value})}
+                  onChange={(e) => {
+                    const selectedProduct = products.find(p => p.id === e.target.value);
+                    setFormData({
+                      ...formData, 
+                      product_id: e.target.value,
+                      cost_price: selectedProduct?.cost_price?.toString() || '',
+                      sale_price: selectedProduct?.sale_price?.toString() || ''
+                    });
+                  }}
                   className="w-full p-2 border rounded-md"
                   required
                 >
@@ -280,6 +320,30 @@ const ProductOrderRequestsPage = () => {
                   value={formData.requested_quantity}
                   onChange={(e) => setFormData({...formData, requested_quantity: e.target.value})}
                   required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="cost_price">Preço de Custo</Label>
+                <Input
+                  id="cost_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.cost_price}
+                  onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
+                  placeholder="Preço automático do produto"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="sale_price">Preço de Venda</Label>
+                <Input
+                  id="sale_price"
+                  type="number"
+                  step="0.01"
+                  value={formData.sale_price}
+                  onChange={(e) => setFormData({...formData, sale_price: e.target.value})}
+                  placeholder="Preço automático do produto"
                 />
               </div>
 
@@ -346,6 +410,8 @@ const ProductOrderRequestsPage = () => {
                 <TableHead>Produto</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Quantidade</TableHead>
+                <TableHead>Preço Custo</TableHead>
+                <TableHead>Preço Venda</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Ações</TableHead>
@@ -359,6 +425,12 @@ const ProductOrderRequestsPage = () => {
                   </TableCell>
                   <TableCell>{request.customer_name}</TableCell>
                   <TableCell>{request.requested_quantity}</TableCell>
+                  <TableCell>
+                    R$ {(request.cost_price || request.products?.cost_price || 0).toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    R$ {(request.sale_price || request.products?.sale_price || 0).toFixed(2)}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={getStatusColor(request.status)}>
                       {request.status}

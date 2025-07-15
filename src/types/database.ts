@@ -124,6 +124,8 @@ export interface ProductOrderRequest {
   product_id: string;
   customer_name: string;
   requested_quantity: number;
+  cost_price?: number;
+  sale_price?: number;
   notes?: string;
   status: string;
   created_at: string;

@@ -1,18 +1,19 @@
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Users, 
-  ShoppingCart, 
-  BarChart3, 
-  LogOut,
+import { NavLink } from 'react-router-dom';
+import {
+  Package,
+  Users,
+  ShoppingCart,
+  BarChart3,
   FolderOpen,
-  FileText,
-  TrendingUp
+  Settings,
+  TrendingUp,
+  ClipboardList,
+  ShoppingBag,
+  FileText
 } from 'lucide-react';
+
 import {
   Sidebar,
   SidebarContent,
@@ -22,79 +23,111 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
 } from '@/components/ui/sidebar';
 
-interface AppSidebarProps {
-  currentPage: string;
-  onPageChange: (page: string) => void;
-}
+export function AppSidebar() {
+  const mainItems = [
+    {
+      title: "Dashboard",
+      url: "/",
+      icon: BarChart3,
+    },
+    {
+      title: "Produtos",
+      url: "/products",
+      icon: Package,
+    },
+    {
+      title: "Categorias",
+      url: "/categories",
+      icon: FolderOpen,
+    },
+    {
+      title: "Clientes",
+      url: "/customers",
+      icon: Users,
+    },
+    {
+      title: "Vendas",
+      url: "/sales",
+      icon: ShoppingCart,
+    },
+    {
+      title: "Encomendas",
+      url: "/orders",
+      icon: ShoppingBag,
+    },
+    {
+      title: "Solicitações de Encomenda",
+      url: "/product-order-requests",
+      icon: ClipboardList,
+    },
+  ];
 
-const AppSidebar = ({ currentPage, onPageChange }: AppSidebarProps) => {
-  const { logout } = useAuth();
-
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'products', label: 'Produtos', icon: Package },
-    { id: 'categories', label: 'Categorias', icon: FolderOpen },
-    { id: 'customers', label: 'Clientes', icon: Users },
-    { id: 'sales', label: 'Vendas', icon: ShoppingCart },
-    { id: 'reports', label: 'Relatórios', icon: BarChart3 },
-    { id: 'profit-report', label: 'Lucro vs Investimento', icon: TrendingUp },
-    { id: 'audit', label: 'Auditoria', icon: FileText },
+  const reportItems = [
+    {
+      title: "Relatórios",
+      url: "/reports",
+      icon: FileText,
+    },
+    {
+      title: "Relatório de Lucros",
+      url: "/profit-report",
+      icon: TrendingUp,
+    },
+    {
+      title: "Relatório de Encomendas",
+      url: "/order-products-report",
+      icon: ClipboardList,
+    },
+    {
+      title: "Log de Auditoria",
+      url: "/audit-log",
+      icon: Settings,
+    },
   ];
 
   return (
-    <Sidebar className="border-r">
-      <SidebarHeader className="p-6">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-sm font-bold">🌸</span>
-          </div>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Perfumes System
-          </h1>
-        </div>
-      </SidebarHeader>
-
+    <Sidebar>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      onClick={() => onPageChange(item.id)}
-                      isActive={currentPage === item.id}
-                      className="w-full"
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              {mainItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className="flex items-center space-x-2">
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Relatórios</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {reportItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} className="flex items-center space-x-2">
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="p-4">
-        <Button
-          onClick={logout}
-          variant="outline"
-          className="w-full flex items-center justify-center space-x-2"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Sair</span>
-        </Button>
-      </SidebarFooter>
     </Sidebar>
   );
-};
+}
 
 export default AppSidebar;
