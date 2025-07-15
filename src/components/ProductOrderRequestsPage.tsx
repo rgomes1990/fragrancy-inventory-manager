@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { ProductOrderRequest, Product } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
+import OrderProductsPDFReport from './OrderProductsPDFReport';
 
 const ProductOrderRequestsPage = () => {
   const [requests, setRequests] = useState<ProductOrderRequest[]>([]);
@@ -243,10 +243,13 @@ const ProductOrderRequestsPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Solicitações de Encomenda</h1>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Solicitação
-        </Button>
+        <div className="flex gap-2">
+          <OrderProductsPDFReport />
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Solicitação
+          </Button>
+        </div>
       </div>
 
       {/* Card com resumo financeiro */}

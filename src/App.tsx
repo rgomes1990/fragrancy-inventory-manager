@@ -12,10 +12,8 @@ import ProductsPage from '@/components/ProductsPage';
 import CategoriesPage from '@/components/CategoriesPage';
 import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
-import OrdersPage from '@/components/OrdersPage';
 import ReportsPage from '@/components/ReportsPage';
 import ProfitReportPage from '@/components/ProfitReportPage';
-import OrderProductsReportPage from '@/pages/OrderProductsReportPage';
 import AuditLogPage from '@/components/AuditLogPage';
 import NotFound from '@/pages/NotFound';
 import LoginForm from '@/components/LoginForm';
@@ -50,11 +48,9 @@ const App = () => {
                         <Route path="/categories" element={<CategoriesPage />} />
                         <Route path="/customers" element={<CustomersPage />} />
                         <Route path="/sales" element={<SalesPage />} />
-                        <Route path="/orders" element={<OrdersPage />} />
                         <Route path="/product-order-requests" element={<ProductOrderRequestsPage />} />
                         <Route path="/reports" element={<ReportsPage />} />
                         <Route path="/profit-report" element={<ProfitReportPage />} />
-                        <Route path="/order-products-report" element={<OrderProductsReportPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>

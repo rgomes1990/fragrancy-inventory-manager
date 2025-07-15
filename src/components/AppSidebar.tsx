@@ -10,8 +10,7 @@ import {
   FileText,
   TrendingUp,
   BarChart3,
-  Shield,
-  ListOrdered
+  Shield
 } from 'lucide-react';
 import {
   Sidebar,
@@ -36,11 +35,9 @@ const AppSidebar = ({ currentPage, onPageChange }: AppSidebarProps) => {
     { title: 'Categorias', url: '/categories', icon: ClipboardList, page: 'categories' },
     { title: 'Clientes', url: '/customers', icon: Users, page: 'customers' },
     { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales' },
-    { title: 'Encomendas', url: '/orders', icon: ListOrdered, page: 'orders' },
     { title: 'Solicitações de Encomenda', url: '/product-order-requests', icon: FileText, page: 'product-order-requests' },
     { title: 'Relatórios', url: '/reports', icon: BarChart3, page: 'reports' },
     { title: 'Lucro vs Investimento', url: '/profit-report', icon: TrendingUp, page: 'profit-report' },
-    { title: 'Relatório de Encomendas', url: '/order-products-report', icon: FileText, page: 'order-products-report' },
     { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log' },
   ];
 
