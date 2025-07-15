@@ -1,19 +1,18 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import {
-  Package,
-  Users,
-  ShoppingCart,
-  BarChart3,
-  FolderOpen,
-  Settings,
+import { 
+  LayoutDashboard, 
+  Package, 
+  Users, 
+  ShoppingCart, 
+  ClipboardList, 
+  FileText,
   TrendingUp,
-  ClipboardList,
-  ShoppingBag,
-  FileText
+  BarChart3,
+  Shield,
+  ListOrdered
 } from 'lucide-react';
-
 import {
   Sidebar,
   SidebarContent,
@@ -25,66 +24,24 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-export function AppSidebar() {
-  const mainItems = [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: BarChart3,
-    },
-    {
-      title: "Produtos",
-      url: "/products",
-      icon: Package,
-    },
-    {
-      title: "Categorias",
-      url: "/categories",
-      icon: FolderOpen,
-    },
-    {
-      title: "Clientes",
-      url: "/customers",
-      icon: Users,
-    },
-    {
-      title: "Vendas",
-      url: "/sales",
-      icon: ShoppingCart,
-    },
-    {
-      title: "Encomendas",
-      url: "/orders",
-      icon: ShoppingBag,
-    },
-    {
-      title: "Solicitações de Encomenda",
-      url: "/product-order-requests",
-      icon: ClipboardList,
-    },
-  ];
+interface AppSidebarProps {
+  currentPage: string;
+  onPageChange: (page: string) => void;
+}
 
-  const reportItems = [
-    {
-      title: "Relatórios",
-      url: "/reports",
-      icon: FileText,
-    },
-    {
-      title: "Relatório de Lucros",
-      url: "/profit-report",
-      icon: TrendingUp,
-    },
-    {
-      title: "Relatório de Encomendas",
-      url: "/order-products-report",
-      icon: ClipboardList,
-    },
-    {
-      title: "Log de Auditoria",
-      url: "/audit-log",
-      icon: Settings,
-    },
+const AppSidebar = ({ currentPage, onPageChange }: AppSidebarProps) => {
+  const menuItems = [
+    { title: 'Dashboard', url: '/', icon: LayoutDashboard, page: 'dashboard' },
+    { title: 'Produtos', url: '/products', icon: Package, page: 'products' },
+    { title: 'Categorias', url: '/categories', icon: ClipboardList, page: 'categories' },
+    { title: 'Clientes', url: '/customers', icon: Users, page: 'customers' },
+    { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales' },
+    { title: 'Encomendas', url: '/orders', icon: ListOrdered, page: 'orders' },
+    { title: 'Solicitações de Encomenda', url: '/product-order-requests', icon: FileText, page: 'product-order-requests' },
+    { title: 'Relatórios', url: '/reports', icon: BarChart3, page: 'reports' },
+    { title: 'Lucro vs Investimento', url: '/profit-report', icon: TrendingUp, page: 'profit-report' },
+    { title: 'Relatório de Encomendas', url: '/order-products-report', icon: FileText, page: 'order-products-report' },
+    { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log' },
   ];
 
   return (
@@ -94,29 +51,19 @@ export function AppSidebar() {
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.page}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className="flex items-center space-x-2">
-                      <item.icon className="w-4 h-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Relatórios</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {reportItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className="flex items-center space-x-2">
-                      <item.icon className="w-4 h-4" />
+                    <NavLink 
+                      to={item.url}
+                      className={({ isActive }) => 
+                        `flex items-center space-x-3 p-3 rounded-lg transition-colors ${
+                          isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+                        }`
+                      }
+                      onClick={() => onPageChange(item.page)}
+                    >
+                      <item.icon className="w-5 h-5" />
                       <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -128,6 +75,6 @@ export function AppSidebar() {
       </SidebarContent>
     </Sidebar>
   );
-}
+};
 
 export default AppSidebar;
