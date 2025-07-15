@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -116,4 +117,32 @@ export interface Reinvestment {
   description?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProductOrderRequest {
+  id: string;
+  product_id: string;
+  customer_name: string;
+  requested_quantity: number;
+  notes?: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  products?: {
+    id: string;
+    name: string;
+    cost_price: number;
+    sale_price: number;
+    quantity: number;
+    category_id: string;
+    image_url?: string;
+    created_at: string;
+    updated_at: string;
+    categories?: {
+      id: string;
+      name: string;
+      created_at: string;
+      updated_at: string;
+    };
+  };
 }

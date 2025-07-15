@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { Product, Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import ImageModal from './ImageModal';
+import ProductOrderRequestDialog from './ProductOrderRequestDialog';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -451,6 +451,10 @@ const ProductsPage = () => {
                   <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
+                      <ProductOrderRequestDialog 
+                        product={product} 
+                        onSuccess={fetchData}
+                      />
                       <Button
                         variant="outline"
                         size="sm"
