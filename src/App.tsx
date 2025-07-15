@@ -15,6 +15,8 @@ import ReportsPage from '@/components/ReportsPage';
 import CategoriesPage from '@/components/CategoriesPage';
 import AuditLogPage from '@/components/AuditLogPage';
 import ProfitReportPage from '@/components/ProfitReportPage';
+import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
+import OrderProductsReportPage from '@/pages/OrderProductsReportPage';
 
 const queryClient = new QueryClient();
 
@@ -52,6 +54,10 @@ const AppContent = () => {
         return <ProfitReportPage />;
       case 'audit':
         return <AuditLogPage />;
+      case 'product-order-requests':
+        return <ProductOrderRequestsPage />;
+      case 'order-products-report':
+        return <OrderProductsReportPage />;
       default:
         return <Dashboard />;
     }
