@@ -289,7 +289,7 @@ const ProductsPage = () => {
                   className="w-full p-2 border rounded-md"
                 >
                   <option value="">Selecione uma categoria</option>
-                  {categories.map((category) => (
+                  {categories.filter(category => category.name !== 'Encomendas').map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name}
                     </option>

@@ -1,9 +1,12 @@
 
 import React, { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 import AppSidebar from './AppSidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,11 +32,14 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
         
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header com trigger do sidebar sempre visível */}
-          <header className="h-14 border-b bg-white flex items-center px-4 lg:px-6 sticky top-0 z-10">
-            <SidebarTrigger className="mr-4" />
-            <h2 className="text-lg font-semibold text-gray-900 truncate">
-              {getPageTitle(currentPage)}
-            </h2>
+          <header className="h-14 border-b bg-white flex items-center justify-between px-4 lg:px-6 sticky top-0 z-10">
+            <div className="flex items-center">
+              <SidebarTrigger className="mr-4" />
+              <h2 className="text-lg font-semibold text-gray-900 truncate">
+                {getPageTitle(currentPage)}
+              </h2>
+            </div>
+            <LogoutButton />
           </header>
 
           {/* Main Content */}
@@ -48,6 +54,32 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
   );
 };
 
+const LogoutButton = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleLogout}
+      className="flex items-center gap-2"
+    >
+      <LogOut className="w-4 h-4" />
+      Sair
+    </Button>
+  );
+};
+
 const getPageTitle = (page: string) => {
   const titles = {
     dashboard: 'Dashboard',
@@ -56,7 +88,7 @@ const getPageTitle = (page: string) => {
     customers: 'Clientes',
     sales: 'Vendas',
     orders: 'Encomendas',
-    'product-order-requests': 'Solicitações de Encomenda',
+    'product-order-requests': 'Encomendas',
     reports: 'Relatórios',
     'profit-report': 'Lucro vs Investimento',
     'order-products-report': 'Relatório de Encomendas',

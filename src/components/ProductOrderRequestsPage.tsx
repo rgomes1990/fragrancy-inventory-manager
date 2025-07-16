@@ -122,15 +122,15 @@ const ProductOrderRequestsPage = () => {
       if (editingRequest) {
         // Se mudando para "Concluído", adicionar ao estoque
         if (formData.status === 'Concluído' && editingRequest.status !== 'Concluído') {
-          const currentProduct = await supabase
+          const { data: currentProduct, error: productError } = await supabase
             .from('products')
             .select('quantity')
             .eq('id', formData.product_id)
             .single();
 
-          if (currentProduct.error) throw currentProduct.error;
+          if (productError) throw productError;
 
-          const newQuantity = currentProduct.data.quantity + parseInt(formData.requested_quantity);
+          const newQuantity = currentProduct.quantity + parseInt(formData.requested_quantity);
 
           const { error: updateProductError } = await supabase
             .from('products')
