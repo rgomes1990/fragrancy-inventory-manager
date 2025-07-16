@@ -318,6 +318,13 @@ const ProductsPage = () => {
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
                   required
                 />
+                {formData.quantity === '0' && (
+                  <div className="mt-1">
+                    <span className="text-sm font-medium text-red-600 bg-red-50 px-2 py-1 rounded">
+                      Tipo: Sem Estoque
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>

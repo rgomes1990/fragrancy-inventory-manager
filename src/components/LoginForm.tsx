@@ -24,6 +24,8 @@ const LoginForm = () => {
           title: "Login realizado com sucesso!",
           description: "Bem-vindo ao sistema de gestão de perfumes.",
         });
+        // Forçar redirecionamento após login bem-sucedido
+        window.location.href = '/';
       } else {
         toast({
           title: "Erro no login",

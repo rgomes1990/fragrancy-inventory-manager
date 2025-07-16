@@ -23,14 +23,26 @@ const OrderProductsPDFReport = () => {
         `)
         .order('created_at', { ascending: false });
 
+      // Buscar produtos do tipo encomenda cadastrados
+      const orderProductsResult = await supabase
+        .from('products')
+        .select(`
+          *,
+          categories(name)
+        `)
+        .eq('is_order_product', true)
+        .order('created_at', { ascending: false });
+
       if (requestsResult.error) throw requestsResult.error;
+      if (orderProductsResult.error) throw orderProductsResult.error;
 
       const orderRequests = requestsResult.data || [];
+      const orderProducts = orderProductsResult.data || [];
 
-      if (orderRequests.length === 0) {
+      if (orderRequests.length === 0 && orderProducts.length === 0) {
         toast({
           title: "Aviso",
-          description: "Nenhuma solicitação de encomenda encontrada.",
+          description: "Nenhuma encomenda encontrada.",
         });
         return;
       }
@@ -69,7 +81,9 @@ const OrderProductsPDFReport = () => {
       let totalCostPrice = 0;
       let totalSalePrice = 0;
       let totalQuantity = 0;
+      let totalItems = 0;
 
+      // Adicionar solicitações de encomenda
       orderRequests.forEach((request) => {
         if (yPosition > 270) {
           doc.addPage();
@@ -85,6 +99,7 @@ const OrderProductsPDFReport = () => {
         totalCostPrice += costPrice * quantity;
         totalSalePrice += salePrice * quantity;
         totalQuantity += quantity;
+        totalItems += 1;
         
         doc.text(productName.substring(0, 20), 20, yPosition);
         doc.text(request.customer_name.substring(0, 15), 60, yPosition);
@@ -95,13 +110,41 @@ const OrderProductsPDFReport = () => {
         
         yPosition += 8;
       });
+
+      // Adicionar produtos do tipo encomenda
+      orderProducts.forEach((product) => {
+        if (yPosition > 270) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        const productName = product.name;
+        const costPrice = product.cost_price || 0;
+        const salePrice = product.sale_price || 0;
+        const quantity = product.quantity;
+        
+        // Calcular totais
+        totalCostPrice += costPrice * quantity;
+        totalSalePrice += salePrice * quantity;
+        totalQuantity += quantity;
+        totalItems += 1;
+        
+        doc.text(productName.substring(0, 20), 20, yPosition);
+        doc.text('Estoque', 60, yPosition);
+        doc.text(quantity.toString(), 100, yPosition);
+        doc.text(`R$ ${costPrice.toFixed(2)}`, 120, yPosition);
+        doc.text(`R$ ${salePrice.toFixed(2)}`, 160, yPosition);
+        doc.text(new Date(product.created_at).toLocaleDateString('pt-BR'), 190, yPosition);
+        
+        yPosition += 8;
+      });
       
       // Totais
       yPosition += 10;
       doc.line(20, yPosition, 200, yPosition);
       doc.setFontSize(12);
       yPosition += 10;
-      doc.text(`Total de solicitações: ${orderRequests.length}`, 20, yPosition);
+      doc.text(`Total de encomendas: ${totalItems}`, 20, yPosition);
       
       yPosition += 8;
       doc.text(`Quantidade total: ${totalQuantity}`, 20, yPosition);

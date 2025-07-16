@@ -51,10 +51,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   }, []);
 
-  // Sempre definir o contexto quando o usuário atual mudar
+  // Sempre definir o contexto quando o usuário atual mudar (com debounce)
   useEffect(() => {
     if (currentUser && isAuthenticated) {
-      setUserContext();
+      const timer = setTimeout(() => {
+        setUserContext();
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [currentUser, isAuthenticated]);
 
