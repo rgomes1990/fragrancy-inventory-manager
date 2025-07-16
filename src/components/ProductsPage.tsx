@@ -454,8 +454,12 @@ const ProductsPage = () => {
                   <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
                   <TableCell>{product.quantity}</TableCell>
                   <TableCell>
-                    <Badge variant={product.is_order_product ? "secondary" : "default"}>
-                      {product.is_order_product ? 'Encomenda' : 'Estoque'}
+                    <Badge variant={
+                      product.is_order_product ? "secondary" : 
+                      product.quantity === 0 ? "destructive" : "default"
+                    }>
+                      {product.is_order_product ? 'Encomenda' : 
+                       product.quantity === 0 ? 'Sem Estoque' : 'Estoque'}
                     </Badge>
                   </TableCell>
                   <TableCell>

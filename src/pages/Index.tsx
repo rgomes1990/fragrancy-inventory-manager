@@ -1,8 +1,9 @@
 
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 
 const Index = () => {
-  return null; // O App.tsx agora gerencia toda a navegação
+  return <Navigate to="/" replace />;
 };
 
 export default Index;

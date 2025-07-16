@@ -120,18 +120,28 @@ const ProductOrderRequestsPage = () => {
       };
 
       if (editingRequest) {
-        // Se mudando para "Concluído", adicionar ao estoque
-        if (formData.status === 'Concluído' && editingRequest.status !== 'Concluído') {
-          const { data: currentProduct, error: productError } = await supabase
-            .from('products')
-            .select('quantity')
-            .eq('id', formData.product_id)
-            .single();
+        // Gerenciar estoque baseado na mudança de status
+        const { data: currentProduct, error: productError } = await supabase
+          .from('products')
+          .select('quantity')
+          .eq('id', formData.product_id)
+          .single();
 
-          if (productError) throw productError;
+        if (productError) throw productError;
 
-          const newQuantity = currentProduct.quantity + parseInt(formData.requested_quantity);
+        let newQuantity = currentProduct.quantity;
 
+        // Se mudando de "Concluído" para "Pendente", subtrair do estoque
+        if (editingRequest.status === 'Concluído' && formData.status === 'Pendente') {
+          newQuantity = Math.max(0, currentProduct.quantity - parseInt(formData.requested_quantity));
+        }
+        // Se mudando de "Pendente" para "Concluído", adicionar ao estoque
+        else if (editingRequest.status !== 'Concluído' && formData.status === 'Concluído') {
+          newQuantity = currentProduct.quantity + parseInt(formData.requested_quantity);
+        }
+
+        // Atualizar quantidade se houve mudança
+        if (newQuantity !== currentProduct.quantity) {
           const { error: updateProductError } = await supabase
             .from('products')
             .update({ quantity: newQuantity })
