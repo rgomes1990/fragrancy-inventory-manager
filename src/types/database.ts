@@ -148,3 +148,13 @@ export interface ProductOrderRequest {
     };
   };
 }
+
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  expense_date: string;
+  created_at: string;
+  updated_at: string;
+}

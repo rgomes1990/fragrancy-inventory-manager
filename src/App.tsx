@@ -12,6 +12,7 @@ import ProductsPage from '@/components/ProductsPage';
 import CategoriesPage from '@/components/CategoriesPage';
 import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
+import ExpensesPage from '@/components/ExpensesPage';
 import ReportsPage from '@/components/ReportsPage';
 import ProfitReportPage from '@/components/ProfitReportPage';
 import AuditLogPage from '@/components/AuditLogPage';
@@ -49,6 +50,7 @@ const App = () => {
                         <Route path="/customers" element={<CustomersPage />} />
                         <Route path="/sales" element={<SalesPage />} />
                         <Route path="/product-order-requests" element={<ProductOrderRequestsPage />} />
+                        <Route path="/expenses" element={<ExpensesPage />} />
                         <Route path="/reports" element={<ReportsPage />} />
                         <Route path="/profit-report" element={<ProfitReportPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />

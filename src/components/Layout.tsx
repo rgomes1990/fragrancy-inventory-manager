@@ -89,6 +89,7 @@ const getPageTitle = (page: string) => {
     sales: 'Vendas',
     orders: 'Encomendas',
     'product-order-requests': 'Encomendas',
+    expenses: 'Despesas',
     reports: 'Relatórios',
     'profit-report': 'Lucro vs Investimento',
     'order-products-report': 'Relatório de Encomendas',
