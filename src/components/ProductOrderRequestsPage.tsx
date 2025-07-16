@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -121,11 +122,19 @@ const ProductOrderRequestsPage = () => {
       if (editingRequest) {
         // Se mudando para "Concluído", adicionar ao estoque
         if (formData.status === 'Concluído' && editingRequest.status !== 'Concluído') {
+          const currentProduct = await supabase
+            .from('products')
+            .select('quantity')
+            .eq('id', formData.product_id)
+            .single();
+
+          if (currentProduct.error) throw currentProduct.error;
+
+          const newQuantity = currentProduct.data.quantity + parseInt(formData.requested_quantity);
+
           const { error: updateProductError } = await supabase
             .from('products')
-            .update({ 
-              quantity: supabase.sql`quantity + ${parseInt(formData.requested_quantity)}`
-            })
+            .update({ quantity: newQuantity })
             .eq('id', formData.product_id);
 
           if (updateProductError) throw updateProductError;

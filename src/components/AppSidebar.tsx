@@ -24,15 +24,12 @@ import {
 } from '@/components/ui/sidebar';
 
 interface AppSidebarProps {
-  isAuthenticated?: boolean;
+  currentPage?: string;
+  onPageChange?: (page: string) => void;
 }
 
-const AppSidebar: React.FC<AppSidebarProps> = ({ isAuthenticated = false }) => {
+const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) => {
   const location = useLocation();
-
-  if (!isAuthenticated) {
-    return null;
-  }
 
   const menuItems = [
     { title: 'Dashboard', url: '/', icon: Home, page: '' },
