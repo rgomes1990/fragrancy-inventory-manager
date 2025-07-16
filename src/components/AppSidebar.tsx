@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Users, 
-  ShoppingCart, 
-  ClipboardList, 
+import { useLocation } from 'react-router-dom';
+import {
+  Home,
+  Package,
+  ClipboardList,
+  Users,
+  ShoppingCart,
   FileText,
   TrendingUp,
   BarChart3,
@@ -24,45 +24,47 @@ import {
 } from '@/components/ui/sidebar';
 
 interface AppSidebarProps {
-  currentPage: string;
-  onPageChange: (page: string) => void;
+  isAuthenticated?: boolean;
 }
 
-const AppSidebar = ({ currentPage, onPageChange }: AppSidebarProps) => {
+const AppSidebar: React.FC<AppSidebarProps> = ({ isAuthenticated = false }) => {
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   const menuItems = [
-    { title: 'Dashboard', url: '/', icon: LayoutDashboard, page: 'dashboard' },
+    { title: 'Dashboard', url: '/', icon: Home, page: '' },
     { title: 'Produtos', url: '/products', icon: Package, page: 'products' },
     { title: 'Categorias', url: '/categories', icon: ClipboardList, page: 'categories' },
     { title: 'Clientes', url: '/customers', icon: Users, page: 'customers' },
     { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales' },
-    { title: 'Solicitações de Encomenda', url: '/product-order-requests', icon: FileText, page: 'product-order-requests' },
+    { title: 'Encomendas', url: '/product-order-requests', icon: FileText, page: 'product-order-requests' },
     { title: 'Relatórios', url: '/reports', icon: BarChart3, page: 'reports' },
     { title: 'Lucro vs Investimento', url: '/profit-report', icon: TrendingUp, page: 'profit-report' },
     { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log' },
   ];
 
+  const isActive = (page: string) => {
+    if (page === '') return location.pathname === '/';
+    return location.pathname.includes(page);
+  };
+
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Sistema de Perfumes</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.page}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url}
-                      className={({ isActive }) => 
-                        `flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                          isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-                        }`
-                      }
-                      onClick={() => onPageChange(item.page)}
-                    >
-                      <item.icon className="w-5 h-5" />
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={isActive(item.page)}>
+                    <a href={item.url}>
+                      <item.icon />
                       <span>{item.title}</span>
-                    </NavLink>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

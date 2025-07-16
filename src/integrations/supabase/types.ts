@@ -186,32 +186,38 @@ export type Database = {
       }
       product_order_requests: {
         Row: {
+          cost_price: number | null
           created_at: string
           customer_name: string
           id: string
           notes: string | null
           product_id: string
           requested_quantity: number
+          sale_price: number | null
           status: string
           updated_at: string
         }
         Insert: {
+          cost_price?: number | null
           created_at?: string
           customer_name: string
           id?: string
           notes?: string | null
           product_id: string
           requested_quantity: number
+          sale_price?: number | null
           status?: string
           updated_at?: string
         }
         Update: {
+          cost_price?: number | null
           created_at?: string
           customer_name?: string
           id?: string
           notes?: string | null
           product_id?: string
           requested_quantity?: number
+          sale_price?: number | null
           status?: string
           updated_at?: string
         }

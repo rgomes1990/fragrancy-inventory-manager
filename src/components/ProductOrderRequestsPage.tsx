@@ -119,6 +119,18 @@ const ProductOrderRequestsPage = () => {
       };
 
       if (editingRequest) {
+        // Se mudando para "Concluído", adicionar ao estoque
+        if (formData.status === 'Concluído' && editingRequest.status !== 'Concluído') {
+          const { error: updateProductError } = await supabase
+            .from('products')
+            .update({ 
+              quantity: supabase.sql`quantity + ${parseInt(formData.requested_quantity)}`
+            })
+            .eq('id', formData.product_id);
+
+          if (updateProductError) throw updateProductError;
+        }
+
         const { error } = await supabase
           .from('product_order_requests')
           .update(requestData)
@@ -215,12 +227,8 @@ const ProductOrderRequestsPage = () => {
     switch (status) {
       case 'Pendente':
         return 'default';
-      case 'Em Produção':
-        return 'secondary';
-      case 'Concluída':
+      case 'Concluído':
         return 'outline';
-      case 'Cancelada':
-        return 'destructive';
       default:
         return 'default';
     }
@@ -229,7 +237,7 @@ const ProductOrderRequestsPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">Solicitações de Encomenda</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Encomendas</h1>
         <Card>
           <CardContent className="p-8 text-center">
             <p>Carregando solicitações...</p>
@@ -242,7 +250,7 @@ const ProductOrderRequestsPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Solicitações de Encomenda</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Encomendas</h1>
         <div className="flex gap-2">
           <OrderProductsPDFReport />
           <Button onClick={() => setShowForm(true)}>
@@ -358,9 +366,7 @@ const ProductOrderRequestsPage = () => {
                   className="w-full p-2 border rounded-md"
                 >
                   <option value="Pendente">Pendente</option>
-                  <option value="Em Produção">Em Produção</option>
-                  <option value="Concluída">Concluída</option>
-                  <option value="Cancelada">Cancelada</option>
+                  <option value="Concluído">Concluído</option>
                 </select>
               </div>
 

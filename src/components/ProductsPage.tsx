@@ -5,13 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Trash2, Edit, Upload, Search } from 'lucide-react';
+import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Product, Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 import ImageModal from './ImageModal';
-import ProductOrderRequestDialog from './ProductOrderRequestDialog';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -21,17 +20,16 @@ const ProductsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { setUserContext } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     name: '',
     cost_price: '',
     sale_price: '',
     quantity: '',
     category_id: '',
-    is_order_product: false,
     image_url: '',
+    is_order_product: false,
   });
 
   const fetchData = async () => {
@@ -43,7 +41,7 @@ const ProductsPage = () => {
             *,
             categories(id, name, created_at, updated_at)
           `)
-          .order('name'),
+          .order('created_at', { ascending: false }),
         supabase
           .from('categories')
           .select('*')
@@ -107,8 +105,8 @@ const ProductsPage = () => {
         sale_price: parseFloat(formData.sale_price),
         quantity: parseInt(formData.quantity),
         category_id: formData.category_id || null,
-        is_order_product: formData.is_order_product,
         image_url: formData.image_url || null,
+        is_order_product: formData.is_order_product || false,
       };
 
       if (editingProduct) {
@@ -156,8 +154,8 @@ const ProductsPage = () => {
       sale_price: product.sale_price.toString(),
       quantity: product.quantity.toString(),
       category_id: product.category_id || '',
-      is_order_product: product.is_order_product,
       image_url: product.image_url || '',
+      is_order_product: product.is_order_product || false,
     });
     setShowForm(true);
   };
@@ -197,46 +195,11 @@ const ProductsPage = () => {
       sale_price: '',
       quantity: '',
       category_id: '',
-      is_order_product: false,
       image_url: '',
+      is_order_product: false,
     });
     setEditingProduct(null);
     setShowForm(false);
-  };
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `product-images/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(filePath);
-
-      setFormData(prev => ({ ...prev, image_url: publicUrl }));
-
-      toast({
-        title: "Sucesso",
-        description: "Imagem carregada com sucesso!",
-      });
-    } catch (error) {
-      console.error('Erro ao fazer upload da imagem:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível fazer upload da imagem.",
-        variant: "destructive",
-      });
-    }
   };
 
   if (loading) {
@@ -270,7 +233,7 @@ const ProductsPage = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="name">Nome</Label>
                 <Input
@@ -279,22 +242,6 @@ const ProductsPage = () => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   required
                 />
-              </div>
-
-              <div>
-                <Label htmlFor="category">Categoria</Label>
-                <select 
-                  value={formData.category_id} 
-                  onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-                  className="w-full p-2 border rounded-md"
-                >
-                  <option value="">Selecione uma categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div>
@@ -332,46 +279,47 @@ const ProductsPage = () => {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_order_product"
-                  checked={formData.is_order_product}
-                  onChange={(e) => setFormData({...formData, is_order_product: e.target.checked})}
+              <div>
+                <Label htmlFor="category">Categoria</Label>
+                <select
+                  id="category"
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({...formData, category_id: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="image_url">URL da Imagem</Label>
+                <Input
+                  id="image_url"
+                  type="url"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({...formData, image_url: e.target.value})}
                 />
-                <Label htmlFor="is_order_product">Produto de Encomenda</Label>
               </div>
 
-              <div className="md:col-span-2 lg:col-span-3">
-                <Label htmlFor="image">Imagem do Produto</Label>
-                <div className="flex items-center space-x-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="is_order_product">
                   <input
-                    type="file"
-                    id="image"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
+                    type="checkbox"
+                    id="is_order_product"
+                    checked={formData.is_order_product}
+                    onChange={(e) => setFormData({...formData, is_order_product: e.target.checked})}
+                    className="mr-2"
                   />
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => document.getElementById('image')?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Carregar Imagem
-                  </Button>
-                  {formData.image_url && (
-                    <img 
-                      src={formData.image_url} 
-                      alt="Preview" 
-                      className="w-20 h-20 object-cover rounded cursor-pointer"
-                      onClick={() => setSelectedImage(formData.image_url)}
-                    />
-                  )}
-                </div>
+                  Produto de Encomenda
+                </Label>
               </div>
 
-              <div className="md:col-span-2 lg:col-span-3 flex space-x-2">
+              <div className="md:col-span-2 flex space-x-2">
                 <Button type="submit">
                   {editingProduct ? 'Atualizar Produto' : 'Criar Produto'}
                 </Button>
@@ -409,10 +357,10 @@ const ProductsPage = () => {
                 <TableHead>Imagem</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Categoria</TableHead>
-                <TableHead>Tipo</TableHead>
                 <TableHead>Preço Custo</TableHead>
                 <TableHead>Preço Venda</TableHead>
                 <TableHead>Quantidade</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -421,15 +369,18 @@ const ProductsPage = () => {
                 <TableRow key={product.id}>
                   <TableCell>
                     {product.image_url ? (
-                      <img 
-                        src={product.image_url} 
-                        alt={product.name}
-                        className="w-12 h-12 object-cover rounded cursor-pointer"
-                        onClick={() => setSelectedImage(product.image_url)}
-                      />
+                      <ImageModal imageUrl={product.image_url} altText={product.name}>
+                        <div className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer border">
+                          <img 
+                            src={product.image_url} 
+                            alt={product.name}
+                            className="w-full h-full object-cover hover:scale-110 transition-transform"
+                          />
+                        </div>
+                      </ImageModal>
                     ) : (
-                      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-                        <Package className="w-6 h-6 text-gray-400" />
+                      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
+                        <ImageIcon className="w-6 h-6 text-gray-400" />
                       </div>
                     )}
                   </TableCell>
@@ -437,20 +388,16 @@ const ProductsPage = () => {
                   <TableCell>
                     {product.categories?.name || 'Sem categoria'}
                   </TableCell>
+                  <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
+                  <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
+                  <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <Badge variant={product.is_order_product ? "secondary" : "default"}>
                       {product.is_order_product ? 'Encomenda' : 'Estoque'}
                     </Badge>
                   </TableCell>
-                  <TableCell>R$ {product.cost_price.toFixed(2)}</TableCell>
-                  <TableCell>R$ {product.sale_price.toFixed(2)}</TableCell>
-                  <TableCell>{product.quantity}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <ProductOrderRequestDialog 
-                        product={product} 
-                        onSuccess={fetchData}
-                      />
                       <Button
                         variant="outline"
                         size="sm"
@@ -474,14 +421,6 @@ const ProductsPage = () => {
           </Table>
         </CardContent>
       </Card>
-
-      {selectedImage && (
-        <ImageModal
-          imageUrl={selectedImage}
-          isOpen={!!selectedImage}
-          onClose={() => setSelectedImage(null)}
-        />
-      )}
     </div>
   );
 };
