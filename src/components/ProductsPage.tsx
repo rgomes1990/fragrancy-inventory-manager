@@ -20,6 +20,8 @@ const ProductsPage = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { setUserContext } = useAuth();
 
@@ -189,6 +191,44 @@ const ProductsPage = () => {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImageUploading(true);
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      setFormData({...formData, image_url: data.publicUrl});
+      
+      toast({
+        title: "Sucesso",
+        description: "Imagem enviada com sucesso!",
+      });
+    } catch (error) {
+      console.error('Erro ao enviar imagem:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar imagem",
+        variant: "destructive",
+      });
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -298,13 +338,27 @@ const ProductsPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="image_url">URL da Imagem</Label>
+                <Label htmlFor="image">Imagem do Produto</Label>
                 <Input
-                  id="image_url"
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="cursor-pointer"
                 />
+                {imageUploading && (
+                  <p className="text-sm text-gray-500 mt-1">Enviando imagem...</p>
+                )}
+                {formData.image_url && (
+                  <div className="mt-2">
+                    <img 
+                      src={formData.image_url} 
+                      alt="Preview" 
+                      className="w-20 h-20 object-cover rounded border cursor-pointer"
+                      onClick={() => setSelectedImage(formData.image_url)}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="md:col-span-2">
