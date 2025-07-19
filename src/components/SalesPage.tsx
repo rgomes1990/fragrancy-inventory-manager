@@ -455,19 +455,11 @@ const SalesPage = () => {
         <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
         <div className="flex space-x-2">
           <Button 
-            onClick={() => setShowForm(true)}
-            variant="outline"
-            className="bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Venda Simples
-          </Button>
-          <Button 
             onClick={() => setShowMultiForm(true)}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Venda Múltiplos Produtos
+            Cadastrar Venda
           </Button>
         </div>
       </div>

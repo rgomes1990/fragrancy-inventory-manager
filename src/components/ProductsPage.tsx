@@ -33,6 +33,7 @@ const ProductsPage = () => {
     category_id: '',
     image_url: '',
     is_order_product: false,
+    customer_name: '',
   });
 
   const fetchData = async () => {
@@ -110,6 +111,7 @@ const ProductsPage = () => {
         category_id: formData.category_id || null,
         image_url: formData.image_url || null,
         is_order_product: formData.is_order_product || false,
+        customer_name: formData.is_order_product ? formData.customer_name : null,
       };
 
       if (editingProduct) {
@@ -159,6 +161,7 @@ const ProductsPage = () => {
       category_id: product.category_id || '',
       image_url: product.image_url || '',
       is_order_product: product.is_order_product || false,
+      customer_name: product.customer_name || '',
     });
     setShowForm(true);
   };
@@ -238,6 +241,7 @@ const ProductsPage = () => {
       category_id: '',
       image_url: '',
       is_order_product: false,
+      customer_name: '',
     });
     setEditingProduct(null);
     setShowForm(false);
@@ -380,6 +384,19 @@ const ProductsPage = () => {
                   Produto de Encomenda
                 </Label>
               </div>
+
+              {formData.is_order_product && (
+                <div className="md:col-span-2">
+                  <Label htmlFor="customer_name">Nome do Cliente</Label>
+                  <Input
+                    id="customer_name"
+                    value={formData.customer_name || ''}
+                    onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
+                    placeholder="Digite o nome do cliente"
+                    required={formData.is_order_product}
+                  />
+                </div>
+              )}
 
               <div className="md:col-span-2 flex space-x-2">
                 <Button type="submit">
