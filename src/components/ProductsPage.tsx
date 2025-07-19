@@ -161,7 +161,7 @@ const ProductsPage = () => {
       category_id: product.category_id || '',
       image_url: product.image_url || '',
       is_order_product: product.is_order_product || false,
-      customer_name: product.customer_name || '',
+      customer_name: (product as any).customer_name || '',
     });
     setShowForm(true);
   };
