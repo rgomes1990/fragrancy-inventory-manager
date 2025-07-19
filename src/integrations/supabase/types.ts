@@ -266,6 +266,7 @@ export type Database = {
           category_id: string | null
           cost_price: number
           created_at: string | null
+          customer_name: string | null
           id: string
           image_url: string | null
           is_order_product: boolean
@@ -278,6 +279,7 @@ export type Database = {
           category_id?: string | null
           cost_price: number
           created_at?: string | null
+          customer_name?: string | null
           id?: string
           image_url?: string | null
           is_order_product?: boolean
@@ -290,6 +292,7 @@ export type Database = {
           category_id?: string | null
           cost_price?: number
           created_at?: string | null
+          customer_name?: string | null
           id?: string
           image_url?: string | null
           is_order_product?: boolean

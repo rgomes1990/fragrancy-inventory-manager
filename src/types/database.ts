@@ -10,6 +10,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   is_order_product: boolean;
+  customer_name?: string;
   categories?: {
     id: string;
     name: string;
