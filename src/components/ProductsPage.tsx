@@ -23,6 +23,7 @@ const ProductsPage = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const { setUserContext } = useAuth();
 
   const [formData, setFormData] = useState({
@@ -75,24 +76,38 @@ const ProductsPage = () => {
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm]);
+  }, [products, searchTerm, typeFilter]);
 
   const filterProducts = () => {
-    if (!searchTerm) {
-      setFilteredProducts(products);
-      return;
-    }
+    let filtered = products;
 
-    const filtered = products.filter(product => {
+    // Apply search filter
+    if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      return (
+      filtered = filtered.filter(product => 
         product.name.toLowerCase().includes(searchLower) ||
         product.categories?.name?.toLowerCase().includes(searchLower) ||
         product.cost_price.toString().includes(searchLower) ||
         product.sale_price.toString().includes(searchLower) ||
         product.quantity.toString().includes(searchLower)
       );
-    });
+    }
+
+    // Apply type filter
+    if (typeFilter) {
+      filtered = filtered.filter(product => {
+        switch (typeFilter) {
+          case 'Encomenda':
+            return product.is_order_product;
+          case 'Estoque':
+            return !product.is_order_product && product.quantity > 0;
+          case 'Sem Estoque':
+            return !product.is_order_product && product.quantity === 0;
+          default:
+            return true;
+        }
+      });
+    }
 
     setFilteredProducts(filtered);
   };
@@ -418,14 +433,26 @@ const ProductsPage = () => {
               <Package className="w-5 h-5" />
               <span>Lista de Produtos</span>
             </CardTitle>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder="Buscar produtos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-64"
-              />
+            <div className="flex space-x-3">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="p-2 border rounded-md bg-background"
+              >
+                <option value="">Todos os tipos</option>
+                <option value="Encomenda">Encomenda</option>
+                <option value="Estoque">Estoque</option>
+                <option value="Sem Estoque">Sem Estoque</option>
+              </select>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Input
+                  placeholder="Buscar produtos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 w-64"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
