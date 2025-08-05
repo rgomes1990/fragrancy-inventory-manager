@@ -85,10 +85,14 @@ const Dashboard = () => {
 
       const { data: allProductsData } = await supabase
         .from('products')
-        .select('cost_price, sale_price, quantity');
+        .select('cost_price, sale_price, quantity, is_order_product');
       
       const totalCostSum = allProductsData?.reduce((sum, product) => {
-        return sum + Number(product.cost_price);
+        // Excluir produtos de encomenda (is_order_product = true)
+        if (!product.is_order_product) {
+          return sum + Number(product.cost_price);
+        }
+        return sum;
       }, 0) || 0;
       
       const totalSaleSum = allProductsData?.reduce((sum, product) => {
