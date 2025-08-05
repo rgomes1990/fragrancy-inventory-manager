@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { Product, Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 import ImageModal from './ImageModal';
+import OrderProductsPDFReport from './OrderProductsPDFReport';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -279,10 +280,13 @@ const ProductsPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Produto
-        </Button>
+        <div className="flex gap-2">
+          <OrderProductsPDFReport />
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Produto
+          </Button>
+        </div>
       </div>
 
       {showForm && (
