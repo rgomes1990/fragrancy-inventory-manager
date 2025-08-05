@@ -258,11 +258,18 @@ const Dashboard = () => {
         bgColor: 'bg-red-50',
       },
       {
-        title: 'Soma Preços de Venda',
+        title: 'Projeção de Vendas',
         value: `R$ ${stats.totalSaleSum.toFixed(2)}`,
         icon: Package,
         color: 'from-indigo-500 to-indigo-600',
         bgColor: 'bg-indigo-50',
+      },
+      {
+        title: 'Caixa',
+        value: `R$ ${(stats.totalRevenue - stats.totalCostSum).toFixed(2)}`,
+        icon: DollarSign,
+        color: 'from-emerald-500 to-emerald-600',
+        bgColor: 'bg-emerald-50',
       },
     ];
 
