@@ -25,7 +25,7 @@ const StockProductsPDFReport = () => {
 
   const generateStockProductsReport = async () => {
     try {
-      // Buscar produtos em estoque (quantity > 0 e não é produto de encomenda)
+      // Buscar produtos em estoque (quantity > 0 e não é produto de encomenda e tem categoria)
       const stockProductsResult = await supabase
         .from('products')
         .select(`
@@ -34,6 +34,7 @@ const StockProductsPDFReport = () => {
         `)
         .eq('is_order_product', false)
         .gt('quantity', 0)
+        .not('category_id', 'is', null)
         .order('name');
 
       if (stockProductsResult.error) throw stockProductsResult.error;
@@ -65,9 +66,8 @@ const StockProductsPDFReport = () => {
       doc.setFontSize(12);
       doc.text('Foto', 20, yPosition);
       doc.text('Produto', 50, yPosition);
-      doc.text('Categoria', 110, yPosition);
-      doc.text('Quantidade', 150, yPosition);
-      doc.text('Preço', 180, yPosition);
+      doc.text('Categoria', 120, yPosition);
+      doc.text('Preço', 170, yPosition);
       
       yPosition += 5;
       
@@ -87,7 +87,6 @@ const StockProductsPDFReport = () => {
         
         const productName = product.name;
         const categoryName = product.categories?.name || 'Sem categoria';
-        const quantity = product.quantity;
         const salePrice = product.sale_price || 0;
         
         // Carregar e adicionar imagem se existir
@@ -104,9 +103,8 @@ const StockProductsPDFReport = () => {
         }
         
         doc.text(productName.substring(0, 20), 50, yPosition);
-        doc.text(categoryName.substring(0, 15), 110, yPosition);
-        doc.text(quantity.toString(), 150, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 180, yPosition);
+        doc.text(categoryName.substring(0, 15), 120, yPosition);
+        doc.text(`R$ ${salePrice.toFixed(2)}`, 170, yPosition);
         
         yPosition += 20; // Aumentar espaçamento para acomodar as imagens
       }
