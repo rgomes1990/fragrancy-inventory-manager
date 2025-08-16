@@ -6,6 +6,23 @@ import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 
 const StockProductsPDFReport = () => {
+  const loadImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Erro ao carregar imagem:', error);
+      return null;
+    }
+  };
+
   const generateStockProductsReport = async () => {
     try {
       // Buscar produtos em estoque (quantity > 0 e não é produto de encomenda)
@@ -46,10 +63,11 @@ const StockProductsPDFReport = () => {
       
       // Cabeçalhos
       doc.setFontSize(12);
-      doc.text('Produto', 20, yPosition);
-      doc.text('Categoria', 80, yPosition);
-      doc.text('Quantidade', 130, yPosition);
-      doc.text('Preço de Venda', 170, yPosition);
+      doc.text('Foto', 20, yPosition);
+      doc.text('Produto', 50, yPosition);
+      doc.text('Categoria', 110, yPosition);
+      doc.text('Quantidade', 150, yPosition);
+      doc.text('Preço de Venda', 180, yPosition);
       
       yPosition += 5;
       
@@ -60,11 +78,9 @@ const StockProductsPDFReport = () => {
       
       // Dados dos produtos
       doc.setFontSize(10);
-      let totalProducts = 0;
-      let totalValue = 0;
 
-      stockProducts.forEach((product) => {
-        if (yPosition > 270) {
+      for (const product of stockProducts) {
+        if (yPosition > 250) {
           doc.addPage();
           yPosition = 20;
         }
@@ -74,29 +90,26 @@ const StockProductsPDFReport = () => {
         const quantity = product.quantity;
         const salePrice = product.sale_price || 0;
         
-        // Calcular totais
-        totalProducts += quantity;
-        totalValue += salePrice * quantity;
+        // Carregar e adicionar imagem se existir
+        if (product.image_url) {
+          try {
+            const imageBase64 = await loadImageAsBase64(product.image_url);
+            if (imageBase64) {
+              const imageSize = 15; // Tamanho da imagem
+              doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
+            }
+          } catch (error) {
+            console.error('Erro ao adicionar imagem:', error);
+          }
+        }
         
-        doc.text(productName.substring(0, 25), 20, yPosition);
-        doc.text(categoryName.substring(0, 20), 80, yPosition);
-        doc.text(quantity.toString(), 130, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 170, yPosition);
+        doc.text(productName.substring(0, 20), 50, yPosition);
+        doc.text(categoryName.substring(0, 15), 110, yPosition);
+        doc.text(quantity.toString(), 150, yPosition);
+        doc.text(`R$ ${salePrice.toFixed(2)}`, 180, yPosition);
         
-        yPosition += 8;
-      });
-      
-      // Totais
-      yPosition += 10;
-      doc.line(20, yPosition, 200, yPosition);
-      doc.setFontSize(12);
-      yPosition += 10;
-      doc.text(`Total de produtos diferentes: ${stockProducts.length}`, 20, yPosition);
-      
-      yPosition += 8;
-      doc.text(`Quantidade total em estoque: ${totalProducts}`, 20, yPosition);
-      yPosition += 8;
-      doc.text(`Valor total do estoque: R$ ${totalValue.toFixed(2)}`, 20, yPosition);
+        yPosition += 20; // Aumentar espaçamento para acomodar as imagens
+      }
       
       // Salvar PDF
       doc.save(`catalogo-estoque-${new Date().toISOString().split('T')[0]}.pdf`);
