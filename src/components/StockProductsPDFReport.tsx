@@ -67,7 +67,7 @@ const StockProductsPDFReport = () => {
       doc.text('Produto', 50, yPosition);
       doc.text('Categoria', 110, yPosition);
       doc.text('Quantidade', 150, yPosition);
-      doc.text('Preço de Venda', 180, yPosition);
+      doc.text('Preço', 180, yPosition);
       
       yPosition += 5;
       
