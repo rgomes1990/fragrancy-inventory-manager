@@ -13,6 +13,7 @@ import { Product, Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
+import StockProductsPDFReport from './StockProductsPDFReport';
 
 const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -282,6 +283,7 @@ const ProductsPage = () => {
         <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
         <div className="flex gap-2">
           <OrderProductsPDFReport />
+          <StockProductsPDFReport />
           <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Novo Produto
