@@ -194,6 +194,13 @@ const SalesPage = () => {
           const newQuantity = product.quantity - item.quantity;
           const updateData: any = { quantity: newQuantity };
 
+          console.log(`[MULTI-VENDA] Atualizando estoque do produto ${product.name}:`, {
+            estoqueAnterior: product.quantity,
+            quantidadeVendida: item.quantity,
+            novoEstoque: newQuantity,
+            productId: item.product_id
+          });
+
           if (item.unit_price !== product.sale_price) {
             updateData.sale_price = item.unit_price;
           }
@@ -203,7 +210,14 @@ const SalesPage = () => {
             .update(updateData)
             .eq('id', item.product_id);
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            console.error('[MULTI-VENDA] Erro ao atualizar estoque:', updateError);
+            throw updateError;
+          }
+
+          console.log(`[MULTI-VENDA] Estoque atualizado com sucesso para ${product.name}`);
+        } else {
+          console.error('[MULTI-VENDA] Produto não encontrado para ID:', item.product_id);
         }
       }
 
@@ -291,12 +305,26 @@ const SalesPage = () => {
         if (saleError) throw saleError;
 
         const newQuantity = product.quantity + editingSale.quantity - quantity;
+        
+        console.log(`[EDIÇÃO VENDA] Atualizando estoque do produto ${product.name}:`, {
+          estoqueAtual: product.quantity,
+          quantidadeAnterior: editingSale.quantity,
+          novaQuantidade: quantity,
+          novoEstoque: newQuantity,
+          productId: formData.product_id
+        });
+
         const { error: updateError } = await supabase
           .from('products')
           .update({ quantity: newQuantity })
           .eq('id', formData.product_id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('[EDIÇÃO VENDA] Erro ao atualizar estoque:', updateError);
+          throw updateError;
+        }
+
+        console.log(`[EDIÇÃO VENDA] Estoque atualizado com sucesso para ${product.name}`);
 
         if (unit_price !== product.sale_price) {
           const { error: priceUpdateError } = await supabase
@@ -321,6 +349,13 @@ const SalesPage = () => {
         const newQuantity = product.quantity - quantity;
         const updateData: any = { quantity: newQuantity };
 
+        console.log(`[VENDA SIMPLES] Atualizando estoque do produto ${product.name}:`, {
+          estoqueAnterior: product.quantity,
+          quantidadeVendida: quantity,
+          novoEstoque: newQuantity,
+          productId: formData.product_id
+        });
+
         if (unit_price !== product.sale_price) {
           updateData.sale_price = unit_price;
         }
@@ -330,7 +365,12 @@ const SalesPage = () => {
           .update(updateData)
           .eq('id', formData.product_id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('[VENDA SIMPLES] Erro ao atualizar estoque:', updateError);
+          throw updateError;
+        }
+
+        console.log(`[VENDA SIMPLES] Estoque atualizado com sucesso para ${product.name}`);
 
         toast({
           title: "Sucesso",
@@ -371,12 +411,26 @@ const SalesPage = () => {
       
       const product = products.find(p => p.id === sale.product_id);
       if (product) {
+        const novoEstoque = product.quantity + sale.quantity;
+        
+        console.log(`[EXCLUSÃO VENDA] Devolvendo estoque do produto ${product.name}:`, {
+          estoqueAtual: product.quantity,
+          quantidadeDevolvida: sale.quantity,
+          novoEstoque: novoEstoque,
+          productId: sale.product_id
+        });
+
         const { error: updateError } = await supabase
           .from('products')
-          .update({ quantity: product.quantity + sale.quantity })
+          .update({ quantity: novoEstoque })
           .eq('id', sale.product_id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('[EXCLUSÃO VENDA] Erro ao devolver estoque:', updateError);
+          throw updateError;
+        }
+
+        console.log(`[EXCLUSÃO VENDA] Estoque devolvido com sucesso para ${product.name}`);
       }
 
       const { error } = await supabase
