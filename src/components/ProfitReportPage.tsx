@@ -10,7 +10,6 @@ interface ProfitData {
   daniloShare: number;
   anaPaulaShare: number;
   totalCostSum: number;
-  productExpenses: number;
   travelExpenses: number;
 }
 
@@ -21,7 +20,6 @@ const ProfitReportPage = () => {
     daniloShare: 0,
     anaPaulaShare: 0,
     totalCostSum: 0,
-    productExpenses: 0,
     travelExpenses: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -45,17 +43,6 @@ const ProfitReportPage = () => {
       }, 0) || 0;
 
       // Buscar despesas por categoria
-      const { data: productExpensesData, error: productExpensesError } = await supabase
-        .from('expenses')
-        .select('amount')
-        .eq('category', 'Despesa Produtos');
-
-      if (productExpensesError) throw productExpensesError;
-
-      const productExpenses = productExpensesData?.reduce((sum, expense) => {
-        return sum + Number(expense.amount);
-      }, 0) || 0;
-
       const { data: travelExpensesData, error: travelExpensesError } = await supabase
         .from('expenses')
         .select('amount')
@@ -82,8 +69,8 @@ const ProfitReportPage = () => {
         return sum;
       }, 0) || 0;
 
-      // Calcular caixa da empresa (receita - custos - despesas produtos - despesas viagem)
-      const companyCash = totalRevenue - totalCostSum - productExpenses - travelExpenses;
+      // Calcular caixa da empresa (receita - custos - despesas viagem)
+      const companyCash = totalRevenue - totalCostSum - travelExpenses;
       
       // Dividir por 2 para cada pessoa
       const daniloShare = companyCash / 2;
@@ -95,7 +82,6 @@ const ProfitReportPage = () => {
         daniloShare,
         anaPaulaShare,
         totalCostSum,
-        productExpenses,
         travelExpenses,
       });
     } catch (error) {
@@ -177,23 +163,8 @@ const ProfitReportPage = () => {
         </Card>
       </div>
 
-      {/* Cards de Despesas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-orange-50 border-0 shadow-md">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Despesas Produtos</p>
-                <p className="text-2xl font-bold text-gray-900">R$ {profitData.productExpenses.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Total de despesas com produtos</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Card de Despesas */}
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
         <Card className="bg-purple-50 border-0 shadow-md">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

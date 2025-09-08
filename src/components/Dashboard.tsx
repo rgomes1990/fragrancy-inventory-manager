@@ -73,11 +73,10 @@ const Dashboard = () => {
         productsQuery = productsQuery.eq('quantity', 0);
       }
 
-      const [productsRes, customersRes, salesRes, productExpensesRes, travelExpensesRes] = await Promise.all([
+      const [productsRes, customersRes, salesRes, travelExpensesRes] = await Promise.all([
         productsQuery,
         supabase.from('customers').select('id', { count: 'exact' }),
         supabase.from('sales').select('total_price', { count: 'exact' }),
-        supabase.from('expenses').select('amount').eq('category', 'Despesa Produtos'),
         supabase.from('expenses').select('amount').eq('category', 'Despesas Viagem')
       ]);
 
@@ -87,9 +86,8 @@ const Dashboard = () => {
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
       
-      const productExpenses = productExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
       const travelExpenses = travelExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
-      const totalExpenses = productExpenses + travelExpenses;
+      const totalExpenses = travelExpenses;
 
       const { data: allProductsData } = await supabase
         .from('products')
