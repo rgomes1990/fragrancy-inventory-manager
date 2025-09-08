@@ -9,6 +9,9 @@ interface ProfitData {
   companyCash: number;
   daniloShare: number;
   anaPaulaShare: number;
+  totalCostSum: number;
+  productExpenses: number;
+  travelExpenses: number;
 }
 
 const ProfitReportPage = () => {
@@ -17,6 +20,9 @@ const ProfitReportPage = () => {
     companyCash: 0,
     daniloShare: 0,
     anaPaulaShare: 0,
+    totalCostSum: 0,
+    productExpenses: 0,
+    travelExpenses: 0,
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -38,14 +44,26 @@ const ProfitReportPage = () => {
         return sum + Number(sale.total_price);
       }, 0) || 0;
 
-      // Buscar soma de todas as despesas
-      const { data: expensesData, error: expensesError } = await supabase
+      // Buscar despesas por categoria
+      const { data: productExpensesData, error: productExpensesError } = await supabase
         .from('expenses')
-        .select('amount');
+        .select('amount')
+        .eq('category', 'Despesa Produtos');
 
-      if (expensesError) throw expensesError;
+      if (productExpensesError) throw productExpensesError;
 
-      const totalExpenses = expensesData?.reduce((sum, expense) => {
+      const productExpenses = productExpensesData?.reduce((sum, expense) => {
+        return sum + Number(expense.amount);
+      }, 0) || 0;
+
+      const { data: travelExpensesData, error: travelExpensesError } = await supabase
+        .from('expenses')
+        .select('amount')
+        .eq('category', 'Despesas Viagem');
+
+      if (travelExpensesError) throw travelExpensesError;
+
+      const travelExpenses = travelExpensesData?.reduce((sum, expense) => {
         return sum + Number(expense.amount);
       }, 0) || 0;
 
@@ -64,8 +82,8 @@ const ProfitReportPage = () => {
         return sum;
       }, 0) || 0;
 
-      // Calcular caixa da empresa (receita - custos - despesas)
-      const companyCash = totalRevenue - totalCostSum - totalExpenses;
+      // Calcular caixa da empresa (receita - custos - despesas produtos - despesas viagem)
+      const companyCash = totalRevenue - totalCostSum - productExpenses - travelExpenses;
       
       // Dividir por 2 para cada pessoa
       const daniloShare = companyCash / 2;
@@ -76,6 +94,9 @@ const ProfitReportPage = () => {
         companyCash,
         daniloShare,
         anaPaulaShare,
+        totalCostSum,
+        productExpenses,
+        travelExpenses,
       });
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
@@ -109,7 +130,7 @@ const ProfitReportPage = () => {
       </div>
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="bg-blue-50 border-0 shadow-md">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -125,6 +146,21 @@ const ProfitReportPage = () => {
           </CardContent>
         </Card>
 
+        <Card className="bg-red-50 border-0 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Soma Preços de Custo</p>
+                <p className="text-2xl font-bold text-gray-900">R$ {profitData.totalCostSum.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Custo de todos os produtos</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="bg-green-50 border-0 shadow-md">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -134,6 +170,39 @@ const ProfitReportPage = () => {
                 <p className="text-xs text-gray-500">Receita - Custos - Despesas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Cards de Despesas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="bg-orange-50 border-0 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Despesas Produtos</p>
+                <p className="text-2xl font-bold text-gray-900">R$ {profitData.productExpenses.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Total de despesas com produtos</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-purple-50 border-0 shadow-md">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Despesas Viagem</p>
+                <p className="text-2xl font-bold text-gray-900">R$ {profitData.travelExpenses.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Total de despesas com viagens</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
