@@ -9,7 +9,6 @@ import {
   ShoppingCart,
   FileText,
   TrendingUp,
-  BarChart3,
   Shield,
   Receipt
 } from 'lucide-react';
@@ -40,7 +39,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) =>
     { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales' },
     { title: 'Encomendas', url: '/product-order-requests', icon: FileText, page: 'product-order-requests' },
     { title: 'Despesas', url: '/expenses', icon: Receipt, page: 'expenses' },
-    { title: 'Relatórios', url: '/reports', icon: BarChart3, page: 'reports' },
     { title: 'Lucro vs Investimento', url: '/profit-report', icon: TrendingUp, page: 'profit-report' },
     { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log' },
   ];
