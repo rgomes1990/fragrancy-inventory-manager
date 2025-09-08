@@ -80,11 +80,11 @@ const Dashboard = () => {
         supabase.from('expenses').select('amount')
       ]);
 
-      // Buscar vendas a partir de 29/08/2024
+      // Buscar vendas a partir de 29/08/2025
       const { data: salesData } = await supabase
         .from('sales')
         .select('total_price, sale_date')
-        .gte('sale_date', '2024-08-29');
+        .gte('sale_date', '2025-08-29');
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
       

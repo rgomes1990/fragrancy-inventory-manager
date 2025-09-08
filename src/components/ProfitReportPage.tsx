@@ -31,11 +31,11 @@ const ProfitReportPage = () => {
 
   const fetchData = async () => {
     try {
-      // Buscar vendas a partir de 29/08/2024
+      // Buscar vendas a partir de 29/08/2025
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
         .select('total_price, sale_date')
-        .gte('sale_date', '2024-08-29');
+        .gte('sale_date', '2025-08-29');
 
       if (salesError) throw salesError;
 
@@ -123,7 +123,7 @@ const ProfitReportPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Receita Total</p>
                 <p className="text-2xl font-bold text-gray-900">R$ {profitData.totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Vendas a partir de 29/08/2024</p>
+                <p className="text-xs text-gray-500">Vendas a partir de 29/08/2025</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
