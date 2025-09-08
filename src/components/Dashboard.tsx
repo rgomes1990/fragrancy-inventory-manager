@@ -11,6 +11,7 @@ interface DashboardStats {
   totalRevenue: number;
   totalCostSum: number;
   totalSaleSum: number;
+  totalExpenses: number;
 }
 
 interface TopProduct {
@@ -42,6 +43,7 @@ const Dashboard = () => {
     totalRevenue: 0,
     totalCostSum: 0,
     totalSaleSum: 0,
+    totalExpenses: 0,
   });
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
@@ -71,10 +73,11 @@ const Dashboard = () => {
         productsQuery = productsQuery.eq('quantity', 0);
       }
 
-      const [productsRes, customersRes, salesRes] = await Promise.all([
+      const [productsRes, customersRes, salesRes, expensesRes] = await Promise.all([
         productsQuery,
         supabase.from('customers').select('id', { count: 'exact' }),
-        supabase.from('sales').select('total_price', { count: 'exact' })
+        supabase.from('sales').select('total_price', { count: 'exact' }),
+        supabase.from('expenses').select('amount')
       ]);
 
       const { data: salesData } = await supabase
@@ -82,6 +85,8 @@ const Dashboard = () => {
         .select('total_price');
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      
+      const totalExpenses = expensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
 
       const { data: allProductsData } = await supabase
         .from('products')
@@ -199,6 +204,7 @@ const Dashboard = () => {
         totalRevenue,
         totalCostSum,
         totalSaleSum,
+        totalExpenses,
       });
 
       setRecentSales(recentSalesData || []);
@@ -266,7 +272,7 @@ const Dashboard = () => {
       },
       {
         title: 'Caixa',
-        value: `R$ ${(stats.totalRevenue - stats.totalCostSum).toFixed(2)}`,
+        value: `R$ ${(stats.totalRevenue - stats.totalCostSum - stats.totalExpenses).toFixed(2)}`,
         icon: DollarSign,
         color: 'from-emerald-500 to-emerald-600',
         bgColor: 'bg-emerald-50',
