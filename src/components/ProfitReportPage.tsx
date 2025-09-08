@@ -31,15 +31,26 @@ const ProfitReportPage = () => {
 
   const fetchData = async () => {
     try {
-      // Buscar vendas a partir de 29/08/2025
-      const { data: salesData, error: salesError } = await supabase
+      // Buscar TODAS as vendas para o card Receita Total
+      const { data: allSalesData, error: allSalesError } = await supabase
+        .from('sales')
+        .select('total_price, sale_date');
+
+      if (allSalesError) throw allSalesError;
+
+      const totalRevenue = allSalesData?.reduce((sum, sale) => {
+        return sum + Number(sale.total_price);
+      }, 0) || 0;
+
+      // Buscar vendas a partir de 29/08/2025 para o cálculo do Caixa da Empresa
+      const { data: salesFromDateData, error: salesFromDateError } = await supabase
         .from('sales')
         .select('total_price, sale_date')
         .gte('sale_date', '2025-08-29');
 
-      if (salesError) throw salesError;
+      if (salesFromDateError) throw salesFromDateError;
 
-      const totalRevenue = salesData?.reduce((sum, sale) => {
+      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
         return sum + Number(sale.total_price);
       }, 0) || 0;
 
@@ -70,7 +81,7 @@ const ProfitReportPage = () => {
       }, 0) || 0;
 
       // Calcular caixa da empresa (receita a partir de 29/08 - todas as despesas)
-      const companyCash = totalRevenue - totalExpenses;
+      const companyCash = revenueFromDate - totalExpenses;
       
       // Dividir por 2 para cada pessoa
       const daniloShare = companyCash / 2;
@@ -123,7 +134,7 @@ const ProfitReportPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Receita Total</p>
                 <p className="text-2xl font-bold text-gray-900">R$ {profitData.totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Vendas a partir de 29/08/2025</p>
+                <p className="text-xs text-gray-500">Todas as vendas desde o início</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
