@@ -49,8 +49,23 @@ const ProfitReportPage = () => {
         return sum + Number(expense.amount);
       }, 0) || 0;
 
-      // Calcular caixa da empresa (receita - despesas)
-      const companyCash = totalRevenue - totalExpenses;
+      // Buscar soma dos custos dos produtos (exceto produtos de encomenda)
+      const { data: allProductsData, error: productsError } = await supabase
+        .from('products')
+        .select('cost_price, is_order_product');
+
+      if (productsError) throw productsError;
+
+      const totalCostSum = allProductsData?.reduce((sum, product) => {
+        // Excluir produtos de encomenda (is_order_product = true)
+        if (!product.is_order_product) {
+          return sum + Number(product.cost_price);
+        }
+        return sum;
+      }, 0) || 0;
+
+      // Calcular caixa da empresa (receita - custos - despesas)
+      const companyCash = totalRevenue - totalCostSum - totalExpenses;
       
       // Dividir por 2 para cada pessoa
       const daniloShare = companyCash / 2;
@@ -116,7 +131,7 @@ const ProfitReportPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Caixa da Empresa</p>
                 <p className="text-2xl font-bold text-gray-900">R$ {profitData.companyCash.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Receita - Despesas</p>
+                <p className="text-xs text-gray-500">Receita - Custos - Despesas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-white" />
