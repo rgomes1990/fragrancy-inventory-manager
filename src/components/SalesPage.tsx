@@ -21,6 +21,7 @@ const SalesPage = () => {
   const [showMultiForm, setShowMultiForm] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedSeller, setSelectedSeller] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const { setUserContext } = useAuth();
@@ -85,7 +86,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth]);
+  }, [sales, searchTerm, selectedMonth, selectedSeller]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
@@ -95,6 +96,12 @@ const SalesPage = () => {
         const saleDate = new Date(sale.sale_date);
         const saleMonth = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
         return saleMonth === selectedMonth;
+      });
+    }
+
+    if (selectedSeller) {
+      filtered = filtered.filter(sale => {
+        return sale.seller === selectedSeller;
       });
     }
 
@@ -631,6 +638,18 @@ const SalesPage = () => {
                   className="pl-9 w-64"
                 />
               </div>
+              <select 
+                value={selectedSeller} 
+                onChange={(e) => setSelectedSeller(e.target.value)}
+                className="p-2 border rounded-md w-40"
+              >
+                <option value="">Todos vendedores</option>
+                {sellers.map((seller) => (
+                  <option key={seller} value={seller}>
+                    {seller}
+                  </option>
+                ))}
+              </select>
               <Calendar className="w-4 h-4" />
               <select 
                 value={selectedMonth} 
