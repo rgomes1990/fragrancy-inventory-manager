@@ -31,10 +31,11 @@ const ProfitReportPage = () => {
 
   const fetchData = async () => {
     try {
-      // Buscar soma de todas as vendas
+      // Buscar vendas a partir de 29/08/2024
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
-        .select('total_price');
+        .select('total_price, sale_date')
+        .gte('sale_date', '2024-08-29');
 
       if (salesError) throw salesError;
 
@@ -42,15 +43,14 @@ const ProfitReportPage = () => {
         return sum + Number(sale.total_price);
       }, 0) || 0;
 
-      // Buscar despesas por categoria
-      const { data: travelExpensesData, error: travelExpensesError } = await supabase
+      // Buscar todas as despesas lançadas
+      const { data: allExpensesData, error: expensesError } = await supabase
         .from('expenses')
-        .select('amount')
-        .eq('category', 'Despesas Viagem');
+        .select('amount');
 
-      if (travelExpensesError) throw travelExpensesError;
+      if (expensesError) throw expensesError;
 
-      const travelExpenses = travelExpensesData?.reduce((sum, expense) => {
+      const totalExpenses = allExpensesData?.reduce((sum, expense) => {
         return sum + Number(expense.amount);
       }, 0) || 0;
 
@@ -69,8 +69,8 @@ const ProfitReportPage = () => {
         return sum;
       }, 0) || 0;
 
-      // Calcular caixa da empresa (receita - custos - despesas viagem)
-      const companyCash = totalRevenue - totalCostSum - travelExpenses;
+      // Calcular caixa da empresa (receita a partir de 29/08 - todas as despesas)
+      const companyCash = totalRevenue - totalExpenses;
       
       // Dividir por 2 para cada pessoa
       const daniloShare = companyCash / 2;
@@ -82,7 +82,7 @@ const ProfitReportPage = () => {
         daniloShare,
         anaPaulaShare,
         totalCostSum,
-        travelExpenses,
+        travelExpenses: totalExpenses,
       });
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
@@ -123,7 +123,7 @@ const ProfitReportPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Receita Total</p>
                 <p className="text-2xl font-bold text-gray-900">R$ {profitData.totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Soma de todas as vendas</p>
+                <p className="text-xs text-gray-500">Vendas a partir de 29/08/2024</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-white" />
@@ -153,7 +153,7 @@ const ProfitReportPage = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600 mb-1">Caixa da Empresa</p>
                 <p className="text-2xl font-bold text-gray-900">R$ {profitData.companyCash.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Receita - Custos - Despesas</p>
+                <p className="text-xs text-gray-500">Vendas (29/08+) - Todas Despesas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-white" />
@@ -169,9 +169,9 @@ const ProfitReportPage = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Despesas Viagem</p>
+                <p className="text-sm font-medium text-gray-600 mb-1">Total Despesas</p>
                 <p className="text-2xl font-bold text-gray-900">R$ {profitData.travelExpenses.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Total de despesas com viagens</p>
+                <p className="text-xs text-gray-500">Soma de todas as despesas</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-white" />

@@ -73,21 +73,23 @@ const Dashboard = () => {
         productsQuery = productsQuery.eq('quantity', 0);
       }
 
-      const [productsRes, customersRes, salesRes, travelExpensesRes] = await Promise.all([
+      const [productsRes, customersRes, salesRes, allExpensesRes] = await Promise.all([
         productsQuery,
         supabase.from('customers').select('id', { count: 'exact' }),
         supabase.from('sales').select('total_price', { count: 'exact' }),
-        supabase.from('expenses').select('amount').eq('category', 'Despesas Viagem')
+        supabase.from('expenses').select('amount')
       ]);
 
+      // Buscar vendas a partir de 29/08/2024
       const { data: salesData } = await supabase
         .from('sales')
-        .select('total_price');
+        .select('total_price, sale_date')
+        .gte('sale_date', '2024-08-29');
       
       const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
       
-      const travelExpenses = travelExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
-      const totalExpenses = travelExpenses;
+      // Somar todas as despesas lançadas
+      const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
 
       const { data: allProductsData } = await supabase
         .from('products')
@@ -272,8 +274,8 @@ const Dashboard = () => {
         bgColor: 'bg-indigo-50',
       },
         {
-          title: 'Caixa',
-          value: `R$ ${(stats.totalRevenue - stats.totalCostSum - stats.totalExpenses).toFixed(2)}`,
+          title: 'Caixa da Empresa',
+          value: `R$ ${(stats.totalRevenue - stats.totalExpenses).toFixed(2)}`,
           icon: DollarSign,
           color: 'from-emerald-500 to-emerald-600',
           bgColor: 'bg-emerald-50',
