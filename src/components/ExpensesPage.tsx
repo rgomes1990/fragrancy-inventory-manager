@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -21,6 +22,7 @@ interface Expense {
   expense_date: string;
   created_at: string;
   updated_at: string;
+  observacao?: string;
 }
 
 const ExpensesPage = () => {
@@ -32,22 +34,13 @@ const ExpensesPage = () => {
     description: '',
     amount: '',
     category: '',
-    expense_date: new Date().toISOString().split('T')[0]
+    expense_date: new Date().toISOString().split('T')[0],
+    observacao: ''
   });
 
   const categories = [
-    'Material de Embalagem',
-    'Transporte',
-    'Marketing',
-    'Aluguel',
-    'Energia',
-    'Internet',
-    'Telefone',
-    'Combustível',
-    'Alimentação',
-    'Equipamentos',
-    'Manutenção',
-    'Outros'
+    'Despesa Produtos',
+    'Despesas Viagem'
   ];
 
   useEffect(() => {
@@ -92,7 +85,8 @@ const ExpensesPage = () => {
         description: formData.description,
         amount: parseFloat(formData.amount),
         category: formData.category,
-        expense_date: formData.expense_date
+        expense_date: formData.expense_date,
+        observacao: formData.observacao
       };
 
       if (editingExpense) {
@@ -124,7 +118,8 @@ const ExpensesPage = () => {
         description: '',
         amount: '',
         category: '',
-        expense_date: new Date().toISOString().split('T')[0]
+        expense_date: new Date().toISOString().split('T')[0],
+        observacao: ''
       });
       fetchExpenses();
     } catch (error) {
@@ -143,7 +138,8 @@ const ExpensesPage = () => {
       description: expense.description,
       amount: expense.amount.toString(),
       category: expense.category,
-      expense_date: expense.expense_date
+      expense_date: expense.expense_date,
+      observacao: expense.observacao || ''
     });
     setDialogOpen(true);
   };
@@ -176,18 +172,8 @@ const ExpensesPage = () => {
 
   const getCategoryBadgeVariant = (category: string) => {
     const variants: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
-      'Material de Embalagem': 'secondary',
-      'Transporte': 'outline',
-      'Marketing': 'default',
-      'Aluguel': 'destructive',
-      'Energia': 'secondary',
-      'Internet': 'outline',
-      'Telefone': 'outline',
-      'Combustível': 'secondary',
-      'Alimentação': 'default',
-      'Equipamentos': 'destructive',
-      'Manutenção': 'secondary',
-      'Outros': 'outline'
+      'Despesa Produtos': 'secondary',
+      'Despesas Viagem': 'outline'
     };
     return variants[category] || 'default';
   };
@@ -211,7 +197,8 @@ const ExpensesPage = () => {
                 description: '',
                 amount: '',
                 category: '',
-                expense_date: new Date().toISOString().split('T')[0]
+                expense_date: new Date().toISOString().split('T')[0],
+                observacao: ''
               });
             }}>
               <Plus className="h-4 w-4 mr-2" />
@@ -269,6 +256,16 @@ const ExpensesPage = () => {
                   type="date"
                   value={formData.expense_date}
                   onChange={(e) => setFormData({...formData, expense_date: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="observacao">Observação</Label>
+                <Textarea
+                  id="observacao"
+                  value={formData.observacao}
+                  onChange={(e) => setFormData({...formData, observacao: e.target.value})}
+                  placeholder="Observações adicionais (opcional)"
+                  rows={3}
                 />
               </div>
               <div className="flex justify-end space-x-2">
@@ -333,6 +330,7 @@ const ExpensesPage = () => {
                   <TableHead>Categoria</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Data</TableHead>
+                  <TableHead>Observação</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -347,6 +345,7 @@ const ExpensesPage = () => {
                     </TableCell>
                     <TableCell>R$ {expense.amount.toFixed(2)}</TableCell>
                     <TableCell>{format(new Date(expense.expense_date), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="max-w-xs truncate">{expense.observacao || '-'}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         <Button
