@@ -9,6 +9,7 @@ interface DashboardStats {
   totalCustomers: number;
   totalSales: number;
   totalRevenue: number;
+  revenueFromDate: number;
   totalCostSum: number;
   totalSaleSum: number;
   totalExpenses: number;
@@ -41,6 +42,7 @@ const Dashboard = () => {
     totalCustomers: 0,
     totalSales: 0,
     totalRevenue: 0,
+    revenueFromDate: 0,
     totalCostSum: 0,
     totalSaleSum: 0,
     totalExpenses: 0,
@@ -80,13 +82,20 @@ const Dashboard = () => {
         supabase.from('expenses').select('amount')
       ]);
 
-      // Buscar vendas a partir de 29/08/2025
-      const { data: salesData } = await supabase
+      // Buscar TODAS as vendas para o card Receita Total
+      const { data: allSalesData } = await supabase
+        .from('sales')
+        .select('total_price');
+      
+      const totalRevenue = allSalesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+
+      // Buscar vendas a partir de 29/08/2025 para o cálculo do Caixa da Empresa
+      const { data: salesFromDateData } = await supabase
         .from('sales')
         .select('total_price, sale_date')
         .gte('sale_date', '2025-08-29');
       
-      const totalRevenue = salesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
       
       // Somar todas as despesas lançadas
       const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
@@ -205,6 +214,7 @@ const Dashboard = () => {
         totalCustomers: customersRes.count || 0,
         totalSales: salesRes.count || 0,
         totalRevenue,
+        revenueFromDate,
         totalCostSum,
         totalSaleSum,
         totalExpenses,
@@ -275,7 +285,7 @@ const Dashboard = () => {
       },
         {
           title: 'Caixa da Empresa',
-          value: `R$ ${(stats.totalRevenue - stats.totalExpenses).toFixed(2)}`,
+          value: `R$ ${(stats.revenueFromDate - stats.totalExpenses).toFixed(2)}`,
           icon: DollarSign,
           color: 'from-emerald-500 to-emerald-600',
           bgColor: 'bg-emerald-50',
