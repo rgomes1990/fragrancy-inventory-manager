@@ -7,6 +7,23 @@ import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 
 const OrderProductsPDFReport = () => {
+  const loadImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Erro ao carregar imagem:', error);
+      return null;
+    }
+  };
+
   const generateOrderProductsReport = async () => {
     try {
       // Buscar todas as solicitações de encomenda
@@ -18,6 +35,7 @@ const OrderProductsPDFReport = () => {
             name, 
             cost_price,
             sale_price,
+            image_url,
             categories(name)
           )
         `)
@@ -62,11 +80,11 @@ const OrderProductsPDFReport = () => {
       
       // Cabeçalhos
       doc.setFontSize(12);
-      doc.text('Produto', 20, yPosition);
-      doc.text('Cliente', 60, yPosition);
-      doc.text('Qtd', 100, yPosition);
-      doc.text('Preço Custo', 120, yPosition);
-      doc.text('Preço Venda', 160, yPosition);
+      doc.text('Foto', 20, yPosition);
+      doc.text('Produto', 50, yPosition);
+      doc.text('Qtd', 110, yPosition);
+      doc.text('Preço Custo', 130, yPosition);
+      doc.text('Preço Venda', 165, yPosition);
       doc.text('Data', 190, yPosition);
       
       yPosition += 5;
@@ -84,8 +102,8 @@ const OrderProductsPDFReport = () => {
       let totalItems = 0;
 
       // Adicionar solicitações de encomenda
-      orderRequests.forEach((request) => {
-        if (yPosition > 270) {
+      for (const request of orderRequests) {
+        if (yPosition > 250) {
           doc.addPage();
           yPosition = 20;
         }
@@ -94,6 +112,7 @@ const OrderProductsPDFReport = () => {
         const costPrice = request.cost_price || request.products?.cost_price || 0;
         const salePrice = request.sale_price || request.products?.sale_price || 0;
         const quantity = request.requested_quantity;
+        const imageUrl = request.products?.image_url;
         
         // Calcular totais
         totalCostPrice += costPrice * quantity;
@@ -101,19 +120,31 @@ const OrderProductsPDFReport = () => {
         totalQuantity += quantity;
         totalItems += 1;
         
-        doc.text(productName.substring(0, 20), 20, yPosition);
-        doc.text(request.customer_name.substring(0, 15), 60, yPosition);
-        doc.text(quantity.toString(), 100, yPosition);
-        doc.text(`R$ ${costPrice.toFixed(2)}`, 120, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 160, yPosition);
+        // Carregar e adicionar imagem se existir
+        if (imageUrl) {
+          try {
+            const imageBase64 = await loadImageAsBase64(imageUrl);
+            if (imageBase64) {
+              const imageSize = 15;
+              doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
+            }
+          } catch (error) {
+            console.error('Erro ao adicionar imagem:', error);
+          }
+        }
+        
+        doc.text(productName.substring(0, 20), 50, yPosition);
+        doc.text(quantity.toString(), 110, yPosition);
+        doc.text(`R$ ${costPrice.toFixed(2)}`, 130, yPosition);
+        doc.text(`R$ ${salePrice.toFixed(2)}`, 165, yPosition);
         doc.text(new Date(request.created_at).toLocaleDateString('pt-BR'), 190, yPosition);
         
-        yPosition += 8;
-      });
+        yPosition += 20;
+      }
 
       // Adicionar produtos do tipo encomenda
-      orderProducts.forEach((product) => {
-        if (yPosition > 270) {
+      for (const product of orderProducts) {
+        if (yPosition > 250) {
           doc.addPage();
           yPosition = 20;
         }
@@ -122,6 +153,7 @@ const OrderProductsPDFReport = () => {
         const costPrice = product.cost_price || 0;
         const salePrice = product.sale_price || 0;
         const quantity = product.quantity;
+        const imageUrl = product.image_url;
         
         // Calcular totais
         totalCostPrice += costPrice * quantity;
@@ -129,15 +161,27 @@ const OrderProductsPDFReport = () => {
         totalQuantity += quantity;
         totalItems += 1;
         
-        doc.text(productName.substring(0, 20), 20, yPosition);
-        doc.text('Estoque', 60, yPosition);
-        doc.text(quantity.toString(), 100, yPosition);
-        doc.text(`R$ ${costPrice.toFixed(2)}`, 120, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 160, yPosition);
+        // Carregar e adicionar imagem se existir
+        if (imageUrl) {
+          try {
+            const imageBase64 = await loadImageAsBase64(imageUrl);
+            if (imageBase64) {
+              const imageSize = 15;
+              doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
+            }
+          } catch (error) {
+            console.error('Erro ao adicionar imagem:', error);
+          }
+        }
+        
+        doc.text(productName.substring(0, 20), 50, yPosition);
+        doc.text(quantity.toString(), 110, yPosition);
+        doc.text(`R$ ${costPrice.toFixed(2)}`, 130, yPosition);
+        doc.text(`R$ ${salePrice.toFixed(2)}`, 165, yPosition);
         doc.text(new Date(product.created_at).toLocaleDateString('pt-BR'), 190, yPosition);
         
-        yPosition += 8;
-      });
+        yPosition += 20;
+      }
       
       // Totais
       yPosition += 10;
