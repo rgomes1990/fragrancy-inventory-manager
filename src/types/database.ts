@@ -37,6 +37,7 @@ export interface Sale {
   total_price: number;
   sale_date: string;
   seller?: string;
+  payment_received: boolean;
   created_at: string;
   customers?: {
     id: string;

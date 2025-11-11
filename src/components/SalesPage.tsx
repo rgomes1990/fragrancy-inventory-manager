@@ -33,6 +33,7 @@ const SalesPage = () => {
     unit_price: '',
     sale_date: new Date().toISOString().split('T')[0],
     seller: '',
+    payment_received: true,
   });
 
   const sellers = ['Ana Paula', 'Rogério', 'Danilo'];
@@ -139,6 +140,7 @@ const SalesPage = () => {
     }>;
     sale_date: string;
     seller: string;
+    payment_received: boolean;
   }) => {
     try {
       await setUserContext();
@@ -181,6 +183,7 @@ const SalesPage = () => {
           total_price: item.subtotal,
           sale_date: saleData.sale_date + 'T00:00:00.000Z',
           seller: saleData.seller,
+          payment_received: saleData.payment_received,
         };
 
         const { error: saleError } = await supabase
@@ -294,6 +297,7 @@ const SalesPage = () => {
         total_price,
         sale_date: formData.sale_date + 'T00:00:00.000Z',
         seller: formData.seller,
+        payment_received: formData.payment_received,
       };
 
       if (editingSale) {
@@ -399,6 +403,7 @@ const SalesPage = () => {
       unit_price: sale.unit_price.toString(),
       sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
       seller: sale.seller || '',
+      payment_received: sale.payment_received ?? true,
     });
     setShowForm(true);
   };
@@ -463,6 +468,7 @@ const SalesPage = () => {
       unit_price: '',
       sale_date: new Date().toISOString().split('T')[0],
       seller: '',
+      payment_received: true,
     });
     setEditingSale(null);
     setShowForm(false);
@@ -658,6 +664,21 @@ const SalesPage = () => {
                 </div>
               )}
 
+              <div className="lg:col-span-4">
+                <div className="flex items-center space-x-2 mb-4">
+                  <input
+                    id="payment_received"
+                    type="checkbox"
+                    checked={formData.payment_received}
+                    onChange={(e) => setFormData({...formData, payment_received: e.target.checked})}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="payment_received" className="text-sm font-medium cursor-pointer">
+                    Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
+                  </Label>
+                </div>
+              </div>
+
               <div className="lg:col-span-4 flex space-x-2">
                 <Button 
                   type="submit" 
@@ -738,6 +759,7 @@ const SalesPage = () => {
                 <TableHead>Valor Unitário</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Vendedor</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -757,6 +779,15 @@ const SalesPage = () => {
                   <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
                   <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
                   <TableCell>{sale.seller || '-'}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      sale.payment_received 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {sale.payment_received ? 'Recebido' : 'Pendente'}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button

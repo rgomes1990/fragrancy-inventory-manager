@@ -23,6 +23,7 @@ interface SalesMultiProductFormProps {
     items: SaleItem[];
     sale_date: string;
     seller: string;
+    payment_received: boolean;
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -31,6 +32,7 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
   const [customerID, setCustomerID] = useState('');
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
   const [seller, setSeller] = useState('');
+  const [paymentReceived, setPaymentReceived] = useState(true);
   const [items, setItems] = useState<SaleItem[]>([
     { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }
   ]);
@@ -98,6 +100,7 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
       items: validItems,
       sale_date: saleDate,
       seller: seller,
+      payment_received: paymentReceived,
     });
   };
 
@@ -257,6 +260,21 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
               <div className="text-2xl font-bold text-green-600">
                 Total da Venda: R$ {calculateTotal().toFixed(2)}
               </div>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="flex items-center space-x-2">
+              <input
+                id="payment_received_multi"
+                type="checkbox"
+                checked={paymentReceived}
+                onChange={(e) => setPaymentReceived(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="payment_received_multi" className="text-sm font-medium cursor-pointer">
+                Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
+              </Label>
             </div>
           </div>
 

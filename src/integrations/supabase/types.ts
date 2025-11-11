@@ -346,6 +346,7 @@ export type Database = {
           created_at: string | null
           customer_id: string | null
           id: string
+          payment_received: boolean
           product_id: string | null
           quantity: number
           sale_date: string | null
@@ -357,6 +358,7 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
+          payment_received?: boolean
           product_id?: string | null
           quantity: number
           sale_date?: string | null
@@ -368,6 +370,7 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
+          payment_received?: boolean
           product_id?: string | null
           quantity?: number
           sale_date?: string | null
