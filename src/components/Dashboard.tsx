@@ -100,9 +100,14 @@ const Dashboard = () => {
       // Somar todas as despesas lançadas
       const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
 
-      const { data: allProductsData } = await supabase
-        .from('products')
-        .select('cost_price, sale_price, quantity, is_order_product');
+      let costSaleSumQuery = supabase.from('products').select('cost_price, sale_price, quantity, is_order_product');
+      if (stockFilter === 'in-stock') {
+        costSaleSumQuery = costSaleSumQuery.gt('quantity', 0);
+      } else if (stockFilter === 'out-of-stock') {
+        costSaleSumQuery = costSaleSumQuery.eq('quantity', 0);
+      }
+
+      const { data: allProductsData } = await costSaleSumQuery;
       
       const totalCostSum = allProductsData?.reduce((sum, product) => {
         // Excluir produtos de encomenda (is_order_product = true)
