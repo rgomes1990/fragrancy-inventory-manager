@@ -38,6 +38,7 @@ export interface Sale {
   sale_date: string;
   seller?: string;
   payment_received: boolean;
+  partial_payment_amount?: number;
   created_at: string;
   customers?: {
     id: string;

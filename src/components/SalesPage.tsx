@@ -34,6 +34,7 @@ const SalesPage = () => {
     sale_date: new Date().toISOString().split('T')[0],
     seller: '',
     payment_received: true,
+    partial_payment_amount: '',
   });
 
   const sellers = ['Ana Paula', 'Rogério', 'Danilo'];
@@ -141,6 +142,7 @@ const SalesPage = () => {
     sale_date: string;
     seller: string;
     payment_received: boolean;
+    partial_payment_amount: number | null;
   }) => {
     try {
       await setUserContext();
@@ -174,7 +176,15 @@ const SalesPage = () => {
         is_local: false
       });
 
+      // Calcular o total de todos os itens para distribuir o pagamento parcial proporcionalmente
+      const totalAllItems = saleData.items.reduce((sum, item) => sum + item.subtotal, 0);
+      
       for (const item of saleData.items) {
+        // Se houver pagamento parcial, calcular proporcionalmente para cada item
+        const itemPartialPayment = saleData.partial_payment_amount 
+          ? (item.subtotal / totalAllItems) * saleData.partial_payment_amount
+          : null;
+        
         const saleRecord = {
           customer_id: saleData.customer_id,
           product_id: item.product_id,
@@ -184,6 +194,7 @@ const SalesPage = () => {
           sale_date: saleData.sale_date + 'T00:00:00.000Z',
           seller: saleData.seller,
           payment_received: saleData.payment_received,
+          partial_payment_amount: itemPartialPayment,
         };
 
         const { error: saleError } = await supabase
@@ -289,6 +300,8 @@ const SalesPage = () => {
 
       const total_price = unit_price * quantity;
 
+      const partialAmount = formData.partial_payment_amount ? parseFloat(formData.partial_payment_amount) : null;
+      
       const saleData = {
         customer_id: formData.customer_id,
         product_id: formData.product_id,
@@ -298,6 +311,7 @@ const SalesPage = () => {
         sale_date: formData.sale_date + 'T00:00:00.000Z',
         seller: formData.seller,
         payment_received: formData.payment_received,
+        partial_payment_amount: partialAmount,
       };
 
       if (editingSale) {
@@ -404,6 +418,7 @@ const SalesPage = () => {
       sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
       seller: sale.seller || '',
       payment_received: sale.payment_received ?? true,
+      partial_payment_amount: sale.partial_payment_amount ? sale.partial_payment_amount.toString() : '',
     });
     setShowForm(true);
   };
@@ -469,6 +484,7 @@ const SalesPage = () => {
       sale_date: new Date().toISOString().split('T')[0],
       seller: '',
       payment_received: true,
+      partial_payment_amount: '',
     });
     setEditingSale(null);
     setShowForm(false);
@@ -677,6 +693,20 @@ const SalesPage = () => {
                     Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
                   </Label>
                 </div>
+                
+                {formData.payment_received && (
+                  <div>
+                    <Label htmlFor="partial_payment">Valor pago parcialmente (deixe em branco para pagamento total)</Label>
+                    <Input
+                      id="partial_payment"
+                      type="number"
+                      step="0.01"
+                      value={formData.partial_payment_amount}
+                      onChange={(e) => setFormData({...formData, partial_payment_amount: e.target.value})}
+                      placeholder="Valor pago"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="lg:col-span-4 flex space-x-2">
@@ -781,11 +811,17 @@ const SalesPage = () => {
                   <TableCell>{sale.seller || '-'}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      sale.payment_received 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
+                      !sale.payment_received 
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-green-100 text-green-800'
                     }`}>
-                      {sale.payment_received ? 'Recebido' : 'Pendente'}
+                      {!sale.payment_received 
+                        ? 'Pendente' 
+                        : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
+                        ? `Parcial (R$ ${sale.partial_payment_amount.toFixed(2)})`
+                        : 'Recebido'}
                     </span>
                   </TableCell>
                   <TableCell>
