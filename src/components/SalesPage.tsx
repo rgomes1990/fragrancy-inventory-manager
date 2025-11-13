@@ -22,6 +22,7 @@ const SalesPage = () => {
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedSeller, setSelectedSeller] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const { setUserContext } = useAuth();
@@ -88,7 +89,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth, selectedSeller]);
+  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
@@ -104,6 +105,20 @@ const SalesPage = () => {
     if (selectedSeller) {
       filtered = filtered.filter(sale => {
         return sale.seller === selectedSeller;
+      });
+    }
+
+    if (selectedStatus) {
+      filtered = filtered.filter(sale => {
+        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+        if (selectedStatus === 'recebido') {
+          return sale.payment_received === true && partialAmount === 0;
+        } else if (selectedStatus === 'pendente') {
+          return sale.payment_received === false && partialAmount === 0;
+        } else if (selectedStatus === 'parcial') {
+          return sale.payment_received === false && partialAmount > 0;
+        }
+        return true;
       });
     }
 
@@ -754,6 +769,16 @@ const SalesPage = () => {
                     {seller}
                   </option>
                 ))}
+              </select>
+              <select 
+                value={selectedStatus} 
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="p-2 border rounded-md w-40"
+              >
+                <option value="">Todos status</option>
+                <option value="recebido">Recebido</option>
+                <option value="pendente">Pendente</option>
+                <option value="parcial">Parcial</option>
               </select>
               <Calendar className="w-4 h-4" />
               <select 
