@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown, UserCheck } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface DashboardStats {
   totalProducts: number;
@@ -39,6 +40,12 @@ interface UserSales {
   rogerio_revenue: number;
 }
 
+interface MonthlySales {
+  month: string;
+  vendas: number;
+  receita: number;
+}
+
 const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
@@ -57,6 +64,7 @@ const Dashboard = () => {
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
+  const [monthlySales, setMonthlySales] = useState<MonthlySales[]>([]);
   const [userSales, setUserSales] = useState<UserSales>({
     ana_paula_sales: 0,
     ana_paula_revenue: 0,
@@ -243,6 +251,59 @@ const Dashboard = () => {
         .sort((a, b) => b.total_spent - a.total_spent)
         .slice(0, 5);
 
+      // Calcular vendas mensais para o gráfico (últimos 12 meses)
+      const { data: allSalesForChart } = await supabase
+        .from('sales')
+        .select('sale_date, total_price');
+
+      const monthlySalesData: Record<string, { vendas: number; receita: number }> = {};
+      
+      // Inicializar os últimos 12 meses
+      const now = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+        monthlySalesData[monthKey] = { vendas: 0, receita: 0 };
+      }
+
+      // Agregar vendas por mês
+      allSalesForChart?.forEach((sale) => {
+        const saleDate = new Date(sale.sale_date);
+        const monthKey = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (monthlySalesData[monthKey]) {
+          monthlySalesData[monthKey].vendas += 1;
+          monthlySalesData[monthKey].receita += Number(sale.total_price);
+        }
+      });
+
+      // Converter para array para o gráfico
+      const chartData = Object.entries(monthlySalesData)
+        .map(([month, data]) => {
+          const [year, monthNum] = month.split('-');
+          const date = new Date(Number(year), Number(monthNum) - 1, 1);
+          const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+          return {
+            month: monthLabel,
+            vendas: data.vendas,
+            receita: data.receita
+          };
+        })
+        .sort((a, b) => {
+          // Ordenar cronologicamente
+          const monthOrder = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+          const aMonth = a.month.split(' ')[0];
+          const bMonth = b.month.split(' ')[0];
+          const aYear = a.month.split(' ')[1];
+          const bYear = b.month.split(' ')[1];
+          
+          if (aYear !== bYear) {
+            return Number(aYear) - Number(bYear);
+          }
+          return monthOrder.indexOf(aMonth) - monthOrder.indexOf(bMonth);
+        });
+
       const productsData = productsRes.data || [];
 
       setStats({
@@ -262,6 +323,7 @@ const Dashboard = () => {
       setRecentSales(recentSalesData || []);
       setTopProducts(top5Products);
       setTopCustomers(top5Customers);
+      setMonthlySales(chartData);
       setUserSales({
         ana_paula_sales: anaPaulaSales,
         ana_paula_revenue: anaPaulaRevenue,
@@ -588,6 +650,65 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráfico de Evolução de Vendas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5 text-blue-500" />
+            <span>Evolução de Vendas Mensais</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={monthlySales}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="month" 
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis 
+                yAxisId="left"
+                style={{ fontSize: '12px' }}
+                label={{ value: 'Quantidade', angle: -90, position: 'insideLeft' }}
+              />
+              <YAxis 
+                yAxisId="right"
+                orientation="right"
+                style={{ fontSize: '12px' }}
+                label={{ value: 'Receita (R$)', angle: 90, position: 'insideRight' }}
+              />
+              <Tooltip 
+                formatter={(value: number, name: string) => {
+                  if (name === 'receita') {
+                    return [`R$ ${value.toFixed(2)}`, 'Receita'];
+                  }
+                  return [value, 'Vendas'];
+                }}
+              />
+              <Legend />
+              <Line 
+                yAxisId="left"
+                type="monotone" 
+                dataKey="vendas" 
+                stroke="#8b5cf6" 
+                strokeWidth={2}
+                name="Vendas"
+                dot={{ fill: '#8b5cf6' }}
+              />
+              <Line 
+                yAxisId="right"
+                type="monotone" 
+                dataKey="receita" 
+                stroke="#10b981" 
+                strokeWidth={2}
+                name="Receita"
+                dot={{ fill: '#10b981' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 };
