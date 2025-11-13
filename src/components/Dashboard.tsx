@@ -13,6 +13,9 @@ interface DashboardStats {
   totalCostSum: number;
   totalSaleSum: number;
   totalExpenses: number;
+  totalPendingPayments: number;
+  totalPartialPayments: number;
+  totalToReceive: number;
 }
 
 interface TopProduct {
@@ -46,6 +49,9 @@ const Dashboard = () => {
     totalCostSum: 0,
     totalSaleSum: 0,
     totalExpenses: 0,
+    totalPendingPayments: 0,
+    totalPartialPayments: 0,
+    totalToReceive: 0,
   });
   
   const [recentSales, setRecentSales] = useState<any[]>([]);
@@ -99,6 +105,31 @@ const Dashboard = () => {
       
       // Somar todas as despesas lançadas
       const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
+
+      // Buscar vendas com pagamentos pendentes e parciais
+      const { data: pendingSalesData } = await supabase
+        .from('sales')
+        .select('*')
+        .eq('payment_received', false);
+
+      let totalPendingPayments = 0;
+      let totalPartialPayments = 0;
+      let totalToReceive = 0;
+
+      pendingSalesData?.forEach((sale) => {
+        const totalPrice = Number(sale.total_price) || 0;
+        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+
+        if (partialAmount > 0) {
+          // Pagamento parcial
+          totalPartialPayments += (totalPrice - partialAmount);
+          totalToReceive += (totalPrice - partialAmount);
+        } else {
+          // Pagamento totalmente pendente
+          totalPendingPayments += totalPrice;
+          totalToReceive += totalPrice;
+        }
+      });
 
       let costSaleSumQuery = supabase.from('products').select('cost_price, sale_price, quantity, is_order_product');
       if (stockFilter === 'in-stock') {
@@ -223,6 +254,9 @@ const Dashboard = () => {
         totalCostSum,
         totalSaleSum,
         totalExpenses,
+        totalPendingPayments,
+        totalPartialPayments,
+        totalToReceive,
       });
 
       setRecentSales(recentSalesData || []);
@@ -288,6 +322,27 @@ const Dashboard = () => {
         color: 'from-indigo-500 to-indigo-600',
         bgColor: 'bg-indigo-50',
       },
+      {
+        title: 'Vendas Pendentes (Total)',
+        value: `R$ ${stats.totalPendingPayments.toFixed(2)}`,
+        icon: TrendingUp,
+        color: 'from-orange-500 to-orange-600',
+        bgColor: 'bg-orange-50',
+      },
+      {
+        title: 'Pagamentos Parciais (Falta Receber)',
+        value: `R$ ${stats.totalPartialPayments.toFixed(2)}`,
+        icon: DollarSign,
+        color: 'from-amber-500 to-amber-600',
+        bgColor: 'bg-amber-50',
+      },
+      {
+        title: 'Total a Receber',
+        value: `R$ ${stats.totalToReceive.toFixed(2)}`,
+        icon: TrendingUp,
+        color: 'from-rose-500 to-rose-600',
+        bgColor: 'bg-rose-50',
+      },
         {
           title: 'Caixa da Empresa',
           value: `R$ ${(stats.revenueFromDate - stats.totalExpenses).toFixed(2)}`,
@@ -305,7 +360,7 @@ const Dashboard = () => {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
             <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse"></div>
           ))}
         </div>
