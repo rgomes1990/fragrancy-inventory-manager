@@ -24,6 +24,7 @@ interface SalesMultiProductFormProps {
     sale_date: string;
     seller: string;
     payment_received: boolean;
+    partial_payment_amount: number | null;
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -33,6 +34,7 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
   const [seller, setSeller] = useState('');
   const [paymentReceived, setPaymentReceived] = useState(true);
+  const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
   const [items, setItems] = useState<SaleItem[]>([
     { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }
   ]);
@@ -95,12 +97,15 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
       return;
     }
 
+    const partialAmount = partialPaymentAmount ? parseFloat(partialPaymentAmount) : null;
+    
     await onSubmit({
       customer_id: customerID,
       items: validItems,
       sale_date: saleDate,
       seller: seller,
       payment_received: paymentReceived,
+      partial_payment_amount: partialAmount,
     });
   };
 
@@ -276,6 +281,20 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
                 Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
               </Label>
             </div>
+            
+            {paymentReceived && (
+              <div className="mt-4">
+                <Label htmlFor="partial_payment_multi">Valor pago parcialmente (deixe em branco para pagamento total)</Label>
+                <Input
+                  id="partial_payment_multi"
+                  type="number"
+                  step="0.01"
+                  value={partialPaymentAmount}
+                  onChange={(e) => setPartialPaymentAmount(e.target.value)}
+                  placeholder="Valor pago"
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-2">
