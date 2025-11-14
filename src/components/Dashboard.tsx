@@ -109,16 +109,18 @@ const Dashboard = () => {
         .select('total_price, sale_date, payment_received, partial_payment_amount')
         .gte('sale_date', '2025-08-29');
       
-      // Calcular receita considerando pagamentos parciais
+      // Calcular receita APENAS com vendas totalmente pagas (excluir vendas parciais)
       const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
-        if (sale.payment_received) {
-          // Pagamento totalmente recebido
-          return sum + Number(sale.total_price);
-        } else if ((sale as any).partial_payment_amount && Number((sale as any).partial_payment_amount) > 0) {
-          // Pagamento parcial - somar apenas o que foi recebido
-          return sum + Number((sale as any).partial_payment_amount);
+        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+        const totalPrice = Number(sale.total_price) || 0;
+        
+        // Apenas somar se for venda totalmente paga:
+        // payment_received = true E (sem partial_payment OU partial_payment >= total_price)
+        if (sale.payment_received && (partialAmount === 0 || partialAmount >= totalPrice)) {
+          return sum + totalPrice;
         }
-        // Pagamento pendente - não somar
+        
+        // Não somar vendas parciais nem pendentes
         return sum;
       }, 0) || 0;
       
