@@ -125,28 +125,40 @@ const Dashboard = () => {
       // Somar todas as despesas lançadas
       const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
 
-      // Buscar vendas com pagamentos pendentes e parciais
+      // Buscar vendas com pagamentos pendentes (payment_received = false)
       const { data: pendingSalesData } = await supabase
         .from('sales')
         .select('*')
         .eq('payment_received', false);
 
+      // Buscar vendas com pagamentos parciais (payment_received = true e partial_payment_amount > 0)
+      const { data: partialSalesData } = await supabase
+        .from('sales')
+        .select('*')
+        .eq('payment_received', true)
+        .not('partial_payment_amount', 'is', null);
+
       let totalPendingPayments = 0;
       let totalPartialPayments = 0;
       let totalToReceive = 0;
 
+      // Vendas totalmente pendentes
       pendingSalesData?.forEach((sale) => {
+        const totalPrice = Number(sale.total_price) || 0;
+        totalPendingPayments += totalPrice;
+        totalToReceive += totalPrice;
+      });
+
+      // Vendas parcialmente pagas
+      partialSalesData?.forEach((sale) => {
         const totalPrice = Number(sale.total_price) || 0;
         const partialAmount = Number((sale as any).partial_payment_amount) || 0;
 
-        if (partialAmount > 0) {
-          // Pagamento parcial
-          totalPartialPayments += (totalPrice - partialAmount);
-          totalToReceive += (totalPrice - partialAmount);
-        } else {
-          // Pagamento totalmente pendente
-          totalPendingPayments += totalPrice;
-          totalToReceive += totalPrice;
+        // Apenas considerar como parcial se o valor pago for menor que o total
+        if (partialAmount > 0 && partialAmount < totalPrice) {
+          const amountToReceive = totalPrice - partialAmount;
+          totalPartialPayments += amountToReceive;
+          totalToReceive += amountToReceive;
         }
       });
 
