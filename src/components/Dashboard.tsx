@@ -106,10 +106,21 @@ const Dashboard = () => {
       // Buscar vendas a partir de 29/08/2025 para o cálculo do Caixa da Empresa
       const { data: salesFromDateData } = await supabase
         .from('sales')
-        .select('total_price, sale_date')
+        .select('total_price, sale_date, payment_received, partial_payment_amount')
         .gte('sale_date', '2025-08-29');
       
-      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      // Calcular receita considerando pagamentos parciais
+      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
+        if (sale.payment_received) {
+          // Pagamento totalmente recebido
+          return sum + Number(sale.total_price);
+        } else if ((sale as any).partial_payment_amount && Number((sale as any).partial_payment_amount) > 0) {
+          // Pagamento parcial - somar apenas o que foi recebido
+          return sum + Number((sale as any).partial_payment_amount);
+        }
+        // Pagamento pendente - não somar
+        return sum;
+      }, 0) || 0;
       
       // Somar todas as despesas lançadas
       const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
