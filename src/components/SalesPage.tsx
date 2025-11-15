@@ -24,6 +24,7 @@ const SalesPage = () => {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
+  const [filteredTotal, setFilteredTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const { setUserContext } = useAuth();
   
@@ -143,8 +144,12 @@ const SalesPage = () => {
 
     setFilteredSales(filtered);
     
+    // Calcular o total dos resultados filtrados
+    const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
+    setFilteredTotal(total);
+    
+    // Manter o cálculo mensal para compatibilidade
     if (selectedMonth) {
-      const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
       setMonthlyTotal(total);
     } else {
       setMonthlyTotal(0);
@@ -800,10 +805,13 @@ const SalesPage = () => {
               </select>
             </div>
           </div>
-          {selectedMonth && (
+          {(selectedMonth || selectedSeller || selectedStatus || searchTerm) && (
             <div className="mt-2 p-3 bg-green-50 rounded-lg">
               <div className="text-lg font-bold text-green-800">
-                Total do mês selecionado: R$ {monthlyTotal.toFixed(2)}
+                Total dos resultados filtrados: R$ {filteredTotal.toFixed(2)}
+              </div>
+              <div className="text-sm text-green-700 mt-1">
+                {filteredSales.length} {filteredSales.length === 1 ? 'venda encontrada' : 'vendas encontradas'}
               </div>
             </div>
           )}
