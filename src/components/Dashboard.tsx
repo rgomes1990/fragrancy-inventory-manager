@@ -389,7 +389,7 @@ const Dashboard = () => {
         bgColor: 'bg-purple-50',
       },
       {
-        title: 'Receita Total',
+        title: 'Vendas Totais',
         value: `R$ ${stats.totalRevenue.toFixed(2)}`,
         icon: DollarSign,
         color: 'from-yellow-500 to-yellow-600',
