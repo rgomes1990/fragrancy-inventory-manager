@@ -775,7 +775,6 @@ const SalesPage = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-2">
               <ShoppingCart className="w-5 h-5" />
-              <span>Histórico de Vendas</span>
             </CardTitle>
             <div className="flex items-center space-x-2">
               <div className="relative">
