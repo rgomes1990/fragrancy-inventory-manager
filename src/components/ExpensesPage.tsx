@@ -253,6 +253,52 @@ const ExpensesPage = () => {
     return <div className="flex justify-center items-center h-64">Carregando...</div>;
   }
 
+  // Buscar os mesmos dados do Dashboard para o Caixa da Empresa
+  const fetchCompanyCash = async () => {
+    // Buscar vendas pagas a partir de 29/08/2025
+    const { data: salesFromDateData } = await supabase
+      .from('sales')
+      .select('total_price, sale_date, payment_received, partial_payment_amount')
+      .gte('sale_date', '2025-08-29');
+    
+    const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
+      const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+      const totalPrice = Number(sale.total_price) || 0;
+      
+      if (sale.payment_received && (partialAmount === 0 || partialAmount >= totalPrice)) {
+        return sum + totalPrice;
+      }
+      return sum;
+    }, 0) || 0;
+
+    // Buscar despesas e entradas de caixa
+    const { data: expensesData } = await supabase
+      .from('expenses')
+      .select('amount, category');
+    
+    const totalExpensesOut = expensesData?.reduce((sum, expense) => {
+      if (expense.category !== 'Entrada de Caixa') {
+        return sum + Number(expense.amount);
+      }
+      return sum;
+    }, 0) || 0;
+    
+    const totalCashInAmount = expensesData?.reduce((sum, expense) => {
+      if (expense.category === 'Entrada de Caixa') {
+        return sum + Number(expense.amount);
+      }
+      return sum;
+    }, 0) || 0;
+
+    return revenueFromDate - totalExpensesOut + totalCashInAmount;
+  };
+
+  const [companyCash, setCompanyCash] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    fetchCompanyCash().then(setCompanyCash);
+  }, [expenses]);
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
@@ -415,12 +461,12 @@ const ExpensesPage = () => {
       <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo em Caixa</CardTitle>
+            <CardTitle className="text-sm font-medium">Saldo em Caixa (Empresa)</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              R$ {totalExpenses.toFixed(2)}
+            <div className={`text-2xl font-bold ${companyCash >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {companyCash.toFixed(2)}
             </div>
           </CardContent>
         </Card>
@@ -430,7 +476,9 @@ const ExpensesPage = () => {
             <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">R$ {totalCashIn.toFixed(2)}</div>
+            <div className="text-2xl font-bold text-green-600">
+              R$ {expenses.filter(e => e.category === 'Entrada de Caixa').reduce((sum, e) => sum + e.amount, 0).toFixed(2)}
+            </div>
           </CardContent>
         </Card>
         <Card>
