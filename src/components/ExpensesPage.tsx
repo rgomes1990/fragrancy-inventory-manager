@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, DollarSign, Calendar, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, DollarSign, Calendar, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,11 +29,18 @@ const ExpensesPage = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cashInDialogOpen, setCashInDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
     category: '',
+    expense_date: new Date().toISOString().split('T')[0],
+    observacao: ''
+  });
+  const [cashInFormData, setCashInFormData] = useState({
+    amount: '',
+    description: '',
     expense_date: new Date().toISOString().split('T')[0],
     observacao: ''
   });
@@ -152,7 +159,7 @@ const ExpensesPage = () => {
         .eq('id', id);
 
       if (error) throw error;
-      
+
       toast({
         title: "Sucesso",
         description: "Despesa excluída com sucesso",
@@ -168,14 +175,78 @@ const ExpensesPage = () => {
     }
   };
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const handleCashInSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!cashInFormData.amount || !cashInFormData.description) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const cashInData = {
+        description: cashInFormData.description,
+        amount: parseFloat(cashInFormData.amount),
+        category: 'Entrada de Caixa',
+        expense_date: cashInFormData.expense_date,
+        observacao: cashInFormData.observacao
+      };
+
+      const { error } = await supabase
+        .from('expenses')
+        .insert([cashInData]);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Sucesso",
+        description: "Entrada de caixa lançada com sucesso",
+      });
+
+      setCashInDialogOpen(false);
+      setCashInFormData({
+        amount: '',
+        description: '',
+        expense_date: new Date().toISOString().split('T')[0],
+        observacao: ''
+      });
+      fetchExpenses();
+    } catch (error) {
+      console.error('Erro ao lançar entrada de caixa:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao lançar entrada de caixa",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const totalExpenses = expenses.reduce((sum, expense) => {
+    if (expense.category === 'Entrada de Caixa') {
+      return sum + expense.amount;
+    }
+    return sum - expense.amount;
+  }, 0);
+  
+  const totalCashIn = expenses
+    .filter(e => e.category === 'Entrada de Caixa')
+    .reduce((sum, e) => sum + e.amount, 0);
+  
+  const totalCashOut = expenses
+    .filter(e => e.category !== 'Entrada de Caixa')
+    .reduce((sum, e) => sum + e.amount, 0);
 
   const getCategoryBadgeVariant = (category: string) => {
     const variants: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
+      'Entrada de Caixa': 'default',
       'Despesa Produtos': 'secondary',
       'Despesas Viagem': 'outline'
     };
-    return variants[category] || 'default';
+    return variants[category] || 'outline';
   };
 
   if (loading) {
@@ -189,22 +260,81 @@ const ExpensesPage = () => {
           <h1 className="text-3xl font-bold">Despesas</h1>
           <p className="text-muted-foreground">Gerencie as despesas da empresa</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => {
-              setEditingExpense(null);
-              setFormData({
-                description: '',
-                amount: '',
-                category: '',
-                expense_date: new Date().toISOString().split('T')[0],
-                observacao: ''
-              });
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Despesa
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Dialog open={cashInDialogOpen} onOpenChange={setCashInDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Entrada de Caixa
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Lançar Entrada de Caixa</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCashInSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="cashInAmount">Valor *</Label>
+                  <Input
+                    id="cashInAmount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={cashInFormData.amount}
+                    onChange={(e) => setCashInFormData({ ...cashInFormData, amount: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cashInDescription">Descrição *</Label>
+                  <Input
+                    id="cashInDescription"
+                    placeholder="Ex: Sobrou de viagem"
+                    value={cashInFormData.description}
+                    onChange={(e) => setCashInFormData({ ...cashInFormData, description: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cashInDate">Data</Label>
+                  <Input
+                    id="cashInDate"
+                    type="date"
+                    value={cashInFormData.expense_date}
+                    onChange={(e) => setCashInFormData({ ...cashInFormData, expense_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cashInObservacao">Observação</Label>
+                  <Textarea
+                    id="cashInObservacao"
+                    placeholder="Observações adicionais"
+                    value={cashInFormData.observacao}
+                    onChange={(e) => setCashInFormData({ ...cashInFormData, observacao: e.target.value })}
+                  />
+                </div>
+                <Button type="submit" className="w-full">
+                  Lançar Entrada
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => {
+                setEditingExpense(null);
+                setFormData({
+                  description: '',
+                  amount: '',
+                  category: '',
+                  expense_date: new Date().toISOString().split('T')[0],
+                  observacao: ''
+                });
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Despesa
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
@@ -279,16 +409,37 @@ const ExpensesPage = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Despesas</CardTitle>
+            <CardTitle className="text-sm font-medium">Saldo em Caixa</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ {totalExpenses.toFixed(2)}</div>
+            <div className={`text-2xl font-bold ${totalExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {totalExpenses.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Entradas</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">R$ {totalCashIn.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Saídas</CardTitle>
+            <DollarSign className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">R$ {totalCashOut.toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -298,17 +449,6 @@ const ExpensesPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{expenses.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Último Registro</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {expenses.length > 0 ? format(new Date(expenses[0].expense_date), 'dd/MM') : '-'}
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -343,7 +483,9 @@ const ExpensesPage = () => {
                         {expense.category}
                       </Badge>
                     </TableCell>
-                    <TableCell>R$ {expense.amount.toFixed(2)}</TableCell>
+                    <TableCell className={expense.category === 'Entrada de Caixa' ? 'text-green-600 font-semibold' : 'text-red-600'}>
+                      {expense.category === 'Entrada de Caixa' ? '+' : '-'} R$ {expense.amount.toFixed(2)}
+                    </TableCell>
                     <TableCell>{format(new Date(expense.expense_date), 'dd/MM/yyyy')}</TableCell>
                     <TableCell className="max-w-xs truncate">{expense.observacao || '-'}</TableCell>
                     <TableCell className="text-right">
