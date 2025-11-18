@@ -14,6 +14,7 @@ interface DashboardStats {
   totalCostSum: number;
   totalSaleSum: number;
   totalExpenses: number;
+  totalCashIn: number;
   totalPendingPayments: number;
   totalPartialPayments: number;
   totalToReceive: number;
@@ -56,6 +57,7 @@ const Dashboard = () => {
     totalCostSum: 0,
     totalSaleSum: 0,
     totalExpenses: 0,
+    totalCashIn: 0,
     totalPendingPayments: 0,
     totalPartialPayments: 0,
     totalToReceive: 0,
@@ -124,8 +126,24 @@ const Dashboard = () => {
         return sum;
       }, 0) || 0;
       
-      // Somar todas as despesas lançadas
-      const totalExpenses = allExpensesRes.data?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
+      // Separar despesas (saídas) e entradas de caixa
+      const { data: expensesData } = await supabase
+        .from('expenses')
+        .select('amount, category');
+      
+      const totalExpenses = expensesData?.reduce((sum, expense) => {
+        if (expense.category !== 'Entrada de Caixa') {
+          return sum + Number(expense.amount);
+        }
+        return sum;
+      }, 0) || 0;
+      
+      const totalCashIn = expensesData?.reduce((sum, expense) => {
+        if (expense.category === 'Entrada de Caixa') {
+          return sum + Number(expense.amount);
+        }
+        return sum;
+      }, 0) || 0;
 
       // Buscar vendas com pagamentos pendentes (payment_received = false)
       const { data: pendingSalesData } = await supabase
@@ -340,6 +358,7 @@ const Dashboard = () => {
         totalCostSum,
         totalSaleSum,
         totalExpenses,
+        totalCashIn,
         totalPendingPayments,
         totalPartialPayments,
         totalToReceive,
@@ -432,7 +451,7 @@ const Dashboard = () => {
       },
         {
           title: 'Caixa da Empresa',
-          value: `R$ ${(stats.revenueFromDate - stats.totalExpenses).toFixed(2)}`,
+          value: `R$ ${(stats.revenueFromDate - stats.totalExpenses + stats.totalCashIn).toFixed(2)}`,
           icon: DollarSign,
           color: 'from-emerald-500 to-emerald-600',
           bgColor: 'bg-emerald-50',
