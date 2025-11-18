@@ -31,6 +31,7 @@ const ExpensesPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cashInDialogOpen, setCashInDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [companyCash, setCompanyCash] = useState<number>(0);
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -53,6 +54,50 @@ const ExpensesPage = () => {
   useEffect(() => {
     fetchExpenses();
   }, []);
+
+  // Buscar os mesmos dados do Dashboard para o Caixa da Empresa
+  useEffect(() => {
+    const fetchCompanyCash = async () => {
+      // Buscar vendas pagas a partir de 29/08/2025
+      const { data: salesFromDateData } = await supabase
+        .from('sales')
+        .select('total_price, sale_date, payment_received, partial_payment_amount')
+        .gte('sale_date', '2025-08-29');
+      
+      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
+        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+        const totalPrice = Number(sale.total_price) || 0;
+        
+        if (sale.payment_received && (partialAmount === 0 || partialAmount >= totalPrice)) {
+          return sum + totalPrice;
+        }
+        return sum;
+      }, 0) || 0;
+
+      // Buscar despesas e entradas de caixa
+      const { data: expensesData } = await supabase
+        .from('expenses')
+        .select('amount, category');
+      
+      const totalExpensesOut = expensesData?.reduce((sum, expense) => {
+        if (expense.category !== 'Entrada de Caixa') {
+          return sum + Number(expense.amount);
+        }
+        return sum;
+      }, 0) || 0;
+      
+      const totalCashInAmount = expensesData?.reduce((sum, expense) => {
+        if (expense.category === 'Entrada de Caixa') {
+          return sum + Number(expense.amount);
+        }
+        return sum;
+      }, 0) || 0;
+
+      return revenueFromDate - totalExpensesOut + totalCashInAmount;
+    };
+
+    fetchCompanyCash().then(setCompanyCash);
+  }, [expenses]);
 
   const fetchExpenses = async () => {
     try {
@@ -252,52 +297,6 @@ const ExpensesPage = () => {
   if (loading) {
     return <div className="flex justify-center items-center h-64">Carregando...</div>;
   }
-
-  // Buscar os mesmos dados do Dashboard para o Caixa da Empresa
-  const fetchCompanyCash = async () => {
-    // Buscar vendas pagas a partir de 29/08/2025
-    const { data: salesFromDateData } = await supabase
-      .from('sales')
-      .select('total_price, sale_date, payment_received, partial_payment_amount')
-      .gte('sale_date', '2025-08-29');
-    
-    const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
-      const partialAmount = Number((sale as any).partial_payment_amount) || 0;
-      const totalPrice = Number(sale.total_price) || 0;
-      
-      if (sale.payment_received && (partialAmount === 0 || partialAmount >= totalPrice)) {
-        return sum + totalPrice;
-      }
-      return sum;
-    }, 0) || 0;
-
-    // Buscar despesas e entradas de caixa
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('amount, category');
-    
-    const totalExpensesOut = expensesData?.reduce((sum, expense) => {
-      if (expense.category !== 'Entrada de Caixa') {
-        return sum + Number(expense.amount);
-      }
-      return sum;
-    }, 0) || 0;
-    
-    const totalCashInAmount = expensesData?.reduce((sum, expense) => {
-      if (expense.category === 'Entrada de Caixa') {
-        return sum + Number(expense.amount);
-      }
-      return sum;
-    }, 0) || 0;
-
-    return revenueFromDate - totalExpensesOut + totalCashInAmount;
-  };
-
-  const [companyCash, setCompanyCash] = React.useState<number>(0);
-
-  React.useEffect(() => {
-    fetchCompanyCash().then(setCompanyCash);
-  }, [expenses]);
 
   return (
     <div className="container mx-auto p-6">
