@@ -23,6 +23,8 @@ const SalesPage = () => {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [filteredTotal, setFilteredTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,12 +92,29 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus]);
+  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, startDate, endDate]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
 
-    if (selectedMonth) {
+    // Filtro por range de datas
+    if (startDate || endDate) {
+      filtered = filtered.filter(sale => {
+        const saleDate = new Date(sale.sale_date);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        
+        if (start && end) {
+          return saleDate >= start && saleDate <= end;
+        } else if (start) {
+          return saleDate >= start;
+        } else if (end) {
+          return saleDate <= end;
+        }
+        return true;
+      });
+    } else if (selectedMonth) {
+      // Apenas filtrar por mês se não houver range de datas
       filtered = filtered.filter(sale => {
         const saleDate = new Date(sale.sale_date);
         const saleMonth = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
@@ -790,22 +809,47 @@ const SalesPage = () => {
                 <option value="pendente">Pendente</option>
                 <option value="parcial">Parcial</option>
               </select>
-              <Calendar className="w-4 h-4" />
-              <select 
-                value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="p-2 border rounded-md w-48"
-              >
-                <option value="">Todos os meses</option>
-                {getMonthOptions().map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (e.target.value) setSelectedMonth('');
+                  }}
+                  placeholder="Data início"
+                  className="w-40"
+                />
+                <span className="text-gray-500">até</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    if (e.target.value) setSelectedMonth('');
+                  }}
+                  placeholder="Data fim"
+                  className="w-40"
+                />
+              </div>
+              {!startDate && !endDate && (
+                <select 
+                  value={selectedMonth} 
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="p-2 border rounded-md w-48"
+                >
+                  <option value="">Todos os meses</option>
+                  {getMonthOptions().map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
-          {(selectedMonth || selectedSeller || selectedStatus || searchTerm) && (
+          {(selectedMonth || selectedSeller || selectedStatus || searchTerm || startDate || endDate) && (
             <div className="mt-2 p-3 bg-green-50 rounded-lg">
               <div className="text-lg font-bold text-green-800">
                 Total dos resultados filtrados: R$ {filteredTotal.toFixed(2)}
