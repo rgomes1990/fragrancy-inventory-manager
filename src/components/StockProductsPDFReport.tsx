@@ -25,7 +25,7 @@ const StockProductsPDFReport = () => {
 
   const generateStockProductsReport = async () => {
     try {
-      // Buscar produtos em estoque (quantity > 0 e não é produto de encomenda e tem categoria)
+      // Buscar produtos em estoque (quantity > 0 e não é produto de encomenda)
       const stockProductsResult = await supabase
         .from('products')
         .select(`
@@ -34,7 +34,6 @@ const StockProductsPDFReport = () => {
         `)
         .eq('is_order_product', false)
         .gt('quantity', 0)
-        .not('category_id', 'is', null)
         .order('name');
 
       if (stockProductsResult.error) throw stockProductsResult.error;
