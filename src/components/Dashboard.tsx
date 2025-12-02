@@ -76,7 +76,7 @@ const Dashboard = () => {
     rogerio_revenue: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [stockFilter, setStockFilter] = useState('all');
+  const [stockFilter, setStockFilter] = useState('in-stock');
 
   useEffect(() => {
     fetchDashboardData();
