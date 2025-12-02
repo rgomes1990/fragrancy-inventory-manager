@@ -194,8 +194,11 @@ const Dashboard = () => {
       const totalCostSum = allProductsData?.reduce((sum, product) => {
         // Excluir produtos de encomenda (is_order_product = true)
         // Multiplicar preço de custo pela quantidade em estoque
+        // Para produtos sem estoque, considerar quantidade = 1
         if (!product.is_order_product) {
-          return sum + (Number(product.cost_price) * Number(product.quantity));
+          const qty = Number(product.quantity);
+          const effectiveQty = qty > 0 ? qty : 1;
+          return sum + (Number(product.cost_price) * effectiveQty);
         }
         return sum;
       }, 0) || 0;
