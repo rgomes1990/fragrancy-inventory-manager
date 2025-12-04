@@ -440,17 +440,17 @@ const ProductsPage = () => {
                 <h3 className="text-sm font-medium text-muted-foreground">Total Preço de Custo</h3>
               </div>
               <p className="text-2xl font-bold text-primary">
-                R$ {filteredProducts.reduce((sum, product) => sum + Number(product.cost_price), 0).toFixed(2)}
+                R$ {filteredProducts.reduce((sum, product) => sum + (Number(product.cost_price) * product.quantity), 0).toFixed(2)}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Total Preço de Venda</h3>
+                <h3 className="text-sm font-medium text-muted-foreground">Projeção de Vendas</h3>
               </div>
               <p className="text-2xl font-bold text-primary">
-                R$ {filteredProducts.reduce((sum, product) => sum + Number(product.sale_price), 0).toFixed(2)}
+                R$ {filteredProducts.reduce((sum, product) => sum + (Number(product.sale_price) * product.quantity), 0).toFixed(2)}
               </p>
             </CardContent>
           </Card>
