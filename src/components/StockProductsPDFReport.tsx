@@ -59,10 +59,28 @@ const StockProductsPDFReport = () => {
         productsByCategory[categoryName].push(product);
       }
 
-      // Ordenar categorias alfabeticamente
+      // Ordem personalizada das categorias
+      const categoryOrder = [
+        'Perfumes Femininos',
+        'Perfumes Masculinos',
+        'Body Splash',
+        'Cremes',
+        'Sem categoria'
+      ];
+      
       const sortedCategories = Object.keys(productsByCategory).sort((a, b) => {
-        if (a === 'Sem categoria') return 1;
-        if (b === 'Sem categoria') return -1;
+        const indexA = categoryOrder.indexOf(a);
+        const indexB = categoryOrder.indexOf(b);
+        
+        // Se ambos estão na lista de prioridade
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        // Se apenas A está na lista de prioridade
+        if (indexA !== -1) return -1;
+        // Se apenas B está na lista de prioridade
+        if (indexB !== -1) return 1;
+        // Se nenhum está na lista, ordenar alfabeticamente
         return a.localeCompare(b);
       });
 
