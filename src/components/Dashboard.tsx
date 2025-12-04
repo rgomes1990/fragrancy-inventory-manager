@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown, UserCheck } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface DashboardStats {
   totalProducts: number;
@@ -717,7 +717,7 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={monthlySales}>
+            <BarChart data={monthlySales}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
                 dataKey="month" 
@@ -743,25 +743,21 @@ const Dashboard = () => {
                 }}
               />
               <Legend />
-              <Line 
+              <Bar 
                 yAxisId="left"
-                type="monotone" 
                 dataKey="vendas" 
-                stroke="#8b5cf6" 
-                strokeWidth={2}
+                fill="#8b5cf6" 
                 name="Vendas"
-                dot={{ fill: '#8b5cf6' }}
+                radius={[4, 4, 0, 0]}
               />
-              <Line 
+              <Bar 
                 yAxisId="right"
-                type="monotone" 
                 dataKey="receita" 
-                stroke="#10b981" 
-                strokeWidth={2}
+                fill="#10b981" 
                 name="Receita"
-                dot={{ fill: '#10b981' }}
+                radius={[4, 4, 0, 0]}
               />
-            </LineChart>
+            </BarChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
