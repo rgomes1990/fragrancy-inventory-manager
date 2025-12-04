@@ -204,7 +204,15 @@ const Dashboard = () => {
       }, 0) || 0;
       
       const totalSaleSum = allProductsData?.reduce((sum, product) => {
-        return sum + Number(product.sale_price);
+        // Excluir produtos de encomenda (is_order_product = true)
+        // Multiplicar preço de venda pela quantidade em estoque
+        // Para produtos sem estoque, considerar quantidade = 1
+        if (!product.is_order_product) {
+          const qty = Number(product.quantity);
+          const effectiveQty = qty > 0 ? qty : 1;
+          return sum + (Number(product.sale_price) * effectiveQty);
+        }
+        return sum;
       }, 0) || 0;
 
       const { data: recentSalesData } = await supabase
