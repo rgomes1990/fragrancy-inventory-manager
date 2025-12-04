@@ -48,6 +48,24 @@ const StockProductsPDFReport = () => {
         return;
       }
 
+      // Agrupar produtos por categoria
+      const productsByCategory: { [key: string]: typeof stockProducts } = {};
+      
+      for (const product of stockProducts) {
+        const categoryName = product.categories?.name || 'Sem categoria';
+        if (!productsByCategory[categoryName]) {
+          productsByCategory[categoryName] = [];
+        }
+        productsByCategory[categoryName].push(product);
+      }
+
+      // Ordenar categorias alfabeticamente
+      const sortedCategories = Object.keys(productsByCategory).sort((a, b) => {
+        if (a === 'Sem categoria') return 1;
+        if (b === 'Sem categoria') return -1;
+        return a.localeCompare(b);
+      });
+
       // Criar PDF
       const doc = new jsPDF();
       
@@ -60,52 +78,81 @@ const StockProductsPDFReport = () => {
       doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 20, 30);
       
       let yPosition = 50;
-      
-      // Cabeçalhos
-      doc.setFontSize(12);
-      doc.text('Foto', 20, yPosition);
-      doc.text('Produto', 50, yPosition);
-      doc.text('Categoria', 120, yPosition);
-      doc.text('Preço', 170, yPosition);
-      
-      yPosition += 5;
-      
-      // Linha separadora
-      doc.line(20, yPosition, 200, yPosition);
-      
-      yPosition += 10;
-      
-      // Dados dos produtos
-      doc.setFontSize(10);
 
-      for (const product of stockProducts) {
-        if (yPosition > 250) {
+      // Iterar por cada categoria
+      for (const categoryName of sortedCategories) {
+        const categoryProducts = productsByCategory[categoryName];
+        
+        // Verificar se precisa de nova página para o cabeçalho da categoria
+        if (yPosition > 240) {
           doc.addPage();
           yPosition = 20;
         }
         
-        const productName = product.name;
-        const categoryName = product.categories?.name || 'Sem categoria';
-        const salePrice = product.sale_price || 0;
+        // Cabeçalho da categoria
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(categoryName, 20, yPosition);
+        yPosition += 8;
         
-        // Carregar e adicionar imagem se existir
-        if (product.image_url) {
-          try {
-            const imageBase64 = await loadImageAsBase64(product.image_url);
-            if (imageBase64) {
-              const imageSize = 15; // Tamanho da imagem
-              doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
-            }
-          } catch (error) {
-            console.error('Erro ao adicionar imagem:', error);
+        // Linha separadora da categoria
+        doc.setDrawColor(100, 100, 100);
+        doc.line(20, yPosition, 190, yPosition);
+        yPosition += 8;
+        
+        // Cabeçalhos das colunas
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Foto', 20, yPosition);
+        doc.text('Produto', 50, yPosition);
+        doc.text('Preço', 160, yPosition);
+        
+        yPosition += 5;
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, yPosition, 190, yPosition);
+        yPosition += 8;
+        
+        doc.setFont('helvetica', 'normal');
+        
+        // Produtos da categoria
+        for (const product of categoryProducts) {
+          if (yPosition > 250) {
+            doc.addPage();
+            yPosition = 20;
+            
+            // Repetir cabeçalho da categoria na nova página
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${categoryName} (continuação)`, 20, yPosition);
+            yPosition += 10;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
           }
+          
+          const productName = product.name;
+          const salePrice = product.sale_price || 0;
+          
+          // Carregar e adicionar imagem se existir
+          if (product.image_url) {
+            try {
+              const imageBase64 = await loadImageAsBase64(product.image_url);
+              if (imageBase64) {
+                const imageSize = 15;
+                doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
+              }
+            } catch (error) {
+              console.error('Erro ao adicionar imagem:', error);
+            }
+          }
+          
+          doc.text(productName.substring(0, 35), 50, yPosition);
+          doc.text(`R$ ${salePrice.toFixed(2)}`, 160, yPosition);
+          
+          yPosition += 20;
         }
         
-        doc.text(productName.substring(0, 20), 50, yPosition);
-        doc.text(categoryName.substring(0, 15), 120, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 170, yPosition);
-        
-        yPosition += 20; // Aumentar espaçamento para acomodar as imagens
+        // Espaço entre categorias
+        yPosition += 5;
       }
       
       // Salvar PDF
