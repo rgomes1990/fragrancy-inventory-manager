@@ -48,10 +48,23 @@ const StockProductsPDFReport = () => {
         return;
       }
 
+      // Filtrar produtos excluindo a categoria "Tg"
+      const filteredProducts = stockProducts.filter(
+        product => product.categories?.name !== 'Tg'
+      );
+
+      if (filteredProducts.length === 0) {
+        toast({
+          title: "Aviso",
+          description: "Nenhum produto em estoque encontrado (excluindo categoria Tg).",
+        });
+        return;
+      }
+
       // Agrupar produtos por categoria
-      const productsByCategory: { [key: string]: typeof stockProducts } = {};
+      const productsByCategory: { [key: string]: typeof filteredProducts } = {};
       
-      for (const product of stockProducts) {
+      for (const product of filteredProducts) {
         const categoryName = product.categories?.name || 'Sem categoria';
         if (!productsByCategory[categoryName]) {
           productsByCategory[categoryName] = [];
