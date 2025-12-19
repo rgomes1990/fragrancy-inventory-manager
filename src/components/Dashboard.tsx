@@ -360,9 +360,12 @@ const Dashboard = () => {
         });
 
       const productsData = productsRes.data || [];
+      
+      // Somar a quantidade total de produtos em estoque
+      const totalProductQuantity = productsData.reduce((sum, product) => sum + (Number(product.quantity) || 0), 0);
 
       setStats({
-        totalProducts: productsData.length,
+        totalProducts: totalProductQuantity,
         totalCustomers: customersRes.count || 0,
         totalSales: salesRes.count || 0,
         totalRevenue,
