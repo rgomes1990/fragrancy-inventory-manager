@@ -25,6 +25,7 @@ const SalesPage = () => {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
@@ -36,11 +37,15 @@ const SalesPage = () => {
   useEffect(() => {
     const statusParam = searchParams.get('status');
     const sellerParam = searchParams.get('seller');
+    const customerParam = searchParams.get('customer');
     if (statusParam) {
       setSelectedStatus(statusParam);
     }
     if (sellerParam) {
       setSelectedSeller(sellerParam);
+    }
+    if (customerParam) {
+      setSelectedCustomerId(customerParam);
     }
   }, [searchParams]);
   
@@ -106,7 +111,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, startDate, endDate]);
+  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, startDate, endDate]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
@@ -140,6 +145,11 @@ const SalesPage = () => {
       filtered = filtered.filter(sale => {
         return sale.seller === selectedSeller;
       });
+    }
+
+    // Filtro por cliente
+    if (selectedCustomerId) {
+      filtered = filtered.filter(sale => sale.customer_id === selectedCustomerId);
     }
 
     if (selectedStatus) {
