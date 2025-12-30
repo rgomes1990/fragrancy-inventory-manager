@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer } from '@/types/database';
-import { useAuth } from '@/contexts/AuthContext';
+
 import SalesMultiProductForm from './SalesMultiProductForm';
 
 const SalesPage = () => {
@@ -31,7 +31,7 @@ const SalesPage = () => {
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [filteredTotal, setFilteredTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const { setUserContext } = useAuth();
+  
 
   // Ler parâmetros da URL na inicialização
   useEffect(() => {
@@ -218,8 +218,6 @@ const SalesPage = () => {
     partial_payment_amount: number | null;
   }) => {
     try {
-      await setUserContext();
-      
       for (const item of saleData.items) {
         const product = products.find(p => p.id === item.product_id);
         if (!product) {
@@ -241,14 +239,9 @@ const SalesPage = () => {
         }
       }
 
-      // Definir o nome do usuário baseado no vendedor selecionado
-      const userContext = saleData.seller;
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_user',
-        setting_value: userContext,
-        is_local: false
-      });
-
+      // Obter cliente com header do usuário atual
+      const supabaseClient = supabaseWithUser();
+      
       // Calcular o total de todos os itens para distribuir o pagamento parcial proporcionalmente
       const totalAllItems = saleData.items.reduce((sum, item) => sum + item.subtotal, 0);
       
@@ -270,7 +263,7 @@ const SalesPage = () => {
           partial_payment_amount: itemPartialPayment,
         };
 
-        const { error: saleError } = await supabase
+        const { error: saleError } = await supabaseClient
           .from('sales')
           .insert([saleRecord]);
 
@@ -292,7 +285,7 @@ const SalesPage = () => {
             updateData.sale_price = item.unit_price;
           }
 
-          const { error: updateError } = await supabase
+          const { error: updateError } = await supabaseClient
             .from('products')
             .update(updateData)
             .eq('id', item.product_id);
@@ -329,13 +322,8 @@ const SalesPage = () => {
     e.preventDefault();
     
     try {
-      // Definir o nome do usuário baseado no vendedor selecionado
-      const userContext = formData.seller;
-      await supabase.rpc('set_config', {
-        setting_name: 'app.current_user',
-        setting_value: userContext,
-        is_local: false
-      });
+      // Obter cliente com header do usuário atual
+      const supabaseClient = supabaseWithUser();
       
       const product = products.find(p => p.id === formData.product_id);
       if (!product) {
@@ -388,7 +376,7 @@ const SalesPage = () => {
       };
 
       if (editingSale) {
-        const { error: saleError } = await supabase
+        const { error: saleError } = await supabaseClient
           .from('sales')
           .update(saleData)
           .eq('id', editingSale.id);
@@ -405,7 +393,7 @@ const SalesPage = () => {
           productId: formData.product_id
         });
 
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseClient
           .from('products')
           .update({ quantity: newQuantity })
           .eq('id', formData.product_id);
@@ -418,7 +406,7 @@ const SalesPage = () => {
         console.log(`[EDIÇÃO VENDA] Estoque atualizado com sucesso para ${product.name}`);
 
         if (unit_price !== product.sale_price) {
-          const { error: priceUpdateError } = await supabase
+          const { error: priceUpdateError } = await supabaseClient
             .from('products')
             .update({ sale_price: unit_price })
             .eq('id', formData.product_id);
@@ -431,7 +419,7 @@ const SalesPage = () => {
           description: "Venda atualizada com sucesso!",
         });
       } else {
-        const { error: saleError } = await supabase
+        const { error: saleError } = await supabaseClient
           .from('sales')
           .insert([saleData]);
 
@@ -451,7 +439,7 @@ const SalesPage = () => {
           updateData.sale_price = unit_price;
         }
 
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseClient
           .from('products')
           .update(updateData)
           .eq('id', formData.product_id);
@@ -500,7 +488,7 @@ const SalesPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
 
     try {
-      await setUserContext();
+      const supabaseClient = supabaseWithUser();
       
       const product = products.find(p => p.id === sale.product_id);
       if (product) {
@@ -513,7 +501,7 @@ const SalesPage = () => {
           productId: sale.product_id
         });
 
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseClient
           .from('products')
           .update({ quantity: novoEstoque })
           .eq('id', sale.product_id);
@@ -526,7 +514,7 @@ const SalesPage = () => {
         console.log(`[EXCLUSÃO VENDA] Estoque devolvido com sucesso para ${product.name}`);
       }
 
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('sales')
         .delete()
         .eq('id', sale.id);

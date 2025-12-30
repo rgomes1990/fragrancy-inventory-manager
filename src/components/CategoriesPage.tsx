@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Tag, Search } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
 
@@ -72,7 +72,7 @@ const CategoriesPage = () => {
       };
 
       if (editingCategory) {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('categories')
           .update(categoryData)
           .eq('id', editingCategory.id);
@@ -83,7 +83,7 @@ const CategoriesPage = () => {
           description: "Categoria atualizada com sucesso!",
         });
       } else {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('categories')
           .insert([categoryData]);
 
@@ -118,7 +118,7 @@ const CategoriesPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await supabaseWithUser()
         .from('categories')
         .delete()
         .eq('id', id);

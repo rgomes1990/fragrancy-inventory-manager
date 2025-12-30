@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Users, Search, ShoppingCart } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
 
@@ -122,7 +122,7 @@ const CustomersPage = () => {
       };
 
       if (editingCustomer) {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('customers')
           .update(customerData)
           .eq('id', editingCustomer.id);
@@ -133,7 +133,7 @@ const CustomersPage = () => {
           description: "Cliente atualizado com sucesso!",
         });
       } else {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('customers')
           .insert([customerData]);
 
@@ -170,7 +170,7 @@ const CustomersPage = () => {
     if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
 
     try {
-      const { error } = await supabase
+      const { error } = await supabaseWithUser()
         .from('customers')
         .delete()
         .eq('id', id);
