@@ -35,8 +35,12 @@ const SalesPage = () => {
   // Ler parâmetros da URL na inicialização
   useEffect(() => {
     const statusParam = searchParams.get('status');
+    const sellerParam = searchParams.get('seller');
     if (statusParam) {
       setSelectedStatus(statusParam);
+    }
+    if (sellerParam) {
+      setSelectedSeller(sellerParam);
     }
   }, [searchParams]);
   

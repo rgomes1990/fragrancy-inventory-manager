@@ -407,6 +407,9 @@ const Dashboard = () => {
       navigate('/sales?status=a-receber');
     } else if (cardType === 'pendente') {
       navigate('/sales?status=pendente');
+    } else if (cardType.startsWith('seller-')) {
+      const seller = cardType.replace('seller-', '');
+      navigate(`/sales?seller=${encodeURIComponent(seller)}`);
     }
   };
 
@@ -562,11 +565,15 @@ const Dashboard = () => {
 
       {/* Cards de vendas por usuário */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-pink-50 border-0 shadow-md">
+        <Card 
+          className="bg-pink-50 border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-pink-400 transition-all duration-300"
+          onClick={() => handleCardClick('seller-Ana Paula')}
+        >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <UserCheck className="w-5 h-5 text-pink-500" />
               <span>Vendas - Ana Paula</span>
+              <span className="text-xs text-pink-500">(clique para ver)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -583,11 +590,15 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50 border-0 shadow-md">
+        <Card 
+          className="bg-blue-50 border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-blue-400 transition-all duration-300"
+          onClick={() => handleCardClick('seller-Danilo')}
+        >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <UserCheck className="w-5 h-5 text-blue-500" />
               <span>Vendas - Danilo</span>
+              <span className="text-xs text-blue-500">(clique para ver)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -604,11 +615,15 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-green-50 border-0 shadow-md">
+        <Card 
+          className="bg-green-50 border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-green-400 transition-all duration-300"
+          onClick={() => handleCardClick('seller-Rogério')}
+        >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <UserCheck className="w-5 h-5 text-green-500" />
               <span>Vendas - Rogério</span>
+              <span className="text-xs text-green-500">(clique para ver)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
