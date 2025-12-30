@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +49,7 @@ interface MonthlySales {
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalCustomers: 0,
@@ -398,6 +400,14 @@ const Dashboard = () => {
     }
   };
 
+  const handleCardClick = (cardType: string) => {
+    if (cardType === 'parcial') {
+      navigate('/sales?status=parcial');
+    } else if (cardType === 'a-receber') {
+      navigate('/sales?status=a-receber');
+    }
+  };
+
   const getFilteredStatsCards = () => {
     const baseCards = [
       {
@@ -449,6 +459,8 @@ const Dashboard = () => {
         icon: TrendingUp,
         color: 'from-orange-500 to-orange-600',
         bgColor: 'bg-orange-50',
+        clickable: true,
+        clickType: 'a-receber',
       },
       {
         title: 'Pagamentos Parciais (Falta Receber)',
@@ -456,6 +468,8 @@ const Dashboard = () => {
         icon: DollarSign,
         color: 'from-amber-500 to-amber-600',
         bgColor: 'bg-amber-50',
+        clickable: true,
+        clickType: 'parcial',
       },
       {
         title: 'Total a Receber',
@@ -463,6 +477,8 @@ const Dashboard = () => {
         icon: TrendingUp,
         color: 'from-rose-500 to-rose-600',
         bgColor: 'bg-rose-50',
+        clickable: true,
+        clickType: 'a-receber',
       },
         {
           title: 'Caixa da Empresa',
@@ -514,12 +530,22 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {getFilteredStatsCards().map((card, index) => {
           const Icon = card.icon;
+          const isClickable = (card as any).clickable;
+          const clickType = (card as any).clickType;
+          
           return (
-            <Card key={index} className={`${card.bgColor} border-0 shadow-md hover:shadow-lg transition-shadow duration-300`}>
+            <Card 
+              key={index} 
+              className={`${card.bgColor} border-0 shadow-md hover:shadow-lg transition-shadow duration-300 ${isClickable ? 'cursor-pointer hover:ring-2 hover:ring-offset-2 hover:ring-primary' : ''}`}
+              onClick={isClickable ? () => handleCardClick(clickType) : undefined}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">{card.title}</p>
+                    <p className="text-sm font-medium text-gray-600 mb-1">
+                      {card.title}
+                      {isClickable && <span className="ml-1 text-xs text-primary">(clique para ver)</span>}
+                    </p>
                     <p className="text-2xl font-bold text-gray-900">{card.value}</p>
                   </div>
                   <div className={`w-12 h-12 bg-gradient-to-r ${card.color} rounded-lg flex items-center justify-center`}>
