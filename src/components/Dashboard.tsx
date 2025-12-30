@@ -181,8 +181,8 @@ const Dashboard = () => {
         }
       });
 
-      // Total a Receber agora é apenas as vendas totalmente pendentes
-      const totalToReceive = totalPendingPayments;
+      // Total a Receber = Pendentes + Parciais
+      const totalToReceive = totalPendingPayments + totalPartialPayments;
 
       let costSaleSumQuery = supabase.from('products').select('cost_price, sale_price, quantity, is_order_product');
       if (stockFilter === 'in-stock') {
@@ -478,7 +478,7 @@ const Dashboard = () => {
         color: 'from-rose-500 to-rose-600',
         bgColor: 'bg-rose-50',
         clickable: true,
-        clickType: 'pendente',
+        clickType: 'a-receber',
       },
         {
           title: 'Caixa da Empresa',
