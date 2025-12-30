@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Product, Category } from '@/types/database';
-import { useAuth } from '@/contexts/AuthContext';
+
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
@@ -26,7 +26,7 @@ const ProductsPage = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const { setUserContext } = useAuth();
+  
 
   const [formData, setFormData] = useState({
     name: '',
@@ -118,8 +118,6 @@ const ProductsPage = () => {
     e.preventDefault();
     
     try {
-      await setUserContext();
-      
       const productData = {
         name: formData.name,
         cost_price: parseFloat(formData.cost_price),
@@ -132,7 +130,7 @@ const ProductsPage = () => {
       };
 
       if (editingProduct) {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('products')
           .update(productData)
           .eq('id', editingProduct.id);
@@ -144,7 +142,7 @@ const ProductsPage = () => {
           description: "Produto atualizado com sucesso!",
         });
       } else {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('products')
           .insert([productData]);
 
@@ -187,9 +185,7 @@ const ProductsPage = () => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
 
     try {
-      await setUserContext();
-      
-      const { error } = await supabase
+      const { error } = await supabaseWithUser()
         .from('products')
         .delete()
         .eq('id', product.id);

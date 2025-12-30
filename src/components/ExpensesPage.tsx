@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 interface Expense {
@@ -142,7 +142,7 @@ const ExpensesPage = () => {
       };
 
       if (editingExpense) {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('expenses')
           .update(expenseData)
           .eq('id', editingExpense.id);
@@ -153,7 +153,7 @@ const ExpensesPage = () => {
           description: "Despesa atualizada com sucesso",
         });
       } else {
-        const { error } = await supabase
+        const { error } = await supabaseWithUser()
           .from('expenses')
           .insert([expenseData]);
 
@@ -198,7 +198,7 @@ const ExpensesPage = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseWithUser()
         .from('expenses')
         .delete()
         .eq('id', id);
@@ -241,7 +241,7 @@ const ExpensesPage = () => {
         observacao: cashInFormData.observacao
       };
 
-      const { error } = await supabase
+      const { error } = await supabaseWithUser()
         .from('expenses')
         .insert([cashInData]);
 

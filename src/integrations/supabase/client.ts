@@ -5,7 +5,41 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://zrvpxzsvynxbskahqwug.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpydnB4enN2eW54YnNrYWhxd3VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMzQ2NjMsImV4cCI6MjA2NTYxMDY2M30.ede9J6ASS-y-CUNFZN8yc2mKApMV3vA242Cqlpco89E";
 
+// Função para obter o usuário atual do localStorage
+const getCurrentUser = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('currentUser') || '';
+  }
+  return '';
+};
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  global: {
+    headers: {
+      'x-current-user': getCurrentUser()
+    }
+  }
+});
+
+// Função para atualizar os headers com o usuário atual
+// Deve ser chamada após login/logout
+export const updateSupabaseHeaders = () => {
+  const currentUser = getCurrentUser();
+  // Criar novo cliente não é ideal, mas podemos usar interceptor
+  // A melhor forma é garantir que cada operação inclua o header
+};
+
+// Função helper para fazer operações com o header do usuário atual
+export const supabaseWithUser = () => {
+  const currentUser = getCurrentUser();
+  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    global: {
+      headers: {
+        'x-current-user': currentUser
+      }
+    }
+  });
+};
