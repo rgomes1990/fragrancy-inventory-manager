@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import SalesMultiProductForm from './SalesMultiProductForm';
 
 const SalesPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,6 +31,14 @@ const SalesPage = () => {
   const [filteredTotal, setFilteredTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const { setUserContext } = useAuth();
+
+  // Ler parâmetros da URL na inicialização
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setSelectedStatus(statusParam);
+    }
+  }, [searchParams]);
   
   const [formData, setFormData] = useState({
     customer_id: '',
@@ -142,6 +152,11 @@ const SalesPage = () => {
         } else if (selectedStatus === 'parcial') {
           // Parcial: payment_received = true e partial_payment_amount > 0 e < total_price
           return sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
+        } else if (selectedStatus === 'a-receber') {
+          // Total a Receber: pendentes + parciais (tudo que ainda falta receber)
+          const isPendente = sale.payment_received === false;
+          const isParcial = sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
+          return isPendente || isParcial;
         }
         return true;
       });
@@ -800,13 +815,21 @@ const SalesPage = () => {
               </select>
               <select 
                 value={selectedStatus} 
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value);
+                  // Limpar o parâmetro da URL quando mudar manualmente
+                  if (searchParams.has('status')) {
+                    searchParams.delete('status');
+                    setSearchParams(searchParams);
+                  }
+                }}
                 className="p-2 border rounded-md w-40"
               >
                 <option value="">Todos status</option>
                 <option value="recebido">Recebido</option>
                 <option value="pendente">Pendente</option>
                 <option value="parcial">Parcial</option>
+                <option value="a-receber">A Receber (todos)</option>
               </select>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
