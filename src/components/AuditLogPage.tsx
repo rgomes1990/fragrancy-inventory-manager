@@ -145,6 +145,76 @@ const AuditLogPage = () => {
     return JSON.stringify(data, null, 2);
   };
 
+  // Função para comparar valores e identificar diferenças
+  const getChangedFields = (oldValues: any, newValues: any) => {
+    if (!oldValues || !newValues) return { changed: [], added: [], removed: [] };
+    
+    const changed: string[] = [];
+    const added: string[] = [];
+    const removed: string[] = [];
+    
+    const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+    
+    allKeys.forEach(key => {
+      const oldVal = oldValues[key];
+      const newVal = newValues[key];
+      
+      if (!(key in oldValues)) {
+        added.push(key);
+      } else if (!(key in newValues)) {
+        removed.push(key);
+      } else if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changed.push(key);
+      }
+    });
+    
+    return { changed, added, removed };
+  };
+
+  // Função para formatar valores de forma legível
+  const formatFieldValue = (value: any): string => {
+    if (value === null || value === undefined) return 'vazio';
+    if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  };
+
+  // Nomes amigáveis para os campos
+  const getFieldDisplayName = (field: string): string => {
+    const fieldNames: Record<string, string> = {
+      id: 'ID',
+      name: 'Nome',
+      quantity: 'Quantidade',
+      cost_price: 'Preço de Custo',
+      sale_price: 'Preço de Venda',
+      category_id: 'Categoria',
+      image_url: 'URL da Imagem',
+      is_order_product: 'Produto de Encomenda',
+      customer_name: 'Nome do Cliente',
+      customer_id: 'Cliente',
+      product_id: 'Produto',
+      unit_price: 'Preço Unitário',
+      total_price: 'Preço Total',
+      sale_date: 'Data da Venda',
+      seller: 'Vendedor',
+      payment_received: 'Pagamento Recebido',
+      partial_payment_amount: 'Valor Parcial',
+      description: 'Descrição',
+      amount: 'Valor',
+      category: 'Categoria',
+      expense_date: 'Data da Despesa',
+      observacao: 'Observação',
+      whatsapp: 'WhatsApp',
+      email: 'E-mail',
+      notes: 'Notas',
+      status: 'Status',
+      total_amount: 'Valor Total',
+      created_at: 'Criado em',
+      updated_at: 'Atualizado em',
+    };
+    return fieldNames[field] || field;
+  };
+
   const getStockChangeInfo = (log: AuditLog) => {
     if (log.table_name !== 'products' || log.operation !== 'UPDATE') return null;
     
@@ -386,23 +456,132 @@ const AuditLogPage = () => {
                                 </div>
                               )}
                               
-                              {log.operation !== 'INSERT' && log.old_values && (
+                              {/* Comparação de Alterações Destacada */}
+                              {log.operation === 'UPDATE' && log.old_values && log.new_values && (
                                 <div>
-                                  <h4 className="font-semibold mb-2">Valores Anteriores:</h4>
-                                  <pre className="bg-gray-100 p-3 rounded text-xs overflow-x-auto">
-                                    {formatJsonData(log.old_values)}
-                                  </pre>
+                                  <h4 className="font-semibold mb-3 text-lg">Campos Alterados:</h4>
+                                  {(() => {
+                                    const { changed, added, removed } = getChangedFields(log.old_values, log.new_values);
+                                    const oldVals = log.old_values as Record<string, any>;
+                                    const newVals = log.new_values as Record<string, any>;
+                                    
+                                    if (changed.length === 0 && added.length === 0 && removed.length === 0) {
+                                      return <p className="text-gray-500">Nenhuma alteração detectada.</p>;
+                                    }
+                                    
+                                    return (
+                                      <div className="space-y-2">
+                                        {changed.map(field => (
+                                          <div key={field} className="p-3 rounded-lg border-2 border-yellow-400 bg-yellow-50">
+                                            <div className="font-medium text-yellow-800 mb-1">
+                                              {getFieldDisplayName(field)}
+                                            </div>
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                              <span className="bg-red-100 text-red-700 px-2 py-1 rounded line-through text-sm">
+                                                {formatFieldValue(oldVals[field])}
+                                              </span>
+                                              <span className="text-gray-400">→</span>
+                                              <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-medium text-sm">
+                                                {formatFieldValue(newVals[field])}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                        
+                                        {added.map(field => (
+                                          <div key={field} className="p-3 rounded-lg border-2 border-green-400 bg-green-50">
+                                            <div className="font-medium text-green-800 mb-1">
+                                              {getFieldDisplayName(field)} <Badge className="bg-green-500 text-white ml-2">Novo</Badge>
+                                            </div>
+                                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-sm">
+                                              {formatFieldValue(newVals[field])}
+                                            </span>
+                                          </div>
+                                        ))}
+                                        
+                                        {removed.map(field => (
+                                          <div key={field} className="p-3 rounded-lg border-2 border-red-400 bg-red-50">
+                                            <div className="font-medium text-red-800 mb-1">
+                                              {getFieldDisplayName(field)} <Badge className="bg-red-500 text-white ml-2">Removido</Badge>
+                                            </div>
+                                            <span className="bg-red-100 text-red-700 px-2 py-1 rounded line-through text-sm">
+                                              {formatFieldValue(oldVals[field])}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+
+                              {/* Para INSERT - mostrar campos adicionados */}
+                              {log.operation === 'INSERT' && log.new_values && (
+                                <div>
+                                  <h4 className="font-semibold mb-3 text-lg">Valores do Novo Registro:</h4>
+                                  <div className="space-y-2">
+                                    {Object.entries(log.new_values as Record<string, any>)
+                                      .filter(([key]) => !['id', 'created_at', 'updated_at'].includes(key))
+                                      .map(([field, value]) => (
+                                        <div key={field} className="p-2 rounded-lg border border-green-300 bg-green-50 flex items-center gap-3">
+                                          <span className="font-medium text-green-800 min-w-[150px]">
+                                            {getFieldDisplayName(field)}:
+                                          </span>
+                                          <span className="text-green-700">
+                                            {formatFieldValue(value)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Para DELETE - mostrar campos removidos */}
+                              {log.operation === 'DELETE' && log.old_values && (
+                                <div>
+                                  <h4 className="font-semibold mb-3 text-lg">Valores do Registro Excluído:</h4>
+                                  <div className="space-y-2">
+                                    {Object.entries(log.old_values as Record<string, any>)
+                                      .filter(([key]) => !['id', 'created_at', 'updated_at'].includes(key))
+                                      .map(([field, value]) => (
+                                        <div key={field} className="p-2 rounded-lg border border-red-300 bg-red-50 flex items-center gap-3">
+                                          <span className="font-medium text-red-800 min-w-[150px]">
+                                            {getFieldDisplayName(field)}:
+                                          </span>
+                                          <span className="text-red-700 line-through">
+                                            {formatFieldValue(value)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                  </div>
                                 </div>
                               )}
                               
-                              {log.operation !== 'DELETE' && log.new_values && (
-                                <div>
-                                  <h4 className="font-semibold mb-2">Valores Novos:</h4>
-                                  <pre className="bg-gray-100 p-3 rounded text-xs overflow-x-auto">
-                                    {formatJsonData(log.new_values)}
-                                  </pre>
+                              {/* JSON completo para referência */}
+                              <details className="mt-4">
+                                <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
+                                  Ver dados completos (JSON)
+                                </summary>
+                                <div className="mt-2 space-y-4">
+                                  {log.operation !== 'INSERT' && log.old_values && (
+                                    <div>
+                                      <h4 className="font-semibold mb-2 text-sm">Valores Anteriores:</h4>
+                                      <pre className="bg-gray-100 p-3 rounded text-xs overflow-x-auto">
+                                        {formatJsonData(log.old_values)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                  
+                                  {log.operation !== 'DELETE' && log.new_values && (
+                                    <div>
+                                      <h4 className="font-semibold mb-2 text-sm">Valores Novos:</h4>
+                                      <pre className="bg-gray-100 p-3 rounded text-xs overflow-x-auto">
+                                        {formatJsonData(log.new_values)}
+                                      </pre>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </details>
                             </div>
                           </DialogContent>
                         </Dialog>
