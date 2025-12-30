@@ -162,13 +162,11 @@ const Dashboard = () => {
 
       let totalPendingPayments = 0;
       let totalPartialPayments = 0;
-      let totalToReceive = 0;
 
       // Vendas totalmente pendentes
       pendingSalesData?.forEach((sale) => {
         const totalPrice = Number(sale.total_price) || 0;
         totalPendingPayments += totalPrice;
-        totalToReceive += totalPrice;
       });
 
       // Vendas parcialmente pagas
@@ -180,9 +178,11 @@ const Dashboard = () => {
         if (partialAmount > 0 && partialAmount < totalPrice) {
           const amountToReceive = totalPrice - partialAmount;
           totalPartialPayments += amountToReceive;
-          totalToReceive += amountToReceive;
         }
       });
+
+      // Total a Receber agora é apenas as vendas totalmente pendentes
+      const totalToReceive = totalPendingPayments;
 
       let costSaleSumQuery = supabase.from('products').select('cost_price, sale_price, quantity, is_order_product');
       if (stockFilter === 'in-stock') {
@@ -460,7 +460,7 @@ const Dashboard = () => {
         color: 'from-orange-500 to-orange-600',
         bgColor: 'bg-orange-50',
         clickable: true,
-        clickType: 'a-receber',
+        clickType: 'pendente',
       },
       {
         title: 'Pagamentos Parciais (Falta Receber)',
@@ -478,7 +478,7 @@ const Dashboard = () => {
         color: 'from-rose-500 to-rose-600',
         bgColor: 'bg-rose-50',
         clickable: true,
-        clickType: 'a-receber',
+        clickType: 'pendente',
       },
         {
           title: 'Caixa da Empresa',
