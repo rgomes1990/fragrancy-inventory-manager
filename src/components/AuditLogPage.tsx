@@ -9,22 +9,29 @@ import { toast } from '@/hooks/use-toast';
 import { AuditLog } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const AuditLogPage = () => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [periodFilter, setPeriodFilter] = useState('7');
 
   useEffect(() => {
     fetchAuditLogs();
-  }, []);
+  }, [periodFilter]);
 
   const fetchAuditLogs = async () => {
     try {
+      const days = parseInt(periodFilter);
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
       const { data, error } = await supabase
         .from('audit_log')
         .select('*')
+        .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (error) throw error;
       setAuditLogs(data || []);
@@ -75,6 +82,21 @@ const AuditLogPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Controle de Alterações</h1>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">Período:</span>
+          <Select value={periodFilter} onValueChange={setPeriodFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Selecione o período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Últimos 7 dias</SelectItem>
+              <SelectItem value="15">Últimos 15 dias</SelectItem>
+              <SelectItem value="30">Último mês</SelectItem>
+              <SelectItem value="60">Últimos 2 meses</SelectItem>
+              <SelectItem value="90">Últimos 3 meses</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card>
