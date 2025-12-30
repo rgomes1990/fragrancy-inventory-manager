@@ -147,8 +147,8 @@ const SalesPage = () => {
           // Recebido totalmente: payment_received = true e (sem partial_payment_amount OU partial_payment_amount >= total_price)
           return sale.payment_received === true && (partialAmount === 0 || partialAmount >= totalPrice);
         } else if (selectedStatus === 'pendente') {
-          // Pendente totalmente: payment_received = false e sem partial_payment_amount
-          return sale.payment_received === false && partialAmount === 0;
+          // Pendente totalmente: payment_received = false (independente de partial_payment_amount)
+          return sale.payment_received === false;
         } else if (selectedStatus === 'parcial') {
           // Parcial: payment_received = true e partial_payment_amount > 0 e < total_price
           return sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
