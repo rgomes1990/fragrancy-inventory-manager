@@ -405,6 +405,8 @@ const Dashboard = () => {
       navigate('/sales?status=parcial');
     } else if (cardType === 'a-receber') {
       navigate('/sales?status=a-receber');
+    } else if (cardType === 'pendente') {
+      navigate('/sales?status=pendente');
     }
   };
 
