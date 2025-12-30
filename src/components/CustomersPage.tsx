@@ -1,18 +1,24 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Users, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Search, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
 
+interface CustomerWithSales extends Customer {
+  salesCount: number;
+}
+
 const CustomersPage = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const navigate = useNavigate();
+  const [customers, setCustomers] = useState<CustomerWithSales[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<CustomerWithSales[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -48,13 +54,45 @@ const CustomersPage = () => {
 
   const fetchCustomers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Buscar clientes e vendas em paralelo
+      const [customersRes, salesRes] = await Promise.all([
+        supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('sales')
+          .select('customer_id')
+      ]);
 
-      if (error) throw error;
-      setCustomers(data || []);
+      if (customersRes.error) throw customersRes.error;
+      if (salesRes.error) throw salesRes.error;
+
+      // Contar vendas por cliente
+      const salesCountByCustomer: Record<string, number> = {};
+      salesRes.data?.forEach(sale => {
+        if (sale.customer_id) {
+          salesCountByCustomer[sale.customer_id] = (salesCountByCustomer[sale.customer_id] || 0) + 1;
+        }
+      });
+
+      // Adicionar contagem de vendas aos clientes
+      const customersWithSales: CustomerWithSales[] = (customersRes.data || []).map(customer => ({
+        ...customer,
+        salesCount: salesCountByCustomer[customer.id] || 0
+      }));
+
+      // Ordenar: clientes com vendas primeiro, depois por data de cadastro
+      customersWithSales.sort((a, b) => {
+        if (a.salesCount > 0 && b.salesCount === 0) return -1;
+        if (a.salesCount === 0 && b.salesCount > 0) return 1;
+        // Se ambos têm ou não têm vendas, ordenar por quantidade de vendas (maior primeiro)
+        if (a.salesCount !== b.salesCount) return b.salesCount - a.salesCount;
+        // Se igual, ordenar por data de cadastro
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      setCustomers(customersWithSales);
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
       toast({
@@ -64,6 +102,12 @@ const CustomersPage = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCustomerClick = (customer: CustomerWithSales) => {
+    if (customer.salesCount > 0) {
+      navigate(`/sales?customer=${encodeURIComponent(customer.id)}`);
     }
   };
 
@@ -247,6 +291,7 @@ const CustomersPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Compras</TableHead>
                   <TableHead>WhatsApp</TableHead>
                   <TableHead>E-mail</TableHead>
                   <TableHead>Data de Cadastro</TableHead>
@@ -256,14 +301,33 @@ const CustomersPage = () => {
               <TableBody>
                 {filteredCustomers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       {searchTerm ? 'Nenhum cliente encontrado para a busca.' : 'Nenhum cliente cadastrado.'}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredCustomers.map((customer) => (
                     <TableRow key={customer.id}>
-                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell 
+                        className={`font-medium ${customer.salesCount > 0 ? 'text-primary cursor-pointer hover:underline' : ''}`}
+                        onClick={() => handleCustomerClick(customer)}
+                      >
+                        <div className="flex items-center gap-2">
+                          {customer.name}
+                          {customer.salesCount > 0 && (
+                            <ShoppingCart className="w-4 h-4 text-green-500" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {customer.salesCount > 0 ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {customer.salesCount} {customer.salesCount === 1 ? 'compra' : 'compras'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>{customer.whatsapp || '-'}</TableCell>
                       <TableCell>{customer.email || '-'}</TableCell>
                       <TableCell>
