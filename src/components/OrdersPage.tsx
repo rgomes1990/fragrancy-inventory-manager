@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Order, OrderItem } from '@/types/database';
 import OrderFormDialog from './OrderFormDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 interface OrderWithItems extends Order {
   order_items: OrderItem[];
@@ -20,20 +21,28 @@ const OrdersPage = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const { setUserContext } = useAuth();
+  const { tenantId, isAdmin } = useTenantFilter();
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (tenantId !== undefined) {
+      fetchOrders();
+    }
+  }, [tenantId, isAdmin]);
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
           order_items (*)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+      
+      if (!isAdmin && tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setOrders(data || []);

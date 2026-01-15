@@ -10,6 +10,7 @@ import { Plus, Edit, Trash2, Users, Search, ShoppingCart } from 'lucide-react';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 interface CustomerWithSales extends Customer {
   salesCount: number;
@@ -17,6 +18,7 @@ interface CustomerWithSales extends Customer {
 
 const CustomersPage = () => {
   const navigate = useNavigate();
+  const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [customers, setCustomers] = useState<CustomerWithSales[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<CustomerWithSales[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,8 +32,10 @@ const CustomersPage = () => {
   });
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    if (tenantId !== undefined) {
+      fetchCustomers();
+    }
+  }, [tenantId, isAdmin]);
 
   useEffect(() => {
     filterCustomers();
@@ -54,15 +58,25 @@ const CustomersPage = () => {
 
   const fetchCustomers = async () => {
     try {
+      // Construir queries com filtro de tenant
+      let customersQuery = supabase
+        .from('customers')
+        .select('*');
+      
+      let salesQuery = supabase
+        .from('sales')
+        .select('customer_id');
+
+      // Aplicar filtro de tenant para usuários não-admin
+      if (!isAdmin && tenantId) {
+        customersQuery = customersQuery.eq('tenant_id', tenantId);
+        salesQuery = salesQuery.eq('tenant_id', tenantId);
+      }
+
       // Buscar clientes e vendas em paralelo
       const [customersRes, salesRes] = await Promise.all([
-        supabase
-          .from('customers')
-          .select('*')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('sales')
-          .select('customer_id')
+        customersQuery.order('created_at', { ascending: false }),
+        salesQuery
       ]);
 
       if (customersRes.error) throw customersRes.error;
@@ -115,11 +129,16 @@ const CustomersPage = () => {
     e.preventDefault();
     
     try {
-      const customerData = {
+      const customerData: any = {
         name: formData.name,
         whatsapp: formData.whatsapp || null,
         email: formData.email || null,
       };
+
+      // Adicionar tenant_id para novos registros
+      if (!editingCustomer) {
+        customerData.tenant_id = getTenantIdForInsert();
+      }
 
       if (editingCustomer) {
         const { error } = await supabaseWithUser()

@@ -9,11 +9,13 @@ import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer } from '@/types/database';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 import SalesMultiProductForm from './SalesMultiProductForm';
 
 const SalesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -64,26 +66,37 @@ const SalesPage = () => {
 
   const fetchData = async () => {
     try {
+      // Construir queries com filtro de tenant
+      let salesQuery = supabase
+        .from('sales')
+        .select(`
+          *,
+          customers(id, name, whatsapp, email, created_at, updated_at),
+          products(id, name, cost_price, sale_price, quantity, category_id, created_at, updated_at, categories(id, name, created_at, updated_at))
+        `);
+      
+      let productsQuery = supabase
+        .from('products')
+        .select(`
+          *,
+          categories(id, name, created_at, updated_at)
+        `);
+      
+      let customersQuery = supabase
+        .from('customers')
+        .select('*');
+
+      // Aplicar filtro de tenant para usuários não-admin
+      if (!isAdmin && tenantId) {
+        salesQuery = salesQuery.eq('tenant_id', tenantId);
+        productsQuery = productsQuery.eq('tenant_id', tenantId);
+        customersQuery = customersQuery.eq('tenant_id', tenantId);
+      }
+
       const [salesRes, productsRes, customersRes] = await Promise.all([
-        supabase
-          .from('sales')
-          .select(`
-            *,
-            customers(id, name, whatsapp, email, created_at, updated_at),
-            products(id, name, cost_price, sale_price, quantity, category_id, created_at, updated_at, categories(id, name, created_at, updated_at))
-          `)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('products')
-          .select(`
-            *,
-            categories(id, name, created_at, updated_at)
-          `)
-          .order('name'),
-        supabase
-          .from('customers')
-          .select('*')
-          .order('name')
+        salesQuery.order('created_at', { ascending: false }),
+        productsQuery.order('name'),
+        customersQuery.order('name')
       ]);
 
       if (salesRes.error) throw salesRes.error;
@@ -106,8 +119,10 @@ const SalesPage = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (tenantId !== undefined) {
+      fetchData();
+    }
+  }, [tenantId, isAdmin]);
 
   useEffect(() => {
     filterSalesBySearch();
@@ -251,7 +266,7 @@ const SalesPage = () => {
           ? (item.subtotal / totalAllItems) * saleData.partial_payment_amount
           : null;
         
-        const saleRecord = {
+        const saleRecord: any = {
           customer_id: saleData.customer_id,
           product_id: item.product_id,
           quantity: item.quantity,
@@ -261,6 +276,7 @@ const SalesPage = () => {
           seller: saleData.seller,
           payment_received: saleData.payment_received,
           partial_payment_amount: itemPartialPayment,
+          tenant_id: getTenantIdForInsert(),
         };
 
         const { error: saleError } = await supabaseClient
@@ -363,7 +379,7 @@ const SalesPage = () => {
 
       const partialAmount = formData.partial_payment_amount ? parseFloat(formData.partial_payment_amount) : null;
       
-      const saleData = {
+      const saleData: any = {
         customer_id: formData.customer_id,
         product_id: formData.product_id,
         quantity,
@@ -374,6 +390,11 @@ const SalesPage = () => {
         payment_received: formData.payment_received,
         partial_payment_amount: partialAmount,
       };
+
+      // Adicionar tenant_id para novos registros
+      if (!editingSale) {
+        saleData.tenant_id = getTenantIdForInsert();
+      }
 
       if (editingSale) {
         const { error: saleError } = await supabaseClient
