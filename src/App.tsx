@@ -15,6 +15,7 @@ import SalesPage from '@/components/SalesPage';
 import ExpensesPage from '@/components/ExpensesPage';
 import ProfitReportPage from '@/components/ProfitReportPage';
 import AuditLogPage from '@/components/AuditLogPage';
+import UsersPage from '@/components/UsersPage';
 import NotFound from '@/pages/NotFound';
 import LoginForm from '@/components/LoginForm';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -50,6 +51,7 @@ const App = () => {
                         <Route path="/sales" element={<SalesPage />} />
                         <Route path="/product-order-requests" element={<ProductOrderRequestsPage />} />
                         <Route path="/expenses" element={<ExpensesPage />} />
+                        <Route path="/users" element={<UsersPage />} />
                         <Route path="/profit-report" element={<ProfitReportPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
                         <Route path="*" element={<NotFound />} />

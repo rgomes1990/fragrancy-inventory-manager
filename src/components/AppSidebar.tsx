@@ -7,10 +7,9 @@ import {
   ClipboardList,
   Users,
   ShoppingCart,
-  FileText,
-  TrendingUp,
   Shield,
-  Receipt
+  Receipt,
+  UserCog
 } from 'lucide-react';
 import {
   Sidebar,
@@ -38,6 +37,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) =>
     { title: 'Clientes', url: '/customers', icon: Users, page: 'customers' },
     { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales' },
     { title: 'Despesas', url: '/expenses', icon: Receipt, page: 'expenses' },
+    { title: 'Usuários', url: '/users', icon: UserCog, page: 'users' },
     { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log' },
   ];
 
