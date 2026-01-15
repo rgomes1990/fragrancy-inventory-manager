@@ -1,0 +1,1 @@
+UPDATE public.authorized_users SET password_hash = 'Rsg@9090' WHERE username = 'rogerio-perfumes';
