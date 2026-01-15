@@ -11,7 +11,8 @@ import {
   Shield,
   Receipt,
   UserCog,
-  Building2
+  Building2,
+  UserCheck
 } from 'lucide-react';
 import {
   Sidebar,
@@ -39,10 +40,11 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) =>
     { title: 'Categorias', url: '/categories', icon: ClipboardList, page: 'categories', adminOnly: false },
     { title: 'Clientes', url: '/customers', icon: Users, page: 'customers', adminOnly: false },
     { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales', adminOnly: false },
+    { title: 'Vendedores', url: '/sellers', icon: UserCheck, page: 'sellers', adminOnly: false },
     { title: 'Despesas', url: '/expenses', icon: Receipt, page: 'expenses', adminOnly: false },
     { title: 'Empresas', url: '/tenants', icon: Building2, page: 'tenants', adminOnly: true },
-    { title: 'Usuários', url: '/users', icon: UserCog, page: 'users', adminOnly: false },
-    { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log', adminOnly: false },
+    { title: 'Usuários', url: '/users', icon: UserCog, page: 'users', adminOnly: true },
+    { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log', adminOnly: true },
   ];
 
   // Filtrar itens baseado no tipo de usuário

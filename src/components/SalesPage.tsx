@@ -62,7 +62,7 @@ const SalesPage = () => {
     partial_payment_amount: '',
   });
 
-  const sellers = ['Ana Paula', 'Rogério', 'Danilo'];
+  const [sellers, setSellers] = useState<{id: string, name: string}[]>([]);
 
   const fetchData = async () => {
     try {
@@ -86,26 +86,34 @@ const SalesPage = () => {
         .from('customers')
         .select('*');
 
+      let sellersQuery = supabase
+        .from('sellers')
+        .select('id, name');
+
       // Aplicar filtro de tenant para usuários não-admin
       if (!isAdmin && tenantId) {
         salesQuery = salesQuery.eq('tenant_id', tenantId);
         productsQuery = productsQuery.eq('tenant_id', tenantId);
         customersQuery = customersQuery.eq('tenant_id', tenantId);
+        sellersQuery = sellersQuery.eq('tenant_id', tenantId);
       }
 
-      const [salesRes, productsRes, customersRes] = await Promise.all([
+      const [salesRes, productsRes, customersRes, sellersRes] = await Promise.all([
         salesQuery.order('created_at', { ascending: false }),
         productsQuery.order('name'),
-        customersQuery.order('name')
+        customersQuery.order('name'),
+        sellersQuery.order('name')
       ]);
 
       if (salesRes.error) throw salesRes.error;
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
+      if (sellersRes.error) throw sellersRes.error;
 
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
       setCustomers(customersRes.data || []);
+      setSellers(sellersRes.data || []);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
       toast({
@@ -729,8 +737,8 @@ const SalesPage = () => {
                 >
                   <option value="">Selecione o vendedor</option>
                   {sellers.map((seller) => (
-                    <option key={seller} value={seller}>
-                      {seller}
+                    <option key={seller.id} value={seller.name}>
+                      {seller.name}
                     </option>
                   ))}
                 </select>
@@ -831,8 +839,8 @@ const SalesPage = () => {
               >
                 <option value="">Todos vendedores</option>
                 {sellers.map((seller) => (
-                  <option key={seller} value={seller}>
-                    {seller}
+                  <option key={seller.id} value={seller.name}>
+                    {seller.name}
                   </option>
                 ))}
               </select>

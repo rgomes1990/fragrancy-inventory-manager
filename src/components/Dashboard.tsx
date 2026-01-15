@@ -34,13 +34,10 @@ interface TopCustomer {
   total_spent: number;
 }
 
-interface UserSales {
-  ana_paula_sales: number;
-  ana_paula_revenue: number;
-  danilo_sales: number;
-  danilo_revenue: number;
-  rogerio_sales: number;
-  rogerio_revenue: number;
+interface SellerSales {
+  name: string;
+  sales: number;
+  revenue: number;
 }
 
 interface MonthlySales {
@@ -71,14 +68,7 @@ const Dashboard = () => {
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
   const [monthlySales, setMonthlySales] = useState<MonthlySales[]>([]);
-  const [userSales, setUserSales] = useState<UserSales>({
-    ana_paula_sales: 0,
-    ana_paula_revenue: 0,
-    danilo_sales: 0,
-    danilo_revenue: 0,
-    rogerio_sales: 0,
-    rogerio_revenue: 0,
-  });
+  const [sellersSales, setSellersSales] = useState<SellerSales[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockFilter, setStockFilter] = useState('in-stock');
 
@@ -122,18 +112,22 @@ const Dashboard = () => {
         expensesQuery
       ]);
 
-      // Buscar TODAS as vendas para o card Receita Total
-      const { data: allSalesData } = await supabase
+      // Buscar TODAS as vendas para o card Receita Total (com filtro de tenant)
+      let allSalesQuery = supabase
         .from('sales')
         .select('total_price');
+      allSalesQuery = applyTenantFilter(allSalesQuery);
+      const { data: allSalesData } = await allSalesQuery;
       
       const totalRevenue = allSalesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
 
       // Buscar vendas a partir de 29/08/2025 para o cálculo do Caixa da Empresa
-      const { data: salesFromDateData } = await supabase
+      let salesFromDateQuery = supabase
         .from('sales')
         .select('total_price, sale_date, payment_received, partial_payment_amount')
         .gte('sale_date', '2025-08-29');
+      salesFromDateQuery = applyTenantFilter(salesFromDateQuery);
+      const { data: salesFromDateData } = await salesFromDateQuery;
       
       // Calcular receita APENAS com vendas totalmente pagas (excluir vendas parciais)
       const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
@@ -151,9 +145,11 @@ const Dashboard = () => {
       }, 0) || 0;
       
       // Separar despesas (saídas) e entradas de caixa
-      const { data: expensesData } = await supabase
+      let expensesDataQuery = supabase
         .from('expenses')
         .select('amount, category');
+      expensesDataQuery = applyTenantFilter(expensesDataQuery);
+      const { data: expensesData } = await expensesDataQuery;
       
       const totalExpenses = expensesData?.reduce((sum, expense) => {
         if (expense.category !== 'Entrada de Caixa') {
@@ -170,17 +166,21 @@ const Dashboard = () => {
       }, 0) || 0;
 
       // Buscar vendas com pagamentos pendentes (payment_received = false)
-      const { data: pendingSalesData } = await supabase
+      let pendingSalesQuery = supabase
         .from('sales')
         .select('*')
         .eq('payment_received', false);
+      pendingSalesQuery = applyTenantFilter(pendingSalesQuery);
+      const { data: pendingSalesData } = await pendingSalesQuery;
 
       // Buscar vendas com pagamentos parciais (payment_received = true e partial_payment_amount > 0)
-      const { data: partialSalesData } = await supabase
+      let partialSalesQuery = supabase
         .from('sales')
         .select('*')
         .eq('payment_received', true)
         .not('partial_payment_amount', 'is', null);
+      partialSalesQuery = applyTenantFilter(partialSalesQuery);
+      const { data: partialSalesData } = await partialSalesQuery;
 
       let totalPendingPayments = 0;
       let totalPartialPayments = 0;
@@ -212,6 +212,7 @@ const Dashboard = () => {
       } else if (stockFilter === 'out-of-stock') {
         costSaleSumQuery = costSaleSumQuery.eq('quantity', 0);
       }
+      costSaleSumQuery = applyTenantFilter(costSaleSumQuery);
 
       const { data: allProductsData } = await costSaleSumQuery;
       
@@ -239,7 +240,7 @@ const Dashboard = () => {
         return sum;
       }, 0) || 0;
 
-      const { data: recentSalesData } = await supabase
+      let recentSalesQuery = supabase
         .from('sales')
         .select(`
           *,
@@ -248,8 +249,10 @@ const Dashboard = () => {
         `)
         .order('created_at', { ascending: false })
         .limit(5);
+      recentSalesQuery = applyTenantFilter(recentSalesQuery);
+      const { data: recentSalesData } = await recentSalesQuery;
 
-      const { data: topProductsData } = await supabase
+      let topProductsQuery = supabase
         .from('sales')
         .select(`
           products(name),
@@ -257,8 +260,10 @@ const Dashboard = () => {
           total_price
         `)
         .not('products', 'is', null);
+      topProductsQuery = applyTenantFilter(topProductsQuery);
+      const { data: topProductsData } = await topProductsQuery;
 
-      const { data: topCustomersData } = await supabase
+      let topCustomersQuery = supabase
         .from('sales')
         .select(`
           customers(name),
@@ -266,33 +271,34 @@ const Dashboard = () => {
           total_price
         `)
         .not('customers', 'is', null);
+      topCustomersQuery = applyTenantFilter(topCustomersQuery);
+      const { data: topCustomersData } = await topCustomersQuery;
 
       // Buscar vendas por vendedor diretamente da tabela sales
-      const { data: salesBySellerData } = await supabase
+      let salesBySellerQuery = supabase
         .from('sales')
         .select('seller, total_price');
+      salesBySellerQuery = applyTenantFilter(salesBySellerQuery);
+      const { data: salesBySellerData } = await salesBySellerQuery;
 
-      let anaPaulaSales = 0;
-      let anaPaulaRevenue = 0;
-      let daniloSales = 0;
-      let daniloRevenue = 0;
-      let rogerioSales = 0;
-      let rogerioRevenue = 0;
-
+      // Agregar vendas por vendedor dinamicamente
+      const sellerStats: Record<string, { sales: number; revenue: number }> = {};
+      
       salesBySellerData?.forEach((sale) => {
+        const sellerName = sale.seller || 'Não informado';
         const revenue = Number(sale.total_price) || 0;
         
-        if (sale.seller === 'Ana Paula') {
-          anaPaulaSales += 1;
-          anaPaulaRevenue += revenue;
-        } else if (sale.seller === 'Danilo') {
-          daniloSales += 1;
-          daniloRevenue += revenue;
-        } else if (sale.seller === 'Rogério') {
-          rogerioSales += 1;
-          rogerioRevenue += revenue;
+        if (!sellerStats[sellerName]) {
+          sellerStats[sellerName] = { sales: 0, revenue: 0 };
         }
+        sellerStats[sellerName].sales += 1;
+        sellerStats[sellerName].revenue += revenue;
       });
+
+      // Converter para array
+      const sellersStatsArray: SellerSales[] = Object.entries(sellerStats)
+        .map(([name, data]) => ({ name, sales: data.sales, revenue: data.revenue }))
+        .sort((a, b) => b.revenue - a.revenue);
 
       const productSales = topProductsData?.reduce((acc, sale) => {
         const productName = sale.products?.name || 'Produto desconhecido';
@@ -331,9 +337,11 @@ const Dashboard = () => {
         .slice(0, 5);
 
       // Calcular vendas mensais para o gráfico (últimos 12 meses)
-      const { data: allSalesForChart } = await supabase
+      let allSalesForChartQuery = supabase
         .from('sales')
         .select('sale_date, total_price');
+      allSalesForChartQuery = applyTenantFilter(allSalesForChartQuery);
+      const { data: allSalesForChart } = await allSalesForChartQuery;
 
       const monthlySalesData: Record<string, { vendas: number; receita: number }> = {};
       
@@ -407,14 +415,7 @@ const Dashboard = () => {
       setTopProducts(top5Products);
       setTopCustomers(top5Customers);
       setMonthlySales(chartData);
-      setUserSales({
-        ana_paula_sales: anaPaulaSales,
-        ana_paula_revenue: anaPaulaRevenue,
-        danilo_sales: daniloSales,
-        danilo_revenue: daniloRevenue,
-        rogerio_sales: rogerioSales,
-        rogerio_revenue: rogerioRevenue,
-      });
+      setSellersSales(sellersStatsArray);
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error);
     } finally {
@@ -585,83 +586,49 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Cards de vendas por usuário */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card 
-          className="bg-pink-50 border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-pink-400 transition-all duration-300"
-          onClick={() => handleCardClick('seller-Ana Paula')}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <UserCheck className="w-5 h-5 text-pink-500" />
-              <span>Vendas - Ana Paula</span>
-              <span className="text-xs text-pink-500">(clique para ver)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Total de Vendas:</span>
-                <span className="font-bold">{userSales.ana_paula_sales}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Receita Total:</span>
-                <span className="font-bold">R$ {userSales.ana_paula_revenue.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="bg-blue-50 border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-blue-400 transition-all duration-300"
-          onClick={() => handleCardClick('seller-Danilo')}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <UserCheck className="w-5 h-5 text-blue-500" />
-              <span>Vendas - Danilo</span>
-              <span className="text-xs text-blue-500">(clique para ver)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Total de Vendas:</span>
-                <span className="font-bold">{userSales.danilo_sales}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Receita Total:</span>
-                <span className="font-bold">R$ {userSales.danilo_revenue.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="bg-green-50 border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-green-400 transition-all duration-300"
-          onClick={() => handleCardClick('seller-Rogério')}
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <UserCheck className="w-5 h-5 text-green-500" />
-              <span>Vendas - Rogério</span>
-              <span className="text-xs text-green-500">(clique para ver)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Total de Vendas:</span>
-                <span className="font-bold">{userSales.rogerio_sales}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Receita Total:</span>
-                <span className="font-bold">R$ {userSales.rogerio_revenue.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Cards de vendas por vendedor (dinâmico) */}
+      {sellersSales.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {sellersSales.map((seller, index) => {
+            const colors = [
+              { bg: 'bg-pink-50', ring: 'ring-pink-400', text: 'text-pink-500' },
+              { bg: 'bg-blue-50', ring: 'ring-blue-400', text: 'text-blue-500' },
+              { bg: 'bg-green-50', ring: 'ring-green-400', text: 'text-green-500' },
+              { bg: 'bg-purple-50', ring: 'ring-purple-400', text: 'text-purple-500' },
+              { bg: 'bg-orange-50', ring: 'ring-orange-400', text: 'text-orange-500' },
+            ];
+            const color = colors[index % colors.length];
+            
+            return (
+              <Card 
+                key={seller.name}
+                className={`${color.bg} border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:${color.ring} transition-all duration-300`}
+                onClick={() => handleCardClick(`seller-${seller.name}`)}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <UserCheck className={`w-5 h-5 ${color.text}`} />
+                    <span>Vendas - {seller.name}</span>
+                    <span className={`text-xs ${color.text}`}>(clique para ver)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Total de Vendas:</span>
+                      <span className="font-bold">{seller.sales}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Receita Total:</span>
+                      <span className="font-bold">R$ {seller.revenue.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Cards de TOP 5 e Rankings */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
