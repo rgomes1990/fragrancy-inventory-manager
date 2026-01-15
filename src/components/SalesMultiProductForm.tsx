@@ -14,10 +14,15 @@ interface SaleItem {
   subtotal: number;
 }
 
+interface Seller {
+  id: string;
+  name: string;
+}
+
 interface SalesMultiProductFormProps {
   customers: Customer[];
   products: Product[];
-  sellers: string[];
+  sellers: Seller[];
   onSubmit: (saleData: {
     customer_id: string;
     items: SaleItem[];
@@ -162,8 +167,8 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
               >
                 <option value="">Selecione o vendedor</option>
                 {sellers.map((sellerOption) => (
-                  <option key={sellerOption} value={sellerOption}>
-                    {sellerOption}
+                  <option key={sellerOption.id} value={sellerOption.name}>
+                    {sellerOption.name}
                   </option>
                 ))}
               </select>
