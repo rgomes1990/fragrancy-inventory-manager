@@ -49,8 +49,15 @@ const SellersPage = () => {
     try {
       let query = supabase.from('sellers').select('*').order('name');
       
-      // Aplicar filtro de tenant para usuários não-admin
-      if (!isAdmin && tenantId) {
+      // Usuários não-admin SEMPRE devem filtrar por tenant_id
+      // Se não for admin, precisa ter tenantId para buscar
+      if (!isAdmin) {
+        if (!tenantId) {
+          // Se não tem tenantId e não é admin, não mostra nada
+          setSellers([]);
+          setLoading(false);
+          return;
+        }
         query = query.eq('tenant_id', tenantId);
       }
       
