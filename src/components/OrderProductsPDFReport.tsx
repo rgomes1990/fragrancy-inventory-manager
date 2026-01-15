@@ -5,8 +5,11 @@ import { FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 const OrderProductsPDFReport = () => {
+  const { tenantId, isAdmin } = useTenantFilter();
+
   const loadImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
     try {
       const response = await fetch(imageUrl);
@@ -26,8 +29,17 @@ const OrderProductsPDFReport = () => {
 
   const generateOrderProductsReport = async () => {
     try {
-      // Buscar todas as solicitações de encomenda
-      const requestsResult = await supabase
+      // Usuário não-admin precisa ter tenantId
+      if (!isAdmin && !tenantId) {
+        toast({
+          title: "Aviso",
+          description: "Não foi possível identificar sua empresa.",
+        });
+        return;
+      }
+
+      // Buscar todas as solicitações de encomenda com filtro de tenant
+      let requestsQuery = supabase
         .from('product_order_requests')
         .select(`
           *,
@@ -41,8 +53,8 @@ const OrderProductsPDFReport = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // Buscar produtos do tipo encomenda cadastrados
-      const orderProductsResult = await supabase
+      // Buscar produtos do tipo encomenda cadastrados com filtro de tenant
+      let orderProductsQuery = supabase
         .from('products')
         .select(`
           *,
@@ -50,6 +62,15 @@ const OrderProductsPDFReport = () => {
         `)
         .eq('is_order_product', true)
         .order('created_at', { ascending: false });
+
+      // Aplicar filtro de tenant para usuários não-admin
+      if (!isAdmin && tenantId) {
+        requestsQuery = requestsQuery.eq('tenant_id', tenantId);
+        orderProductsQuery = orderProductsQuery.eq('tenant_id', tenantId);
+      }
+
+      const requestsResult = await requestsQuery;
+      const orderProductsResult = await orderProductsQuery;
 
       if (requestsResult.error) throw requestsResult.error;
       if (orderProductsResult.error) throw orderProductsResult.error;
