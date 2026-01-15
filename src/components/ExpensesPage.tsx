@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 interface Expense {
   id: string;
@@ -26,6 +27,7 @@ interface Expense {
 }
 
 const ExpensesPage = () => {
+  const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -52,17 +54,25 @@ const ExpensesPage = () => {
   ];
 
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    if (tenantId !== undefined) {
+      fetchExpenses();
+    }
+  }, [tenantId, isAdmin]);
 
   // Buscar os mesmos dados do Dashboard para o Caixa da Empresa
   useEffect(() => {
     const fetchCompanyCash = async () => {
       // Buscar vendas pagas a partir de 29/08/2025
-      const { data: salesFromDateData } = await supabase
+      let salesQuery = supabase
         .from('sales')
         .select('total_price, sale_date, payment_received, partial_payment_amount')
         .gte('sale_date', '2025-08-29');
+      
+      if (!isAdmin && tenantId) {
+        salesQuery = salesQuery.eq('tenant_id', tenantId);
+      }
+      
+      const { data: salesFromDateData } = await salesQuery;
       
       const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
         const partialAmount = Number((sale as any).partial_payment_amount) || 0;
@@ -75,9 +85,15 @@ const ExpensesPage = () => {
       }, 0) || 0;
 
       // Buscar despesas e entradas de caixa
-      const { data: expensesData } = await supabase
+      let expensesQuery = supabase
         .from('expenses')
         .select('amount, category');
+      
+      if (!isAdmin && tenantId) {
+        expensesQuery = expensesQuery.eq('tenant_id', tenantId);
+      }
+      
+      const { data: expensesData } = await expensesQuery;
       
       const totalExpensesOut = expensesData?.reduce((sum, expense) => {
         if (expense.category !== 'Entrada de Caixa') {
@@ -96,15 +112,22 @@ const ExpensesPage = () => {
       return revenueFromDate - totalExpensesOut + totalCashInAmount;
     };
 
-    fetchCompanyCash().then(setCompanyCash);
-  }, [expenses]);
+    if (tenantId !== undefined) {
+      fetchCompanyCash().then(setCompanyCash);
+    }
+  }, [expenses, tenantId, isAdmin]);
 
   const fetchExpenses = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
-        .select('*')
-        .order('expense_date', { ascending: false });
+        .select('*');
+      
+      if (!isAdmin && tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.order('expense_date', { ascending: false });
 
       if (error) throw error;
       setExpenses(data || []);
@@ -133,13 +156,18 @@ const ExpensesPage = () => {
     }
 
     try {
-      const expenseData = {
+      const expenseData: any = {
         description: formData.description,
         amount: parseFloat(formData.amount),
         category: formData.category,
         expense_date: formData.expense_date,
         observacao: formData.observacao
       };
+
+      // Adicionar tenant_id para novos registros
+      if (!editingExpense) {
+        expenseData.tenant_id = getTenantIdForInsert();
+      }
 
       if (editingExpense) {
         const { error } = await supabaseWithUser()
@@ -233,12 +261,13 @@ const ExpensesPage = () => {
     }
 
     try {
-      const cashInData = {
+      const cashInData: any = {
         description: cashInFormData.description,
         amount: parseFloat(cashInFormData.amount),
         category: 'Entrada de Caixa',
         expense_date: cashInFormData.expense_date,
-        observacao: cashInFormData.observacao
+        observacao: cashInFormData.observacao,
+        tenant_id: getTenantIdForInsert()
       };
 
       const { error } = await supabaseWithUser()

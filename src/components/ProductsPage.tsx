@@ -10,12 +10,14 @@ import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon } from 'lucide-
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Product, Category } from '@/types/database';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
 
 const ProductsPage = () => {
+  const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -41,18 +43,27 @@ const ProductsPage = () => {
 
   const fetchData = async () => {
     try {
+      // Construir query com filtro de tenant
+      let productsQuery = supabase
+        .from('products')
+        .select(`
+          *,
+          categories(id, name, created_at, updated_at)
+        `);
+      
+      let categoriesQuery = supabase
+        .from('categories')
+        .select('*');
+
+      // Aplicar filtro de tenant para usuários não-admin
+      if (!isAdmin && tenantId) {
+        productsQuery = productsQuery.eq('tenant_id', tenantId);
+        categoriesQuery = categoriesQuery.eq('tenant_id', tenantId);
+      }
+
       const [productsRes, categoriesRes] = await Promise.all([
-        supabase
-          .from('products')
-          .select(`
-            *,
-            categories(id, name, created_at, updated_at)
-          `)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('categories')
-          .select('*')
-          .order('name')
+        productsQuery.order('created_at', { ascending: false }),
+        categoriesQuery.order('name')
       ]);
 
       if (productsRes.error) throw productsRes.error;
@@ -74,7 +85,7 @@ const ProductsPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [tenantId, isAdmin]);
 
   useEffect(() => {
     filterProducts();
@@ -118,7 +129,7 @@ const ProductsPage = () => {
     e.preventDefault();
     
     try {
-      const productData = {
+      const productData: any = {
         name: formData.name,
         cost_price: parseFloat(formData.cost_price),
         sale_price: parseFloat(formData.sale_price),
@@ -128,6 +139,11 @@ const ProductsPage = () => {
         is_order_product: formData.is_order_product || false,
         customer_name: formData.is_order_product ? formData.customer_name : null,
       };
+
+      // Adicionar tenant_id para novos registros
+      if (!editingProduct) {
+        productData.tenant_id = getTenantIdForInsert();
+      }
 
       if (editingProduct) {
         const { error } = await supabaseWithUser()

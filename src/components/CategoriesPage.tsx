@@ -9,8 +9,10 @@ import { Plus, Edit, Trash2, Tag, Search } from 'lucide-react';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 const CategoriesPage = () => {
+  const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +24,10 @@ const CategoriesPage = () => {
   });
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    if (tenantId !== undefined) {
+      fetchCategories();
+    }
+  }, [tenantId, isAdmin]);
 
   useEffect(() => {
     filterCategories();
@@ -31,10 +35,16 @@ const CategoriesPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('categories')
-        .select('*')
-        .order('name', { ascending: true });
+        .select('*');
+      
+      // Aplicar filtro de tenant para usuários não-admin
+      if (!isAdmin && tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.order('name', { ascending: true });
 
       if (error) throw error;
       setCategories(data || []);
@@ -67,9 +77,14 @@ const CategoriesPage = () => {
     e.preventDefault();
     
     try {
-      const categoryData = {
+      const categoryData: any = {
         name: formData.name,
       };
+
+      // Adicionar tenant_id para novos registros
+      if (!editingCategory) {
+        categoryData.tenant_id = getTenantIdForInsert();
+      }
 
       if (editingCategory) {
         const { error } = await supabaseWithUser()

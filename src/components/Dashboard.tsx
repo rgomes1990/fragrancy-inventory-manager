@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 interface DashboardStats {
   totalProducts: number;
@@ -50,6 +51,7 @@ interface MonthlySales {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { tenantId, isAdmin } = useTenantFilter();
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalCustomers: 0,
@@ -81,8 +83,18 @@ const Dashboard = () => {
   const [stockFilter, setStockFilter] = useState('in-stock');
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [stockFilter]);
+    if (tenantId !== undefined) {
+      fetchDashboardData();
+    }
+  }, [stockFilter, tenantId, isAdmin]);
+
+  // Helper function to apply tenant filter
+  const applyTenantFilter = (query: any) => {
+    if (!isAdmin && tenantId) {
+      return query.eq('tenant_id', tenantId);
+    }
+    return query;
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -92,12 +104,22 @@ const Dashboard = () => {
       } else if (stockFilter === 'out-of-stock') {
         productsQuery = productsQuery.eq('quantity', 0);
       }
+      productsQuery = applyTenantFilter(productsQuery);
+
+      let customersQuery = supabase.from('customers').select('id', { count: 'exact' });
+      customersQuery = applyTenantFilter(customersQuery);
+
+      let salesQuery = supabase.from('sales').select('total_price', { count: 'exact' });
+      salesQuery = applyTenantFilter(salesQuery);
+
+      let expensesQuery = supabase.from('expenses').select('amount');
+      expensesQuery = applyTenantFilter(expensesQuery);
 
       const [productsRes, customersRes, salesRes, allExpensesRes] = await Promise.all([
         productsQuery,
-        supabase.from('customers').select('id', { count: 'exact' }),
-        supabase.from('sales').select('total_price', { count: 'exact' }),
-        supabase.from('expenses').select('amount')
+        customersQuery,
+        salesQuery,
+        expensesQuery
       ]);
 
       // Buscar TODAS as vendas para o card Receita Total
