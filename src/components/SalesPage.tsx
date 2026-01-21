@@ -65,6 +65,16 @@ const SalesPage = () => {
   const [sellers, setSellers] = useState<{id: string, name: string}[]>([]);
 
   const fetchData = async () => {
+    // Usuário não-admin PRECISA ter tenantId carregado
+    if (!isAdmin && !tenantId) {
+      setSales([]);
+      setProducts([]);
+      setCustomers([]);
+      setSellers([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       // Construir queries com filtro de tenant
       let salesQuery = supabase
@@ -127,7 +137,8 @@ const SalesPage = () => {
   };
 
   useEffect(() => {
-    if (tenantId !== undefined) {
+    // Só buscar dados quando tenantId estiver definido (ou for admin)
+    if (isAdmin || tenantId) {
       fetchData();
     }
   }, [tenantId, isAdmin]);

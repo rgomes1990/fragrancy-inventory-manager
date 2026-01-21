@@ -42,6 +42,14 @@ const ProductsPage = () => {
   });
 
   const fetchData = async () => {
+    // Usuário não-admin PRECISA ter tenantId carregado
+    if (!isAdmin && !tenantId) {
+      setProducts([]);
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       // Construir query com filtro de tenant
       let productsQuery = supabase
@@ -84,7 +92,10 @@ const ProductsPage = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    // Só buscar dados quando tenantId estiver definido (ou for admin)
+    if (isAdmin || tenantId) {
+      fetchData();
+    }
   }, [tenantId, isAdmin]);
 
   useEffect(() => {
