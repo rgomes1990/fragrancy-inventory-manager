@@ -108,11 +108,20 @@ const SellersPage = () => {
           description: "Vendedor atualizado com sucesso!",
         });
       } else {
+        const tenantIdForSeller = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForSeller) {
+          toast({
+            title: "Erro",
+            description: "Empresa não identificada. Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
         const { error } = await supabaseClient
           .from('sellers')
           .insert([{ 
             name: formData.name, 
-            tenant_id: getTenantIdForInsert() 
+            tenant_id: tenantIdForSeller 
           }]);
 
         if (error) throw error;

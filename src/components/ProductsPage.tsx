@@ -151,9 +151,18 @@ const ProductsPage = () => {
         customer_name: formData.is_order_product ? formData.customer_name : null,
       };
 
-      // Adicionar tenant_id para novos registros
+      // Adicionar tenant_id para novos registros - com validação
       if (!editingProduct) {
-        productData.tenant_id = getTenantIdForInsert();
+        const tenantIdForProduct = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForProduct) {
+          toast({
+            title: "Erro",
+            description: "Empresa não identificada. Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+        productData.tenant_id = tenantIdForProduct;
       }
 
       if (editingProduct) {
