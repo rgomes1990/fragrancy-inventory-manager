@@ -251,6 +251,16 @@ const SalesPage = () => {
     payment_received: boolean;
     partial_payment_amount: number | null;
   }) => {
+    // CRÍTICO: Usuário não-admin PRECISA ter tenantId para salvar vendas
+    const tenantIdToUse = getTenantIdForInsert();
+    if (!isAdmin && !tenantIdToUse) {
+      toast({
+        title: "Erro",
+        description: "Empresa não identificada. Por favor, faça login novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       for (const item of saleData.items) {
         const product = products.find(p => p.id === item.product_id);
@@ -295,7 +305,7 @@ const SalesPage = () => {
           seller: saleData.seller,
           payment_received: saleData.payment_received,
           partial_payment_amount: itemPartialPayment,
-          tenant_id: getTenantIdForInsert(),
+          tenant_id: tenantIdToUse,
         };
 
         const { error: saleError } = await supabaseClient
@@ -410,9 +420,18 @@ const SalesPage = () => {
         partial_payment_amount: partialAmount,
       };
 
-      // Adicionar tenant_id para novos registros
+      // Adicionar tenant_id para novos registros - com validação
       if (!editingSale) {
-        saleData.tenant_id = getTenantIdForInsert();
+        const tenantIdForSale = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForSale) {
+          toast({
+            title: "Erro",
+            description: "Empresa não identificada. Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+        saleData.tenant_id = tenantIdForSale;
       }
 
       if (editingSale) {

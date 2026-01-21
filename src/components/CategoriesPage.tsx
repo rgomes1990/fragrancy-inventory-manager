@@ -81,9 +81,18 @@ const CategoriesPage = () => {
         name: formData.name,
       };
 
-      // Adicionar tenant_id para novos registros
+      // Adicionar tenant_id para novos registros - com validação
       if (!editingCategory) {
-        categoryData.tenant_id = getTenantIdForInsert();
+        const tenantIdForCategory = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForCategory) {
+          toast({
+            title: "Erro",
+            description: "Empresa não identificada. Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+        categoryData.tenant_id = tenantIdForCategory;
       }
 
       if (editingCategory) {

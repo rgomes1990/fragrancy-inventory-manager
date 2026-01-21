@@ -164,9 +164,18 @@ const ExpensesPage = () => {
         observacao: formData.observacao
       };
 
-      // Adicionar tenant_id para novos registros
+      // Adicionar tenant_id para novos registros - com validação
       if (!editingExpense) {
-        expenseData.tenant_id = getTenantIdForInsert();
+        const tenantIdForExpense = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForExpense) {
+          toast({
+            title: "Erro",
+            description: "Empresa não identificada. Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+        expenseData.tenant_id = tenantIdForExpense;
       }
 
       if (editingExpense) {
@@ -261,13 +270,23 @@ const ExpensesPage = () => {
     }
 
     try {
+      const tenantIdForCashIn = getTenantIdForInsert();
+      if (!isAdmin && !tenantIdForCashIn) {
+        toast({
+          title: "Erro",
+          description: "Empresa não identificada. Por favor, faça login novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const cashInData: any = {
         description: cashInFormData.description,
         amount: parseFloat(cashInFormData.amount),
         category: 'Entrada de Caixa',
         expense_date: cashInFormData.expense_date,
         observacao: cashInFormData.observacao,
-        tenant_id: getTenantIdForInsert()
+        tenant_id: tenantIdForCashIn
       };
 
       const { error } = await supabaseWithUser()

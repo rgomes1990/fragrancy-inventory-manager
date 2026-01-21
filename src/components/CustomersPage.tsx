@@ -135,9 +135,18 @@ const CustomersPage = () => {
         email: formData.email || null,
       };
 
-      // Adicionar tenant_id para novos registros
+      // Adicionar tenant_id para novos registros - com validação
       if (!editingCustomer) {
-        customerData.tenant_id = getTenantIdForInsert();
+        const tenantIdForCustomer = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForCustomer) {
+          toast({
+            title: "Erro",
+            description: "Empresa não identificada. Por favor, faça login novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+        customerData.tenant_id = tenantIdForCustomer;
       }
 
       if (editingCustomer) {
