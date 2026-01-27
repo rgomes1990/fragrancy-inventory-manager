@@ -54,7 +54,8 @@ const ExpensesPage = () => {
   ];
 
   useEffect(() => {
-    if (tenantId !== undefined) {
+    // Só buscar dados quando tenantId estiver definido (ou for admin)
+    if (isAdmin || tenantId) {
       fetchExpenses();
     }
   }, [tenantId, isAdmin]);
@@ -112,17 +113,26 @@ const ExpensesPage = () => {
       return revenueFromDate - totalExpensesOut + totalCashInAmount;
     };
 
-    if (tenantId !== undefined) {
+    // Só buscar quando tenantId estiver definido (ou for admin)
+    if (isAdmin || tenantId) {
       fetchCompanyCash().then(setCompanyCash);
     }
   }, [expenses, tenantId, isAdmin]);
 
   const fetchExpenses = async () => {
+    // Usuário não-admin PRECISA ter tenantId carregado
+    if (!isAdmin && !tenantId) {
+      setExpenses([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       let query = supabase
         .from('expenses')
         .select('*');
       
+      // Aplicar filtro de tenant para usuários não-admin
       if (!isAdmin && tenantId) {
         query = query.eq('tenant_id', tenantId);
       }
