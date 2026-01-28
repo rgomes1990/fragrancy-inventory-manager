@@ -31,6 +31,7 @@ const ExpensesPage = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [cashInDialogOpen, setCashInDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [companyCash, setCompanyCash] = useState<number>(0);
@@ -561,8 +562,27 @@ const ExpensesPage = () => {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Lista de Despesas</CardTitle>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="categoryFilter" className="text-sm font-medium whitespace-nowrap">
+              Filtrar por:
+            </Label>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="Entrada de Caixa">Entrada de Caixa</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           {expenses.length === 0 ? (
@@ -582,7 +602,9 @@ const ExpensesPage = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((expense) => (
+                {expenses
+                  .filter((expense) => categoryFilter === 'all' || expense.category === categoryFilter)
+                  .map((expense) => (
                   <TableRow key={expense.id}>
                     <TableCell className="font-medium">{expense.description}</TableCell>
                     <TableCell>
