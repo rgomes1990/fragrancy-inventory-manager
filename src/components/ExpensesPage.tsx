@@ -50,7 +50,8 @@ const ExpensesPage = () => {
 
   const categories = [
     'Despesa Produtos',
-    'Despesas Viagem'
+    'Despesas Viagem',
+    'Prolabore'
   ];
 
   useEffect(() => {
@@ -347,7 +348,8 @@ const ExpensesPage = () => {
     const variants: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
       'Entrada de Caixa': 'default',
       'Despesa Produtos': 'secondary',
-      'Despesas Viagem': 'outline'
+      'Despesas Viagem': 'outline',
+      'Prolabore': 'destructive'
     };
     return variants[category] || 'outline';
   };
