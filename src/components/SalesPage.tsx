@@ -28,6 +28,7 @@ const SalesPage = () => {
   const [selectedSeller, setSelectedSeller] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedPaymentType, setSelectedPaymentType] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [monthlyTotal, setMonthlyTotal] = useState(0);
@@ -148,7 +149,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, startDate, endDate]);
+  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
@@ -187,6 +188,11 @@ const SalesPage = () => {
     // Filtro por cliente
     if (selectedCustomerId) {
       filtered = filtered.filter(sale => sale.customer_id === selectedCustomerId);
+    }
+
+    // Filtro por tipo de pagamento
+    if (selectedPaymentType) {
+      filtered = filtered.filter(sale => (sale as any).payment_type === selectedPaymentType);
     }
 
     if (selectedStatus) {
@@ -916,6 +922,17 @@ const SalesPage = () => {
                 <option value="parcial">Parcial</option>
                 <option value="a-receber">A Receber (todos)</option>
               </select>
+              <select 
+                value={selectedPaymentType} 
+                onChange={(e) => setSelectedPaymentType(e.target.value)}
+                className="p-2 border rounded-md w-40"
+              >
+                <option value="">Todos tipos</option>
+                <option value="Débito">Débito</option>
+                <option value="Crédito">Crédito</option>
+                <option value="Pix">Pix</option>
+                <option value="Link">Link</option>
+              </select>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
                 <Input
@@ -956,7 +973,7 @@ const SalesPage = () => {
               )}
             </div>
           </div>
-          {(selectedMonth || selectedSeller || selectedStatus || searchTerm || startDate || endDate) && (
+          {(selectedMonth || selectedSeller || selectedStatus || selectedPaymentType || searchTerm || startDate || endDate) && (
             <div className="mt-2 p-3 bg-green-50 rounded-lg">
               <div className="text-lg font-bold text-green-800">
                 Total dos resultados filtrados: R$ {filteredTotal.toFixed(2)}
