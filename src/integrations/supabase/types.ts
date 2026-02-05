@@ -458,6 +458,7 @@ export type Database = {
           id: string
           partial_payment_amount: number | null
           payment_received: boolean
+          payment_type: string | null
           product_id: string | null
           quantity: number
           sale_date: string | null
@@ -472,6 +473,7 @@ export type Database = {
           id?: string
           partial_payment_amount?: number | null
           payment_received?: boolean
+          payment_type?: string | null
           product_id?: string | null
           quantity: number
           sale_date?: string | null
@@ -486,6 +488,7 @@ export type Database = {
           id?: string
           partial_payment_amount?: number | null
           payment_received?: boolean
+          payment_type?: string | null
           product_id?: string | null
           quantity?: number
           sale_date?: string | null

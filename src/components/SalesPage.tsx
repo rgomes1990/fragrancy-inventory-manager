@@ -60,7 +60,10 @@ const SalesPage = () => {
     seller: '',
     payment_received: true,
     partial_payment_amount: '',
+    payment_type: '',
   });
+
+  const paymentTypes = ['Débito', 'Crédito', 'Pix', 'Link'];
 
   const [sellers, setSellers] = useState<{id: string, name: string}[]>([]);
 
@@ -250,6 +253,7 @@ const SalesPage = () => {
     seller: string;
     payment_received: boolean;
     partial_payment_amount: number | null;
+    payment_type: string | null;
   }) => {
     // CRÍTICO: Usuário não-admin PRECISA ter tenantId para salvar vendas
     const tenantIdToUse = getTenantIdForInsert();
@@ -305,6 +309,7 @@ const SalesPage = () => {
           seller: saleData.seller,
           payment_received: saleData.payment_received,
           partial_payment_amount: itemPartialPayment,
+          payment_type: saleData.payment_type,
           tenant_id: tenantIdToUse,
         };
 
@@ -418,6 +423,7 @@ const SalesPage = () => {
         seller: formData.seller,
         payment_received: formData.payment_received,
         partial_payment_amount: partialAmount,
+        payment_type: formData.payment_type || null,
       };
 
       // Adicionar tenant_id para novos registros - com validação
@@ -539,6 +545,7 @@ const SalesPage = () => {
       seller: sale.seller || '',
       payment_received: sale.payment_received ?? true,
       partial_payment_amount: sale.partial_payment_amount ? sale.partial_payment_amount.toString() : '',
+      payment_type: (sale as any).payment_type || '',
     });
     setShowForm(true);
   };
@@ -605,6 +612,7 @@ const SalesPage = () => {
       seller: '',
       payment_received: true,
       partial_payment_amount: '',
+      payment_type: '',
     });
     setEditingSale(null);
     setShowForm(false);
@@ -769,6 +777,22 @@ const SalesPage = () => {
                   {sellers.map((seller) => (
                     <option key={seller.id} value={seller.name}>
                       {seller.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="payment_type">Tipo de Pagamento</Label>
+                <select 
+                  value={formData.payment_type} 
+                  onChange={(e) => setFormData({...formData, payment_type: e.target.value})}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="">Selecione o tipo</option>
+                  {paymentTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
                     </option>
                   ))}
                 </select>
