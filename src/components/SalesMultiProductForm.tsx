@@ -30,6 +30,7 @@ interface SalesMultiProductFormProps {
     seller: string;
     payment_received: boolean;
     partial_payment_amount: number | null;
+    payment_type: string | null;
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -40,9 +41,12 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
   const [seller, setSeller] = useState('');
   const [paymentReceived, setPaymentReceived] = useState(true);
   const [partialPaymentAmount, setPartialPaymentAmount] = useState('');
+  const [paymentType, setPaymentType] = useState('');
   const [items, setItems] = useState<SaleItem[]>([
     { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }
   ]);
+
+  const paymentTypes = ['Débito', 'Crédito', 'Pix', 'Link'];
 
   const addItem = () => {
     setItems([...items, { product_id: '', quantity: 1, unit_price: 0, subtotal: 0 }]);
@@ -111,6 +115,7 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
       seller: seller,
       payment_received: paymentReceived,
       partial_payment_amount: partialAmount,
+      payment_type: paymentType || null,
     });
   };
 
@@ -169,6 +174,22 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
                 {sellers.map((sellerOption) => (
                   <option key={sellerOption.id} value={sellerOption.name}>
                     {sellerOption.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="payment_type">Tipo de Pagamento</Label>
+              <select 
+                value={paymentType} 
+                onChange={(e) => setPaymentType(e.target.value)}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="">Selecione o tipo</option>
+                {paymentTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
                   </option>
                 ))}
               </select>
