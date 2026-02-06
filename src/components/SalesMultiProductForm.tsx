@@ -287,9 +287,26 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
               })}
             </div>
 
-            <div className="text-right mt-4 p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                Total da Venda: R$ {calculateTotal().toFixed(2)}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                <div className="text-xl font-bold text-foreground">
+                  Total da Venda: <span className="text-green-600">R$ {calculateTotal().toFixed(2)}</span>
+                </div>
+                {paymentReceived && partialPaymentAmount && parseFloat(partialPaymentAmount) > 0 && (
+                  <div className="flex flex-col md:flex-row gap-4 text-sm">
+                    <div className="px-3 py-2 bg-green-100 text-green-800 rounded-md">
+                      <span className="font-medium">Valor Pago:</span> R$ {parseFloat(partialPaymentAmount).toFixed(2)}
+                    </div>
+                    <div className="px-3 py-2 bg-amber-100 text-amber-800 rounded-md">
+                      <span className="font-medium">Pendente:</span> R$ {(calculateTotal() - parseFloat(partialPaymentAmount)).toFixed(2)}
+                    </div>
+                  </div>
+                )}
+                {!paymentReceived && (
+                  <div className="px-3 py-2 bg-red-100 text-red-800 rounded-md text-sm">
+                    <span className="font-medium">Pendente:</span> R$ {calculateTotal().toFixed(2)} (sem recebimento)
+                  </div>
+                )}
               </div>
             </div>
           </div>
