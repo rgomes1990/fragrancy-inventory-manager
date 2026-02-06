@@ -155,6 +155,7 @@ const StockProductsPDFReport = () => {
         doc.setFont('helvetica', 'bold');
         doc.text('Foto', 20, yPosition);
         doc.text('Produto', 50, yPosition);
+        doc.text('Qtd', 140, yPosition);
         doc.text('Preço', 160, yPosition);
         
         yPosition += 5;
@@ -181,6 +182,7 @@ const StockProductsPDFReport = () => {
           
           const productName = product.name;
           const salePrice = product.sale_price || 0;
+          const quantity = product.quantity || 0;
           
           // Carregar e adicionar imagem se existir
           if (product.image_url) {
@@ -195,7 +197,8 @@ const StockProductsPDFReport = () => {
             }
           }
           
-          doc.text(productName.substring(0, 35), 50, yPosition);
+          doc.text(productName.substring(0, 30), 50, yPosition);
+          doc.text(quantity.toString(), 140, yPosition);
           doc.text(`R$ ${salePrice.toFixed(2)}`, 160, yPosition);
           
           yPosition += 20;
