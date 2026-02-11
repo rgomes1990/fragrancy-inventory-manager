@@ -462,6 +462,7 @@ export type Database = {
           product_id: string | null
           quantity: number
           sale_date: string | null
+          sale_group_id: string | null
           seller: string | null
           tenant_id: string | null
           total_price: number
@@ -477,6 +478,7 @@ export type Database = {
           product_id?: string | null
           quantity: number
           sale_date?: string | null
+          sale_group_id?: string | null
           seller?: string | null
           tenant_id?: string | null
           total_price: number
@@ -492,6 +494,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           sale_date?: string | null
+          sale_group_id?: string | null
           seller?: string | null
           tenant_id?: string | null
           total_price?: number
