@@ -296,6 +296,9 @@ const SalesPage = () => {
       // Obter cliente com header do usuário atual
       const supabaseClient = supabaseWithUser();
       
+      // Gerar um sale_group_id compartilhado para agrupar itens da mesma venda múltipla
+      const groupId = saleData.items.length > 1 ? crypto.randomUUID() : null;
+      
       // Calcular o total de todos os itens para distribuir o pagamento parcial proporcionalmente
       const totalAllItems = saleData.items.reduce((sum, item) => sum + item.subtotal, 0);
       
@@ -317,6 +320,7 @@ const SalesPage = () => {
           partial_payment_amount: itemPartialPayment,
           payment_type: saleData.payment_type,
           tenant_id: tenantIdToUse,
+          sale_group_id: groupId,
         };
 
         const { error: saleError } = await supabaseClient
@@ -1000,57 +1004,116 @@ const SalesPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSales.map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell>
-                    {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {sale.customers?.name || 'Cliente não encontrado'}
-                  </TableCell>
-                  <TableCell>
-                    {sale.products?.name || 'Produto não encontrado'}
-                  </TableCell>
-                  <TableCell>{sale.quantity}</TableCell>
-                  <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
-                  <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
-                  <TableCell>{sale.seller || '-'}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      !sale.payment_received 
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {!sale.payment_received 
-                        ? 'Pendente' 
-                        : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
-                        ? `Parcial (R$ ${sale.partial_payment_amount.toFixed(2)})`
-                        : 'Recebido'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(sale)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(sale)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {(() => {
+                // Agrupar vendas pelo sale_group_id
+                const groupedSales: Map<string, Sale[]> = new Map();
+                const ungroupedSales: Sale[] = [];
+
+                filteredSales.forEach((sale) => {
+                  const groupId = (sale as any).sale_group_id;
+                  if (groupId) {
+                    if (!groupedSales.has(groupId)) {
+                      groupedSales.set(groupId, []);
+                    }
+                    groupedSales.get(groupId)!.push(sale);
+                  } else {
+                    ungroupedSales.push(sale);
+                  }
+                });
+
+                const renderSaleRow = (sale: Sale, isGrouped: boolean = false, isFirst: boolean = false, groupTotal?: number, groupPaid?: number, groupSize?: number) => (
+                  <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
+                    <TableCell>
+                      {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {sale.customers?.name || 'Cliente não encontrado'}
+                    </TableCell>
+                    <TableCell>
+                      {sale.products?.name || 'Produto não encontrado'}
+                    </TableCell>
+                    <TableCell>{sale.quantity}</TableCell>
+                    <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
+                    <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
+                    <TableCell>{sale.seller || '-'}</TableCell>
+                    <TableCell>
+                      {isGrouped && isFirst && groupTotal !== undefined ? (
+                        <div className="space-y-1">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            !sale.payment_received 
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : (groupPaid || 0) > 0 && (groupPaid || 0) < groupTotal
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {!sale.payment_received 
+                              ? `Pendente (Total: R$ ${groupTotal.toFixed(2)})` 
+                              : (groupPaid || 0) > 0 && (groupPaid || 0) < groupTotal
+                              ? `Parcial - Pago: R$ ${(groupPaid || 0).toFixed(2)} | Pendente: R$ ${(groupTotal - (groupPaid || 0)).toFixed(2)}`
+                              : `Recebido (Total: R$ ${groupTotal.toFixed(2)})`}
+                          </span>
+                          <div className="text-xs text-muted-foreground">
+                            Venda com {groupSize} itens
+                          </div>
+                        </div>
+                      ) : isGrouped ? (
+                        <span className="text-xs text-muted-foreground">↳ mesmo grupo</span>
+                      ) : (
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          !sale.payment_received 
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {!sale.payment_received 
+                            ? 'Pendente' 
+                            : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
+                            ? `Parcial (R$ ${sale.partial_payment_amount.toFixed(2)})`
+                            : 'Recebido'}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(sale)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(sale)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+
+                const rows: React.ReactNode[] = [];
+
+                // Renderizar vendas agrupadas
+                groupedSales.forEach((groupSales) => {
+                  const groupTotal = groupSales.reduce((sum, s) => sum + Number(s.total_price), 0);
+                  const groupPaid = groupSales.reduce((sum, s) => sum + (Number((s as any).partial_payment_amount) || 0), 0);
+                  groupSales.forEach((sale, idx) => {
+                    rows.push(renderSaleRow(sale, true, idx === 0, groupTotal, groupPaid, groupSales.length));
+                  });
+                });
+
+                // Renderizar vendas individuais
+                ungroupedSales.forEach((sale) => {
+                  rows.push(renderSaleRow(sale));
+                });
+
+                return rows;
+              })()}
             </TableBody>
           </Table>
         </CardContent>
