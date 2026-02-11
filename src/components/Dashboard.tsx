@@ -129,18 +129,22 @@ const Dashboard = () => {
       salesFromDateQuery = applyTenantFilter(salesFromDateQuery);
       const { data: salesFromDateData } = await salesFromDateQuery;
       
-      // Calcular receita APENAS com vendas totalmente pagas (excluir vendas parciais)
+      // Calcular receita para o Caixa: vendas totalmente pagas + valor pago das parciais
       const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
         const partialAmount = Number((sale as any).partial_payment_amount) || 0;
         const totalPrice = Number(sale.total_price) || 0;
         
-        // Apenas somar se for venda totalmente paga:
-        // payment_received = true E (sem partial_payment OU partial_payment >= total_price)
-        if (sale.payment_received && (partialAmount === 0 || partialAmount >= totalPrice)) {
-          return sum + totalPrice;
+        if (sale.payment_received) {
+          if (partialAmount > 0 && partialAmount < totalPrice) {
+            // Venda parcial: somar apenas o valor efetivamente pago
+            return sum + partialAmount;
+          } else {
+            // Venda totalmente paga: somar o total
+            return sum + totalPrice;
+          }
         }
         
-        // Não somar vendas parciais nem pendentes
+        // Vendas pendentes (payment_received = false) não entram no caixa
         return sum;
       }, 0) || 0;
       
