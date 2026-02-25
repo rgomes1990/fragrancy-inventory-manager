@@ -12,6 +12,7 @@ import { Sale, Product, Customer } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 import SalesMultiProductForm from './SalesMultiProductForm';
+import SearchableSelect from './SearchableSelect';
 
 const SalesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -706,38 +707,26 @@ const SalesPage = () => {
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="customer">Cliente</Label>
-                <select 
-                  value={formData.customer_id} 
-                  onChange={(e) => setFormData({...formData, customer_id: e.target.value})}
-                  className="w-full p-2 border rounded-md"
+                <SearchableSelect
+                  options={validCustomers.map(c => ({ value: c.id, label: c.name }))}
+                  value={formData.customer_id}
+                  onChange={(val) => setFormData({...formData, customer_id: val})}
+                  placeholder="Selecione o cliente"
                   required
-                >
-                  <option value="">Selecione o cliente</option>
-                  {validCustomers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               
               <div>
                 <Label htmlFor="product">Produto</Label>
-                <select 
-                  value={formData.product_id} 
-                  onChange={(e) => setFormData({...formData, product_id: e.target.value})}
-                  className="w-full p-2 border rounded-md"
-                  required
-                >
-                  <option value="">Selecione o produto</option>
-                  {validProducts
+                <SearchableSelect
+                  options={validProducts
                     .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
-                    .map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} (Estoque: {product.quantity})
-                      </option>
-                    ))}
-                </select>
+                    .map(p => ({ value: p.id, label: `${p.name} (Estoque: ${p.quantity})` }))}
+                  value={formData.product_id}
+                  onChange={(val) => setFormData({...formData, product_id: val})}
+                  placeholder="Selecione o produto"
+                  required
+                />
               </div>
               
               <div>

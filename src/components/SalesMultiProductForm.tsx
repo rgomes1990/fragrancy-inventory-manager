@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, ShoppingCart } from 'lucide-react';
 import { Product, Customer } from '@/types/database';
+import SearchableSelect from './SearchableSelect';
 
 interface SaleItem {
   product_id: string;
@@ -136,19 +137,13 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="customer">Cliente</Label>
-              <select 
-                value={customerID} 
-                onChange={(e) => setCustomerID(e.target.value)}
-                className="w-full p-2 border rounded-md"
+              <SearchableSelect
+                options={customers.filter(c => c?.id && c?.name).map(c => ({ value: c.id, label: c.name }))}
+                value={customerID}
+                onChange={setCustomerID}
+                placeholder="Selecione o cliente"
                 required
-              >
-                <option value="">Selecione o cliente</option>
-                {customers.filter(c => c?.id && c?.name).map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             
             <div>
@@ -213,18 +208,12 @@ const SalesMultiProductForm = ({ customers, products, sellers, onSubmit, onCance
                   <div key={index} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 border rounded-lg">
                     <div>
                       <Label>Produto</Label>
-                      <select 
-                        value={item.product_id} 
-                        onChange={(e) => handleProductChange(index, e.target.value)}
-                        className="w-full p-2 border rounded-md"
-                      >
-                        <option value="">Selecione o produto</option>
-                        {products.filter(p => p?.id && p?.name && p.quantity > 0 && !p.is_order_product).map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name} (Estoque: {product.quantity})
-                          </option>
-                        ))}
-                      </select>
+                      <SearchableSelect
+                        options={products.filter(p => p?.id && p?.name && p.quantity > 0 && !p.is_order_product).map(p => ({ value: p.id, label: `${p.name} (Estoque: ${p.quantity})` }))}
+                        value={item.product_id}
+                        onChange={(val) => handleProductChange(index, val)}
+                        placeholder="Selecione o produto"
+                      />
                     </div>
                     
                     <div>
