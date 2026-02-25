@@ -152,6 +152,18 @@ export interface ProductOrderRequest {
   };
 }
 
+export interface StockEntry {
+  id: string;
+  product_id: string;
+  quantity: number;
+  unit_cost: number;
+  tenant_id?: string;
+  notes?: string;
+  entry_date: string;
+  created_at: string;
+  products?: Product;
+}
+
 export interface Expense {
   id: string;
   description: string;

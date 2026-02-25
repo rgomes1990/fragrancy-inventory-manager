@@ -15,6 +15,7 @@ import { useTenantFilter } from '@/hooks/useTenantFilter';
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
+import StockEntryDialog from './StockEntryDialog';
 
 const ProductsPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
@@ -316,6 +317,7 @@ const ProductsPage = () => {
         <div className="flex gap-2">
           <OrderProductsPDFReport />
           <StockProductsPDFReport />
+          <StockEntryDialog products={products} onSuccess={fetchData} />
           <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Novo Produto
