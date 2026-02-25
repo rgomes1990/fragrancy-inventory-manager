@@ -556,6 +556,54 @@ export type Database = {
           },
         ]
       }
+      stock_entries: {
+        Row: {
+          created_at: string
+          entry_date: string
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          tenant_id: string | null
+          unit_cost: number
+        }
+        Insert: {
+          created_at?: string
+          entry_date?: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          tenant_id?: string | null
+          unit_cost: number
+        }
+        Update: {
+          created_at?: string
+          entry_date?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          tenant_id?: string | null
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_entries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           created_at: string
