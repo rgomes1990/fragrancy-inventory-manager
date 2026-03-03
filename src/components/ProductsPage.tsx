@@ -235,6 +235,10 @@ const ProductsPage = () => {
         if (formData.image_url && formData.image_url !== (selectedExistingProduct.image_url || '')) {
           updateFields.image_url = formData.image_url || null;
         }
+        if (formData.is_order_product !== selectedExistingProduct.is_order_product) {
+          updateFields.is_order_product = formData.is_order_product;
+        }
+        updateFields.customer_name = formData.is_order_product ? formData.customer_name : null;
         if (Object.keys(updateFields).length > 0) {
           await supabaseWithUser()
             .from('products')
@@ -535,22 +539,20 @@ const ProductsPage = () => {
                 )}
               </div>
 
-              {!selectedExistingProduct && (
-                <div className="md:col-span-2">
-                  <Label htmlFor="is_order_product">
-                    <input
-                      type="checkbox"
-                      id="is_order_product"
-                      checked={formData.is_order_product}
-                      onChange={(e) => setFormData({ ...formData, is_order_product: e.target.checked })}
-                      className="mr-2"
-                    />
-                    Produto de Encomenda
-                  </Label>
-                </div>
-              )}
+              <div className="md:col-span-2">
+                <Label htmlFor="is_order_product">
+                  <input
+                    type="checkbox"
+                    id="is_order_product"
+                    checked={formData.is_order_product}
+                    onChange={(e) => setFormData({ ...formData, is_order_product: e.target.checked })}
+                    className="mr-2"
+                  />
+                  Produto de Encomenda
+                </Label>
+              </div>
 
-              {formData.is_order_product && !selectedExistingProduct && (
+              {formData.is_order_product && (
                 <div className="md:col-span-2">
                   <Label htmlFor="customer_name">Nome do Cliente</Label>
                   <Input
