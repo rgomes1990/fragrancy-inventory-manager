@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,6 @@ import { useTenantFilter } from '@/hooks/useTenantFilter';
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
-import StockEntryDialog from './StockEntryDialog';
 
 const ProductsPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
@@ -29,8 +28,8 @@ const ProductsPage = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  
 
+  // Unified form: new product + stock entry
   const [formData, setFormData] = useState({
     name: '',
     cost_price: '',
@@ -42,8 +41,28 @@ const ProductsPage = () => {
     customer_name: '',
   });
 
+  // Autocomplete state
+  const [nameSuggestions, setNameSuggestions] = useState<Product[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedExistingProduct, setSelectedExistingProduct] = useState<Product | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+        nameInputRef.current && !nameInputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const fetchData = async () => {
-    // Usuário não-admin PRECISA ter tenantId carregado
     if (!isAdmin && !tenantId) {
       setProducts([]);
       setCategories([]);
@@ -52,19 +71,11 @@ const ProductsPage = () => {
     }
 
     try {
-      // Construir query com filtro de tenant
       let productsQuery = supabase
         .from('products')
-        .select(`
-          *,
-          categories(id, name, created_at, updated_at)
-        `);
-      
-      let categoriesQuery = supabase
-        .from('categories')
-        .select('*');
+        .select(`*, categories(id, name, created_at, updated_at)`);
+      let categoriesQuery = supabase.from('categories').select('*');
 
-      // Aplicar filtro de tenant para usuários não-admin
       if (!isAdmin && tenantId) {
         productsQuery = productsQuery.eq('tenant_id', tenantId);
         categoriesQuery = categoriesQuery.eq('tenant_id', tenantId);
@@ -82,21 +93,14 @@ const ProductsPage = () => {
       setCategories(categoriesRes.data || []);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível carregar os dados.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Só buscar dados quando tenantId estiver definido (ou for admin)
-    if (isAdmin || tenantId) {
-      fetchData();
-    }
+    if (isAdmin || tenantId) fetchData();
   }, [tenantId, isAdmin]);
 
   useEffect(() => {
@@ -105,11 +109,9 @@ const ProductsPage = () => {
 
   const filterProducts = () => {
     let filtered = products;
-
-    // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(product => 
+      filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(searchLower) ||
         product.categories?.name?.toLowerCase().includes(searchLower) ||
         product.cost_price.toString().includes(searchLower) ||
@@ -117,94 +119,181 @@ const ProductsPage = () => {
         product.quantity.toString().includes(searchLower)
       );
     }
-
-    // Apply type filter
     if (typeFilter) {
       filtered = filtered.filter(product => {
         switch (typeFilter) {
-          case 'Encomenda':
-            return product.is_order_product;
-          case 'Estoque':
-            return !product.is_order_product && product.quantity > 0;
-          case 'Sem Estoque':
-            return !product.is_order_product && product.quantity === 0;
-          default:
-            return true;
+          case 'Encomenda': return product.is_order_product;
+          case 'Estoque': return !product.is_order_product && product.quantity > 0;
+          case 'Sem Estoque': return !product.is_order_product && product.quantity === 0;
+          default: return true;
         }
       });
     }
-
     setFilteredProducts(filtered);
+  };
+
+  // Handle name input change for autocomplete
+  const handleNameChange = (value: string) => {
+    setFormData({ ...formData, name: value });
+    setSelectedExistingProduct(null);
+
+    if (value.length >= 2 && !editingProduct) {
+      const lower = value.toLowerCase();
+      const matches = products.filter(p => p.name.toLowerCase().includes(lower));
+      setNameSuggestions(matches);
+      setShowSuggestions(matches.length > 0);
+    } else {
+      setShowSuggestions(false);
+      setNameSuggestions([]);
+    }
+  };
+
+  // Select existing product from suggestions
+  const handleSelectExistingProduct = (product: Product) => {
+    setSelectedExistingProduct(product);
+    setFormData({
+      ...formData,
+      name: product.name,
+      cost_price: '', // user will enter the NEW purchase cost
+      sale_price: product.sale_price.toString(),
+      quantity: '', // user will enter quantity being added
+      category_id: product.category_id || '',
+      image_url: product.image_url || '',
+      is_order_product: product.is_order_product || false,
+      customer_name: (product as any).customer_name || '',
+    });
+    setShowSuggestions(false);
+  };
+
+  // Calculate estimated new weighted average
+  const getWeightedAveragePreview = () => {
+    if (!selectedExistingProduct || !formData.cost_price || !formData.quantity) return null;
+    const currentQty = selectedExistingProduct.quantity;
+    const currentCost = Number(selectedExistingProduct.cost_price);
+    const newQty = parseInt(formData.quantity);
+    const newCost = parseFloat(formData.cost_price);
+    if (isNaN(newQty) || isNaN(newCost) || newQty <= 0) return null;
+    const totalQty = currentQty + newQty;
+    const avgCost = ((currentQty * currentCost) + (newQty * newCost)) / totalQty;
+    return { avgCost: avgCost.toFixed(2), totalQty };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      const productData: any = {
-        name: formData.name,
-        cost_price: parseFloat(formData.cost_price),
-        sale_price: parseFloat(formData.sale_price),
-        quantity: parseInt(formData.quantity),
-        category_id: formData.category_id || null,
-        image_url: formData.image_url || null,
-        is_order_product: formData.is_order_product || false,
-        customer_name: formData.is_order_product ? formData.customer_name : null,
-      };
-
-      // Adicionar tenant_id para novos registros - com validação
-      if (!editingProduct) {
-        const tenantIdForProduct = getTenantIdForInsert();
-        if (!isAdmin && !tenantIdForProduct) {
-          toast({
-            title: "Erro",
-            description: "Empresa não identificada. Por favor, faça login novamente.",
-            variant: "destructive",
-          });
-          return;
-        }
-        productData.tenant_id = tenantIdForProduct;
-      }
-
+      // CASE 1: Editing an existing product (direct update)
       if (editingProduct) {
+        const productData: any = {
+          name: formData.name,
+          cost_price: parseFloat(formData.cost_price),
+          sale_price: parseFloat(formData.sale_price),
+          quantity: parseInt(formData.quantity),
+          category_id: formData.category_id || null,
+          image_url: formData.image_url || null,
+          is_order_product: formData.is_order_product || false,
+          customer_name: formData.is_order_product ? formData.customer_name : null,
+        };
+
         const { error } = await supabaseWithUser()
           .from('products')
           .update(productData)
           .eq('id', editingProduct.id);
 
         if (error) throw error;
+        toast({ title: "Sucesso", description: "Produto atualizado com sucesso!" });
 
-        toast({
-          title: "Sucesso",
-          description: "Produto atualizado com sucesso!",
-        });
+      // CASE 2: Selected existing product → stock entry (weighted average via trigger)
+      } else if (selectedExistingProduct) {
+        const qty = parseInt(formData.quantity);
+        const cost = parseFloat(formData.cost_price);
+
+        if (!qty || qty <= 0 || isNaN(cost)) {
+          toast({ title: "Erro", description: "Informe quantidade e custo válidos.", variant: "destructive" });
+          return;
+        }
+
+        const tenantId = getTenantIdForInsert();
+        if (!isAdmin && !tenantId) {
+          toast({ title: "Erro", description: "Empresa não identificada.", variant: "destructive" });
+          return;
+        }
+
+        // Update sale_price if changed
+        if (formData.sale_price && parseFloat(formData.sale_price) !== Number(selectedExistingProduct.sale_price)) {
+          await supabaseWithUser()
+            .from('products')
+            .update({ sale_price: parseFloat(formData.sale_price) })
+            .eq('id', selectedExistingProduct.id);
+        }
+
+        // Update category/image/order fields if changed
+        const updateFields: any = {};
+        if (formData.category_id && formData.category_id !== (selectedExistingProduct.category_id || '')) {
+          updateFields.category_id = formData.category_id || null;
+        }
+        if (formData.image_url && formData.image_url !== (selectedExistingProduct.image_url || '')) {
+          updateFields.image_url = formData.image_url || null;
+        }
+        if (Object.keys(updateFields).length > 0) {
+          await supabaseWithUser()
+            .from('products')
+            .update(updateFields)
+            .eq('id', selectedExistingProduct.id);
+        }
+
+        // Insert stock entry → trigger recalculates cost_price & quantity
+        const { error } = await supabaseWithUser()
+          .from('stock_entries')
+          .insert([{
+            product_id: selectedExistingProduct.id,
+            quantity: qty,
+            unit_cost: cost,
+            tenant_id: tenantId,
+          }]);
+
+        if (error) throw error;
+        toast({ title: "Sucesso", description: "Entrada de estoque registrada! Custo médio recalculado automaticamente." });
+
+      // CASE 3: Brand new product
       } else {
+        const tenantIdForProduct = getTenantIdForInsert();
+        if (!isAdmin && !tenantIdForProduct) {
+          toast({ title: "Erro", description: "Empresa não identificada.", variant: "destructive" });
+          return;
+        }
+
+        const productData: any = {
+          name: formData.name,
+          cost_price: parseFloat(formData.cost_price),
+          sale_price: parseFloat(formData.sale_price),
+          quantity: parseInt(formData.quantity),
+          category_id: formData.category_id || null,
+          image_url: formData.image_url || null,
+          is_order_product: formData.is_order_product || false,
+          customer_name: formData.is_order_product ? formData.customer_name : null,
+          tenant_id: tenantIdForProduct,
+        };
+
         const { error } = await supabaseWithUser()
           .from('products')
           .insert([productData]);
 
         if (error) throw error;
-
-        toast({
-          title: "Sucesso",
-          description: "Produto criado com sucesso!",
-        });
+        toast({ title: "Sucesso", description: "Produto criado com sucesso!" });
       }
 
       resetForm();
       fetchData();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o produto.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível salvar o produto.", variant: "destructive" });
     }
   };
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    setSelectedExistingProduct(null);
     setFormData({
       name: product.name,
       cost_price: product.cost_price.toString(),
@@ -220,92 +309,52 @@ const ProductsPage = () => {
 
   const handleDelete = async (product: Product) => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
-
     try {
-      const { error } = await supabaseWithUser()
-        .from('products')
-        .delete()
-        .eq('id', product.id);
-
+      const { error } = await supabaseWithUser().from('products').delete().eq('id', product.id);
       if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Produto excluído com sucesso!",
-      });
+      toast({ title: "Sucesso", description: "Produto excluído com sucesso!" });
       fetchData();
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o produto.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível excluir o produto.", variant: "destructive" });
     }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       setImageUploading(true);
-      
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file);
-
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(fileName, file);
       if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-
-      setFormData({...formData, image_url: data.publicUrl});
-      
-      toast({
-        title: "Sucesso",
-        description: "Imagem enviada com sucesso!",
-      });
+      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+      setFormData({ ...formData, image_url: data.publicUrl });
+      toast({ title: "Sucesso", description: "Imagem enviada com sucesso!" });
     } catch (error) {
       console.error('Erro ao enviar imagem:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar imagem",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Erro ao enviar imagem", variant: "destructive" });
     } finally {
       setImageUploading(false);
     }
   };
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      cost_price: '',
-      sale_price: '',
-      quantity: '',
-      category_id: '',
-      image_url: '',
-      is_order_product: false,
-      customer_name: '',
-    });
+    setFormData({ name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false, customer_name: '' });
     setEditingProduct(null);
+    setSelectedExistingProduct(null);
     setShowForm(false);
+    setShowSuggestions(false);
   };
+
+  const weightedPreview = getWeightedAveragePreview();
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p>Carregando produtos...</p>
-          </CardContent>
-        </Card>
+        <h1 className="text-3xl font-bold text-foreground">Produtos</h1>
+        <Card><CardContent className="p-8 text-center"><p>Carregando produtos...</p></CardContent></Card>
       </div>
     );
   }
@@ -313,14 +362,13 @@ const ProductsPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
+        <h1 className="text-3xl font-bold text-foreground">Produtos</h1>
         <div className="flex gap-2">
           <OrderProductsPDFReport />
           <StockProductsPDFReport />
-          <StockEntryDialog products={products} onSuccess={fetchData} />
           <Button onClick={() => setShowForm(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Novo Produto
+            Novo Produto / Entrada
           </Button>
         </div>
       </div>
@@ -329,29 +377,101 @@ const ProductsPage = () => {
         <Card>
           <CardHeader>
             <CardTitle>
-              {editingProduct ? 'Editar Produto' : 'Novo Produto'}
+              {editingProduct ? 'Editar Produto' : selectedExistingProduct ? `Entrada de Estoque: ${selectedExistingProduct.name}` : 'Novo Produto / Entrada de Estoque'}
             </CardTitle>
+            {!editingProduct && !selectedExistingProduct && (
+              <p className="text-sm text-muted-foreground">
+                Digite o nome do produto. Se ele já existir, selecione para dar entrada no estoque. Caso contrário, será criado como novo.
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nome</Label>
+              {/* Product name with autocomplete */}
+              <div className="relative md:col-span-2">
+                <Label htmlFor="name">Nome do Produto</Label>
                 <Input
+                  ref={nameInputRef}
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  onFocus={() => {
+                    if (formData.name.length >= 2 && nameSuggestions.length > 0 && !editingProduct) {
+                      setShowSuggestions(true);
+                    }
+                  }}
                   required
+                  disabled={!!editingProduct || !!selectedExistingProduct}
+                  placeholder="Digite o nome do produto..."
+                  autoComplete="off"
                 />
+                {selectedExistingProduct && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-7 text-xs"
+                    onClick={() => {
+                      setSelectedExistingProduct(null);
+                      setFormData({ ...formData, name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false, customer_name: '' });
+                    }}
+                  >
+                    Limpar seleção
+                  </Button>
+                )}
+                {showSuggestions && nameSuggestions.length > 0 && (
+                  <div
+                    ref={suggestionsRef}
+                    className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-y-auto"
+                  >
+                    {nameSuggestions.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm flex justify-between items-center"
+                        onClick={() => handleSelectExistingProduct(p)}
+                      >
+                        <span className="font-medium">{p.name}</span>
+                        <span className="text-muted-foreground text-xs">
+                          Estoque: {p.quantity} | Custo: R$ {Number(p.cost_price).toFixed(2)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
+              {/* Weighted average preview for existing product */}
+              {selectedExistingProduct && (
+                <div className="md:col-span-2 bg-muted p-4 rounded-md space-y-1 text-sm">
+                  <p className="font-medium text-foreground">Produto existente selecionado</p>
+                  <p>Custo atual: <strong>R$ {Number(selectedExistingProduct.cost_price).toFixed(2)}</strong></p>
+                  <p>Estoque atual: <strong>{selectedExistingProduct.quantity}</strong></p>
+                  <p>Preço de venda atual: <strong>R$ {Number(selectedExistingProduct.sale_price).toFixed(2)}</strong></p>
+                  {weightedPreview && (
+                    <>
+                      <hr className="my-2 border-border" />
+                      <p className="text-primary font-medium">
+                        Novo custo médio estimado: <strong>R$ {weightedPreview.avgCost}</strong>
+                      </p>
+                      <p className="text-primary">
+                        Novo estoque total: <strong>{weightedPreview.totalQty}</strong>
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div>
-                <Label htmlFor="cost_price">Preço de Custo</Label>
+                <Label htmlFor="cost_price">
+                  {selectedExistingProduct ? 'Custo Unitário desta Compra' : 'Preço de Custo'}
+                </Label>
                 <Input
                   id="cost_price"
                   type="number"
                   step="0.01"
                   value={formData.cost_price}
-                  onChange={(e) => setFormData({...formData, cost_price: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
                   required
                 />
               </div>
@@ -363,23 +483,26 @@ const ProductsPage = () => {
                   type="number"
                   step="0.01"
                   value={formData.sale_price}
-                  onChange={(e) => setFormData({...formData, sale_price: e.target.value})}
-                  required
+                  onChange={(e) => setFormData({ ...formData, sale_price: e.target.value })}
+                  required={!selectedExistingProduct}
                 />
               </div>
 
               <div>
-                <Label htmlFor="quantity">Quantidade</Label>
+                <Label htmlFor="quantity">
+                  {selectedExistingProduct ? 'Quantidade a Adicionar' : 'Quantidade'}
+                </Label>
                 <Input
                   id="quantity"
                   type="number"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                   required
+                  min={selectedExistingProduct ? "1" : "0"}
                 />
-                {formData.quantity === '0' && (
+                {!selectedExistingProduct && formData.quantity === '0' && (
                   <div className="mt-1">
-                    <span className="text-sm font-medium text-red-600 bg-red-50 px-2 py-1 rounded">
+                    <span className="text-sm font-medium text-destructive bg-destructive/10 px-2 py-1 rounded">
                       Tipo: Sem Estoque
                     </span>
                   </div>
@@ -391,62 +514,49 @@ const ProductsPage = () => {
                 <select
                   id="category"
                   value={formData.category_id}
-                  onChange={(e) => setFormData({...formData, category_id: e.target.value})}
-                  className="w-full p-2 border rounded-md"
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                  className="w-full p-2 border rounded-md bg-background"
                 >
                   <option value="">Selecione uma categoria</option>
-                  {categories.filter(category => category.name !== 'Encomendas').map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
+                  {categories.filter(c => c.name !== 'Encomendas').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
 
               <div>
                 <Label htmlFor="image">Imagem do Produto</Label>
-                <Input
-                  id="image"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="cursor-pointer"
-                />
-                {imageUploading && (
-                  <p className="text-sm text-gray-500 mt-1">Enviando imagem...</p>
-                )}
+                <Input id="image" type="file" accept="image/*" onChange={handleImageUpload} className="cursor-pointer" />
+                {imageUploading && <p className="text-sm text-muted-foreground mt-1">Enviando imagem...</p>}
                 {formData.image_url && (
                   <div className="mt-2">
-                    <img 
-                      src={formData.image_url} 
-                      alt="Preview" 
-                      className="w-20 h-20 object-cover rounded border cursor-pointer"
-                      onClick={() => setSelectedImage(formData.image_url)}
-                    />
+                    <img src={formData.image_url} alt="Preview" className="w-20 h-20 object-cover rounded border cursor-pointer" onClick={() => setSelectedImage(formData.image_url)} />
                   </div>
                 )}
               </div>
 
-              <div className="md:col-span-2">
-                <Label htmlFor="is_order_product">
-                  <input
-                    type="checkbox"
-                    id="is_order_product"
-                    checked={formData.is_order_product}
-                    onChange={(e) => setFormData({...formData, is_order_product: e.target.checked})}
-                    className="mr-2"
-                  />
-                  Produto de Encomenda
-                </Label>
-              </div>
+              {!selectedExistingProduct && (
+                <div className="md:col-span-2">
+                  <Label htmlFor="is_order_product">
+                    <input
+                      type="checkbox"
+                      id="is_order_product"
+                      checked={formData.is_order_product}
+                      onChange={(e) => setFormData({ ...formData, is_order_product: e.target.checked })}
+                      className="mr-2"
+                    />
+                    Produto de Encomenda
+                  </Label>
+                </div>
+              )}
 
-              {formData.is_order_product && (
+              {formData.is_order_product && !selectedExistingProduct && (
                 <div className="md:col-span-2">
                   <Label htmlFor="customer_name">Nome do Cliente</Label>
                   <Input
                     id="customer_name"
                     value={formData.customer_name || ''}
-                    onChange={(e) => setFormData({...formData, customer_name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
                     placeholder="Digite o nome do cliente"
                     required={formData.is_order_product}
                   />
@@ -455,11 +565,9 @@ const ProductsPage = () => {
 
               <div className="md:col-span-2 flex space-x-2">
                 <Button type="submit">
-                  {editingProduct ? 'Atualizar Produto' : 'Criar Produto'}
+                  {editingProduct ? 'Atualizar Produto' : selectedExistingProduct ? 'Registrar Entrada de Estoque' : 'Criar Produto'}
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancelar
-                </Button>
+                <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
               </div>
             </form>
           </CardContent>
@@ -470,21 +578,17 @@ const ProductsPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Total Preço de Custo</h3>
-              </div>
+              <h3 className="text-sm font-medium text-muted-foreground">Total Preço de Custo</h3>
               <p className="text-2xl font-bold text-primary">
-                R$ {filteredProducts.reduce((sum, product) => sum + (Number(product.cost_price) * product.quantity), 0).toFixed(2)}
+                R$ {filteredProducts.reduce((sum, p) => sum + (Number(p.cost_price) * p.quantity), 0).toFixed(2)}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Projeção de Vendas</h3>
-              </div>
+              <h3 className="text-sm font-medium text-muted-foreground">Projeção de Vendas</h3>
               <p className="text-2xl font-bold text-primary">
-                R$ {filteredProducts.reduce((sum, product) => sum + (Number(product.sale_price) * product.quantity), 0).toFixed(2)}
+                R$ {filteredProducts.reduce((sum, p) => sum + (Number(p.sale_price) * p.quantity), 0).toFixed(2)}
               </p>
             </CardContent>
           </Card>
@@ -510,7 +614,7 @@ const ProductsPage = () => {
                 <option value="Sem Estoque">Sem Estoque</option>
               </select>
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar produtos..."
                   value={searchTerm}
@@ -542,50 +646,31 @@ const ProductsPage = () => {
                     {product.image_url ? (
                       <ImageModal imageUrl={product.image_url} productName={product.name}>
                         <div className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer border">
-                          <img 
-                            src={product.image_url} 
-                            alt={product.name}
-                            className="w-full h-full object-cover hover:scale-110 transition-transform"
-                          />
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover hover:scale-110 transition-transform" />
                         </div>
                       </ImageModal>
                     ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                        <ImageIcon className="w-6 h-6 text-gray-400" />
+                      <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center">
+                        <ImageIcon className="w-6 h-6 text-muted-foreground" />
                       </div>
                     )}
                   </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>
-                    {product.categories?.name || 'Sem categoria'}
-                  </TableCell>
+                  <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
                   <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
                   <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
                   <TableCell>{product.quantity}</TableCell>
                   <TableCell>
-                    <Badge variant={
-                      product.is_order_product ? "secondary" : 
-                      product.quantity === 0 ? "destructive" : "default"
-                    }>
-                      {product.is_order_product ? 'Encomenda' : 
-                       product.quantity === 0 ? 'Sem Estoque' : 'Estoque'}
+                    <Badge variant={product.is_order_product ? "secondary" : product.quantity === 0 ? "destructive" : "default"}>
+                      {product.is_order_product ? 'Encomenda' : product.quantity === 0 ? 'Sem Estoque' : 'Estoque'}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(product)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(product)}>
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(product)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleDelete(product)} className="text-destructive hover:bg-destructive/10">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
