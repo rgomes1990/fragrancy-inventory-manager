@@ -38,7 +38,6 @@ const ProductsPage = () => {
     category_id: '',
     image_url: '',
     is_order_product: false,
-    customer_name: '',
   });
 
   // Autocomplete state
@@ -154,13 +153,12 @@ const ProductsPage = () => {
     setFormData({
       ...formData,
       name: product.name,
-      cost_price: '', // user will enter the NEW purchase cost
+      cost_price: '',
       sale_price: product.sale_price.toString(),
-      quantity: '', // user will enter quantity being added
+      quantity: '',
       category_id: product.category_id || '',
       image_url: product.image_url || '',
-      is_order_product: product.is_order_product || false,
-      customer_name: (product as any).customer_name || '',
+      is_order_product: false,
     });
     setShowSuggestions(false);
   };
@@ -192,7 +190,6 @@ const ProductsPage = () => {
           category_id: formData.category_id || null,
           image_url: formData.image_url || null,
           is_order_product: formData.is_order_product || false,
-          customer_name: formData.is_order_product ? formData.customer_name : null,
         };
 
         const { error } = await supabaseWithUser()
@@ -203,7 +200,7 @@ const ProductsPage = () => {
         if (error) throw error;
         toast({ title: "Sucesso", description: "Produto atualizado com sucesso!" });
 
-      // CASE 2: Selected existing product → stock entry (weighted average via trigger)
+      // CASE 2: Selected existing product
       } else if (selectedExistingProduct) {
         const qty = parseInt(formData.quantity);
         const cost = parseFloat(formData.cost_price);
@@ -227,7 +224,7 @@ const ProductsPage = () => {
             .eq('id', selectedExistingProduct.id);
         }
 
-        // Update category/image/order fields if changed
+        // Update category/image if changed
         const updateFields: any = {};
         if (formData.category_id && formData.category_id !== (selectedExistingProduct.category_id || '')) {
           updateFields.category_id = formData.category_id || null;
@@ -235,10 +232,6 @@ const ProductsPage = () => {
         if (formData.image_url && formData.image_url !== (selectedExistingProduct.image_url || '')) {
           updateFields.image_url = formData.image_url || null;
         }
-        if (formData.is_order_product !== selectedExistingProduct.is_order_product) {
-          updateFields.is_order_product = formData.is_order_product;
-        }
-        updateFields.customer_name = formData.is_order_product ? formData.customer_name : null;
         if (Object.keys(updateFields).length > 0) {
           await supabaseWithUser()
             .from('products')
@@ -246,18 +239,36 @@ const ProductsPage = () => {
             .eq('id', selectedExistingProduct.id);
         }
 
-        // Insert stock entry → trigger recalculates cost_price & quantity
-        const { error } = await supabaseWithUser()
-          .from('stock_entries')
-          .insert([{
-            product_id: selectedExistingProduct.id,
-            quantity: qty,
-            unit_cost: cost,
-            tenant_id: tenantId,
-          }]);
+        if (formData.is_order_product) {
+          // ENCOMENDA: create a product_order_requests record, do NOT add to stock
+          const { error } = await supabaseWithUser()
+            .from('product_order_requests')
+            .insert([{
+              product_id: selectedExistingProduct.id,
+              customer_name: 'Encomenda',
+              requested_quantity: qty,
+              cost_price: cost,
+              sale_price: formData.sale_price ? parseFloat(formData.sale_price) : Number(selectedExistingProduct.sale_price),
+              status: 'Pendente',
+              tenant_id: tenantId,
+            }]);
 
-        if (error) throw error;
-        toast({ title: "Sucesso", description: "Entrada de estoque registrada! Custo médio recalculado automaticamente." });
+          if (error) throw error;
+          toast({ title: "Sucesso", description: "Encomenda registrada! As unidades existentes em estoque não foram alteradas." });
+        } else {
+          // ESTOQUE: insert stock entry → trigger recalculates cost_price & quantity
+          const { error } = await supabaseWithUser()
+            .from('stock_entries')
+            .insert([{
+              product_id: selectedExistingProduct.id,
+              quantity: qty,
+              unit_cost: cost,
+              tenant_id: tenantId,
+            }]);
+
+          if (error) throw error;
+          toast({ title: "Sucesso", description: "Entrada de estoque registrada! Custo médio recalculado automaticamente." });
+        }
 
       // CASE 3: Brand new product
       } else {
@@ -275,7 +286,6 @@ const ProductsPage = () => {
           category_id: formData.category_id || null,
           image_url: formData.image_url || null,
           is_order_product: formData.is_order_product || false,
-          customer_name: formData.is_order_product ? formData.customer_name : null,
           tenant_id: tenantIdForProduct,
         };
 
@@ -306,7 +316,6 @@ const ProductsPage = () => {
       category_id: product.category_id || '',
       image_url: product.image_url || '',
       is_order_product: product.is_order_product || false,
-      customer_name: (product as any).customer_name || '',
     });
     setShowForm(true);
   };
@@ -345,7 +354,7 @@ const ProductsPage = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false, customer_name: '' });
+    setFormData({ name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false });
     setEditingProduct(null);
     setSelectedExistingProduct(null);
     setShowForm(false);
@@ -417,7 +426,7 @@ const ProductsPage = () => {
                     className="absolute right-2 top-7 text-xs"
                     onClick={() => {
                       setSelectedExistingProduct(null);
-                      setFormData({ ...formData, name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false, customer_name: '' });
+                      setFormData({ ...formData, name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false });
                     }}
                   >
                     Limpar seleção
@@ -552,22 +561,19 @@ const ProductsPage = () => {
                 </Label>
               </div>
 
-              {formData.is_order_product && (
-                <div className="md:col-span-2">
-                  <Label htmlFor="customer_name">Nome do Cliente</Label>
-                  <Input
-                    id="customer_name"
-                    value={formData.customer_name || ''}
-                    onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                    placeholder="Digite o nome do cliente"
-                    required={formData.is_order_product}
-                  />
+              {formData.is_order_product && selectedExistingProduct && (
+                <div className="md:col-span-2 bg-accent/50 border border-border p-3 rounded-md text-sm">
+                  <p className="font-medium text-foreground">⚠️ Modo Encomenda</p>
+                  <p className="text-muted-foreground">
+                    As {formData.quantity || '0'} unidades serão registradas como encomenda separadamente. 
+                    O estoque atual ({selectedExistingProduct.quantity} un.) não será alterado.
+                  </p>
                 </div>
               )}
 
               <div className="md:col-span-2 flex space-x-2">
                 <Button type="submit">
-                  {editingProduct ? 'Atualizar Produto' : selectedExistingProduct ? 'Registrar Entrada de Estoque' : 'Criar Produto'}
+                  {editingProduct ? 'Atualizar Produto' : selectedExistingProduct ? (formData.is_order_product ? 'Registrar Encomenda' : 'Registrar Entrada de Estoque') : 'Criar Produto'}
                 </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
               </div>
