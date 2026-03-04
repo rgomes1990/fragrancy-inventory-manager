@@ -6,11 +6,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon } from 'lucide-react';
+import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon, ArrowDownToLine } from 'lucide-react';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Product, Category } from '@/types/database';
+import { Product, Category, ProductOrderRequest } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
+
+// Row displayed in the unified table — either a product or an order request
+interface DisplayRow {
+  type: 'product' | 'order_request';
+  id: string;
+  name: string;
+  category_name: string;
+  cost_price: number;
+  sale_price: number;
+  quantity: number;
+  image_url?: string;
+  badge: 'Estoque' | 'Sem Estoque' | 'Encomenda';
+  product?: Product;
+  orderRequest?: ProductOrderRequest;
+}
 
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
@@ -19,8 +34,9 @@ import StockProductsPDFReport from './StockProductsPDFReport';
 const ProductsPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [orderRequests, setOrderRequests] = useState<ProductOrderRequest[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [displayRows, setDisplayRows] = useState<DisplayRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -64,6 +80,7 @@ const ProductsPage = () => {
   const fetchData = async () => {
     if (!isAdmin && !tenantId) {
       setProducts([]);
+      setOrderRequests([]);
       setCategories([]);
       setLoading(false);
       return;
@@ -74,22 +91,30 @@ const ProductsPage = () => {
         .from('products')
         .select(`*, categories(id, name, created_at, updated_at)`);
       let categoriesQuery = supabase.from('categories').select('*');
+      let orderRequestsQuery = supabase
+        .from('product_order_requests')
+        .select(`*, products(id, name, cost_price, sale_price, quantity, category_id, image_url, created_at, updated_at, is_order_product, categories(id, name, created_at, updated_at))`)
+        .order('created_at', { ascending: false });
 
       if (!isAdmin && tenantId) {
         productsQuery = productsQuery.eq('tenant_id', tenantId);
         categoriesQuery = categoriesQuery.eq('tenant_id', tenantId);
+        orderRequestsQuery = orderRequestsQuery.eq('tenant_id', tenantId);
       }
 
-      const [productsRes, categoriesRes] = await Promise.all([
+      const [productsRes, categoriesRes, orderRequestsRes] = await Promise.all([
         productsQuery.order('created_at', { ascending: false }),
-        categoriesQuery.order('name')
+        categoriesQuery.order('name'),
+        orderRequestsQuery
       ]);
 
       if (productsRes.error) throw productsRes.error;
       if (categoriesRes.error) throw categoriesRes.error;
+      if (orderRequestsRes.error) throw orderRequestsRes.error;
 
       setProducts(productsRes.data || []);
       setCategories(categoriesRes.data || []);
+      setOrderRequests(orderRequestsRes.data || []);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
       toast({ title: "Erro", description: "Não foi possível carregar os dados.", variant: "destructive" });
@@ -103,32 +128,67 @@ const ProductsPage = () => {
   }, [tenantId, isAdmin]);
 
   useEffect(() => {
-    filterProducts();
-  }, [products, searchTerm, typeFilter]);
+    buildDisplayRows();
+  }, [products, orderRequests, searchTerm, typeFilter]);
 
-  const filterProducts = () => {
-    let filtered = products;
+  const buildDisplayRows = () => {
+    const rows: DisplayRow[] = [];
+
+    // Add products as rows
+    for (const product of products) {
+      rows.push({
+        type: 'product',
+        id: product.id,
+        name: product.name,
+        category_name: product.categories?.name || 'Sem categoria',
+        cost_price: Number(product.cost_price),
+        sale_price: Number(product.sale_price),
+        quantity: product.quantity,
+        image_url: product.image_url,
+        badge: product.is_order_product ? 'Encomenda' : product.quantity === 0 ? 'Sem Estoque' : 'Estoque',
+        product,
+      });
+    }
+
+    // Add order requests as separate rows
+    for (const req of orderRequests) {
+      rows.push({
+        type: 'order_request',
+        id: req.id,
+        name: req.products?.name || 'Produto não encontrado',
+        category_name: req.products?.categories?.name || 'Sem categoria',
+        cost_price: Number(req.cost_price || req.products?.cost_price || 0),
+        sale_price: Number(req.sale_price || req.products?.sale_price || 0),
+        quantity: req.requested_quantity,
+        image_url: req.products?.image_url,
+        badge: 'Encomenda',
+        orderRequest: req,
+      });
+    }
+
+    // Apply search filter
+    let filtered = rows;
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchLower) ||
-        product.categories?.name?.toLowerCase().includes(searchLower) ||
-        product.cost_price.toString().includes(searchLower) ||
-        product.sale_price.toString().includes(searchLower) ||
-        product.quantity.toString().includes(searchLower)
+      filtered = filtered.filter(row =>
+        row.name.toLowerCase().includes(searchLower) ||
+        row.category_name.toLowerCase().includes(searchLower) ||
+        row.cost_price.toString().includes(searchLower) ||
+        row.sale_price.toString().includes(searchLower) ||
+        row.quantity.toString().includes(searchLower)
       );
     }
     if (typeFilter) {
-      filtered = filtered.filter(product => {
+      filtered = filtered.filter(row => {
         switch (typeFilter) {
-          case 'Encomenda': return product.is_order_product;
-          case 'Estoque': return !product.is_order_product && product.quantity > 0;
-          case 'Sem Estoque': return !product.is_order_product && product.quantity === 0;
+          case 'Encomenda': return row.badge === 'Encomenda';
+          case 'Estoque': return row.badge === 'Estoque';
+          case 'Sem Estoque': return row.badge === 'Sem Estoque';
           default: return true;
         }
       });
     }
-    setFilteredProducts(filtered);
+    setDisplayRows(filtered);
   };
 
   // Handle name input change for autocomplete
@@ -361,6 +421,54 @@ const ProductsPage = () => {
     setShowSuggestions(false);
   };
 
+  // Convert an order request into a stock entry (merge into product stock)
+  const handleConvertOrderToStock = async (req: ProductOrderRequest) => {
+    if (!confirm(`Converter encomenda de ${req.requested_quantity} un. para estoque? As unidades serão adicionadas ao estoque do produto.`)) return;
+    try {
+      const tenantIdInsert = getTenantIdForInsert();
+      // Insert stock entry → trigger recalculates cost_price & quantity on the product
+      const { error: stockError } = await supabaseWithUser()
+        .from('stock_entries')
+        .insert([{
+          product_id: req.product_id,
+          quantity: req.requested_quantity,
+          unit_cost: req.cost_price || 0,
+          tenant_id: tenantIdInsert,
+        }]);
+      if (stockError) throw stockError;
+
+      // Delete the order request
+      const { error: deleteError } = await supabaseWithUser()
+        .from('product_order_requests')
+        .delete()
+        .eq('id', req.id);
+      if (deleteError) throw deleteError;
+
+      toast({ title: "Sucesso", description: "Encomenda convertida em estoque! Custo médio recalculado." });
+      fetchData();
+    } catch (error) {
+      console.error('Erro ao converter encomenda:', error);
+      toast({ title: "Erro", description: "Não foi possível converter a encomenda.", variant: "destructive" });
+    }
+  };
+
+  // Delete an order request
+  const handleDeleteOrderRequest = async (req: ProductOrderRequest) => {
+    if (!confirm('Tem certeza que deseja excluir esta encomenda?')) return;
+    try {
+      const { error } = await supabaseWithUser()
+        .from('product_order_requests')
+        .delete()
+        .eq('id', req.id);
+      if (error) throw error;
+      toast({ title: "Sucesso", description: "Encomenda excluída com sucesso!" });
+      fetchData();
+    } catch (error) {
+      console.error('Erro ao excluir encomenda:', error);
+      toast({ title: "Erro", description: "Não foi possível excluir a encomenda.", variant: "destructive" });
+    }
+  };
+
   const weightedPreview = getWeightedAveragePreview();
 
   if (loading) {
@@ -588,7 +696,7 @@ const ProductsPage = () => {
             <CardContent className="p-4">
               <h3 className="text-sm font-medium text-muted-foreground">Total Preço de Custo</h3>
               <p className="text-2xl font-bold text-primary">
-                R$ {filteredProducts.reduce((sum, p) => sum + (Number(p.cost_price) * p.quantity), 0).toFixed(2)}
+                R$ {displayRows.reduce((sum, r) => sum + (r.cost_price * r.quantity), 0).toFixed(2)}
               </p>
             </CardContent>
           </Card>
@@ -596,7 +704,7 @@ const ProductsPage = () => {
             <CardContent className="p-4">
               <h3 className="text-sm font-medium text-muted-foreground">Projeção de Vendas</h3>
               <p className="text-2xl font-bold text-primary">
-                R$ {filteredProducts.reduce((sum, p) => sum + (Number(p.sale_price) * p.quantity), 0).toFixed(2)}
+                R$ {displayRows.reduce((sum, r) => sum + (r.sale_price * r.quantity), 0).toFixed(2)}
               </p>
             </CardContent>
           </Card>
@@ -648,13 +756,13 @@ const ProductsPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id}>
+              {displayRows.map((row) => (
+                <TableRow key={`${row.type}-${row.id}`} className={row.type === 'order_request' ? 'bg-accent/30' : ''}>
                   <TableCell>
-                    {product.image_url ? (
-                      <ImageModal imageUrl={product.image_url} productName={product.name}>
+                    {row.image_url ? (
+                      <ImageModal imageUrl={row.image_url} productName={row.name}>
                         <div className="w-12 h-12 rounded-lg overflow-hidden cursor-pointer border">
-                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover hover:scale-110 transition-transform" />
+                          <img src={row.image_url} alt={row.name} className="w-full h-full object-cover hover:scale-110 transition-transform" />
                         </div>
                       </ImageModal>
                     ) : (
@@ -663,24 +771,48 @@ const ProductsPage = () => {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.categories?.name || 'Sem categoria'}</TableCell>
-                  <TableCell>R$ {Number(product.cost_price).toFixed(2)}</TableCell>
-                  <TableCell>R$ {Number(product.sale_price).toFixed(2)}</TableCell>
-                  <TableCell>{product.quantity}</TableCell>
+                  <TableCell className="font-medium">{row.name}</TableCell>
+                  <TableCell>{row.category_name}</TableCell>
+                  <TableCell>R$ {row.cost_price.toFixed(2)}</TableCell>
+                  <TableCell>R$ {row.sale_price.toFixed(2)}</TableCell>
+                  <TableCell>{row.quantity}</TableCell>
                   <TableCell>
-                    <Badge variant={product.is_order_product ? "secondary" : product.quantity === 0 ? "destructive" : "default"}>
-                      {product.is_order_product ? 'Encomenda' : product.quantity === 0 ? 'Sem Estoque' : 'Estoque'}
+                    <Badge variant={row.badge === 'Encomenda' ? "secondary" : row.badge === 'Sem Estoque' ? "destructive" : "default"}>
+                      {row.badge}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(product)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(product)} className="text-destructive hover:bg-destructive/10">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {row.type === 'product' && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(row.product!)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleDelete(row.product!)} className="text-destructive hover:bg-destructive/10">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {row.type === 'order_request' && row.orderRequest && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleConvertOrderToStock(row.orderRequest!)}
+                            title="Converter para estoque"
+                          >
+                            <ArrowDownToLine className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteOrderRequest(row.orderRequest!)}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
