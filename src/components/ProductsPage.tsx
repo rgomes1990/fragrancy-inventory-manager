@@ -522,7 +522,7 @@ const ProductsPage = () => {
                     }
                   }}
                   required
-                  disabled={!!editingProduct || !!selectedExistingProduct}
+                  disabled={!!selectedExistingProduct}
                   placeholder="Digite o nome do produto..."
                   autoComplete="off"
                 />
