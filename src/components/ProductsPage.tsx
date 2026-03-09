@@ -381,9 +381,8 @@ const ProductsPage = () => {
   };
 
   const handleDelete = async (product: Product) => {
-    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
     try {
-      // Count dependent records
+      // Check dependent records
       const { data: stockData } = await supabaseWithUser().from('stock_entries').select('id').eq('product_id', product.id);
       const { data: orderData } = await supabaseWithUser().from('product_order_requests').select('id').eq('product_id', product.id);
       const { data: salesData } = await supabaseWithUser().from('sales').select('id').eq('product_id', product.id);
@@ -392,24 +391,26 @@ const ProductsPage = () => {
       const orderCount = orderData?.length || 0;
       const salesCount = salesData?.length || 0;
 
-      // Delete dependent records
-      if (stockCount > 0) await supabaseWithUser().from('stock_entries').delete().eq('product_id', product.id);
-      if (orderCount > 0) await supabaseWithUser().from('product_order_requests').delete().eq('product_id', product.id);
-      if (salesCount > 0) await supabaseWithUser().from('sales').update({ product_id: null }).eq('product_id', product.id);
+      if (stockCount > 0 || orderCount > 0 || salesCount > 0) {
+        const deps: string[] = [];
+        if (stockCount > 0) deps.push(`${stockCount} entrada(s) de estoque`);
+        if (orderCount > 0) deps.push(`${orderCount} encomenda(s)`);
+        if (salesCount > 0) deps.push(`${salesCount} venda(s)`);
+
+        toast({
+          title: "Exclusão bloqueada",
+          description: `O produto "${product.name}" possui dependências e não pode ser excluído. Dependências encontradas: ${deps.join(', ')}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!confirm('Tem certeza que deseja excluir este produto?')) return;
 
       const { error } = await supabaseWithUser().from('products').delete().eq('id', product.id);
       if (error) throw error;
 
-      const details: string[] = [];
-      if (stockCount > 0) details.push(`${stockCount} entrada(s) de estoque removida(s)`);
-      if (orderCount > 0) details.push(`${orderCount} encomenda(s) removida(s)`);
-      if (salesCount > 0) details.push(`${salesCount} venda(s) desvinculada(s)`);
-
-      const description = details.length > 0
-        ? `Produto excluído com sucesso! Relacionamentos: ${details.join(', ')}.`
-        : "Produto excluído com sucesso!";
-
-      toast({ title: "Sucesso", description });
+      toast({ title: "Sucesso", description: "Produto excluído com sucesso!" });
       fetchData();
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
