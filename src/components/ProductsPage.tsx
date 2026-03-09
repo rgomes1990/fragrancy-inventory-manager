@@ -383,20 +383,33 @@ const ProductsPage = () => {
   const handleDelete = async (product: Product) => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
     try {
-      // Delete dependent records first
-      await supabaseWithUser().from('stock_entries').delete().eq('product_id', product.id);
-      await supabaseWithUser().from('product_order_requests').delete().eq('product_id', product.id);
-      
-      // Check for sales referencing this product
-      const { data: salesData } = await supabaseWithUser().from('sales').select('id').eq('product_id', product.id).limit(1);
-      if (salesData && salesData.length > 0) {
-        // Nullify product reference in sales instead of deleting them
-        await supabaseWithUser().from('sales').update({ product_id: null }).eq('product_id', product.id);
-      }
+      // Count dependent records
+      const { data: stockData } = await supabaseWithUser().from('stock_entries').select('id').eq('product_id', product.id);
+      const { data: orderData } = await supabaseWithUser().from('product_order_requests').select('id').eq('product_id', product.id);
+      const { data: salesData } = await supabaseWithUser().from('sales').select('id').eq('product_id', product.id);
+
+      const stockCount = stockData?.length || 0;
+      const orderCount = orderData?.length || 0;
+      const salesCount = salesData?.length || 0;
+
+      // Delete dependent records
+      if (stockCount > 0) await supabaseWithUser().from('stock_entries').delete().eq('product_id', product.id);
+      if (orderCount > 0) await supabaseWithUser().from('product_order_requests').delete().eq('product_id', product.id);
+      if (salesCount > 0) await supabaseWithUser().from('sales').update({ product_id: null }).eq('product_id', product.id);
 
       const { error } = await supabaseWithUser().from('products').delete().eq('id', product.id);
       if (error) throw error;
-      toast({ title: "Sucesso", description: "Produto excluído com sucesso!" });
+
+      const details: string[] = [];
+      if (stockCount > 0) details.push(`${stockCount} entrada(s) de estoque removida(s)`);
+      if (orderCount > 0) details.push(`${orderCount} encomenda(s) removida(s)`);
+      if (salesCount > 0) details.push(`${salesCount} venda(s) desvinculada(s)`);
+
+      const description = details.length > 0
+        ? `Produto excluído com sucesso! Relacionamentos: ${details.join(', ')}.`
+        : "Produto excluído com sucesso!";
+
+      toast({ title: "Sucesso", description });
       fetchData();
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
