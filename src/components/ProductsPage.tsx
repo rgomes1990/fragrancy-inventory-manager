@@ -383,6 +383,17 @@ const ProductsPage = () => {
   const handleDelete = async (product: Product) => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
     try {
+      // Delete dependent records first
+      await supabaseWithUser().from('stock_entries').delete().eq('product_id', product.id);
+      await supabaseWithUser().from('product_order_requests').delete().eq('product_id', product.id);
+      
+      // Check for sales referencing this product
+      const { data: salesData } = await supabaseWithUser().from('sales').select('id').eq('product_id', product.id).limit(1);
+      if (salesData && salesData.length > 0) {
+        // Nullify product reference in sales instead of deleting them
+        await supabaseWithUser().from('sales').update({ product_id: null }).eq('product_id', product.id);
+      }
+
       const { error } = await supabaseWithUser().from('products').delete().eq('id', product.id);
       if (error) throw error;
       toast({ title: "Sucesso", description: "Produto excluído com sucesso!" });
