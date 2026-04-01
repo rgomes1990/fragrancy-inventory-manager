@@ -174,21 +174,21 @@ const CategoriesPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Categorias</h1>
-        <div className="flex items-center space-x-4">
-          <div className="relative">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-gray-900 min-w-0">Categorias</h1>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:space-x-4 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Buscar categorias..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-9 w-full"
             />
           </div>
           <Button 
             onClick={() => setShowForm(true)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto shrink-0"
           >
             <Plus className="w-4 h-4 mr-2" />
             Nova Categoria
