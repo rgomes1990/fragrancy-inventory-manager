@@ -2,6 +2,7 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Home,
   Package,
@@ -24,6 +25,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 
 interface AppSidebarProps {
@@ -34,6 +36,8 @@ interface AppSidebarProps {
 const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) => {
   const location = useLocation();
   const { isAdmin } = useAuth();
+  const isMobile = useIsMobile();
+  const { setOpenMobile } = useSidebar();
 
   const menuItems = [
     { title: 'Dashboard', url: '/', icon: Home, page: '', adminOnly: false },
@@ -67,7 +71,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) =>
               {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.page)}>
-                    <Link to={item.url}>
+                    <Link to={item.url} onClick={() => { if (isMobile) setOpenMobile(false); }}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
