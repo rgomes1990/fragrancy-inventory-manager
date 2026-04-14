@@ -268,11 +268,11 @@ const ProductOrderRequestsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Encomendas</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-gray-900 min-w-0">Encomendas</h1>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <OrderProductsPDFReport />
-          <Button onClick={() => setShowForm(true)}>
+          <Button onClick={() => setShowForm(true)} className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
             Nova Solicitação
           </Button>
@@ -415,18 +415,18 @@ const ProductOrderRequestsPage = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center space-x-2">
               <ShoppingCart className="w-5 h-5" />
               <span>Lista de Solicitações</span>
             </CardTitle>
-            <div className="relative">
+            <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Buscar solicitações..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-64"
+                className="pl-9 w-full"
               />
             </div>
           </div>

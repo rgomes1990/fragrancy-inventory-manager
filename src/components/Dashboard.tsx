@@ -539,11 +539,11 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:space-x-4 w-full sm:w-auto">
           <Select value={stockFilter} onValueChange={setStockFilter}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Filtrar por estoque" />
             </SelectTrigger>
             <SelectContent>
