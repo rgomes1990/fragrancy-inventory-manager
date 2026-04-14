@@ -360,13 +360,13 @@ const ExpensesPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Despesas</h1>
           <p className="text-muted-foreground">Gerencie as despesas da empresa</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row w-full sm:w-auto">
           <Dialog open={cashInDialogOpen} onOpenChange={setCashInDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -562,14 +562,14 @@ const ExpensesPage = () => {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Lista de Despesas</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Label htmlFor="categoryFilter" className="text-sm font-medium whitespace-nowrap">
               Filtrar por:
             </Label>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>
               <SelectContent>

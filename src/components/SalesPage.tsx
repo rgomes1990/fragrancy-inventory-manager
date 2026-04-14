@@ -673,17 +673,15 @@ const SalesPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
-        <div className="flex space-x-2">
-          <Button 
-            onClick={() => setShowMultiForm(true)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Cadastrar Venda
-          </Button>
-        </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-gray-900 min-w-0">Vendas</h1>
+        <Button 
+          onClick={() => setShowMultiForm(true)}
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Cadastrar Venda
+        </Button>
       </div>
 
       {showMultiForm && (
@@ -871,24 +869,25 @@ const SalesPage = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3">
             <CardTitle className="flex items-center space-x-2">
               <ShoppingCart className="w-5 h-5" />
+              <span>Vendas</span>
             </CardTitle>
-            <div className="flex items-center space-x-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
                   placeholder="Buscar vendas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-64"
+                  className="pl-9 w-full"
                 />
               </div>
               <select 
                 value={selectedSeller} 
                 onChange={(e) => setSelectedSeller(e.target.value)}
-                className="p-2 border rounded-md w-40"
+                className="p-2 border rounded-md w-full"
               >
                 <option value="">Todos vendedores</option>
                 {sellers.map((seller) => (
@@ -901,13 +900,12 @@ const SalesPage = () => {
                 value={selectedStatus} 
                 onChange={(e) => {
                   setSelectedStatus(e.target.value);
-                  // Limpar o parâmetro da URL quando mudar manualmente
                   if (searchParams.has('status')) {
                     searchParams.delete('status');
                     setSearchParams(searchParams);
                   }
                 }}
-                className="p-2 border rounded-md w-40"
+                className="p-2 border rounded-md w-full"
               >
                 <option value="">Todos status</option>
                 <option value="recebido">Recebido</option>
@@ -918,7 +916,7 @@ const SalesPage = () => {
               <select 
                 value={selectedPaymentType} 
                 onChange={(e) => setSelectedPaymentType(e.target.value)}
-                className="p-2 border rounded-md w-40"
+                className="p-2 border rounded-md w-full"
               >
                 <option value="">Todos tipos</option>
                 <option value="Débito">Débito</option>
@@ -926,8 +924,8 @@ const SalesPage = () => {
                 <option value="Pix">Pix</option>
                 <option value="Link">Link</option>
               </select>
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4" />
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <Calendar className="w-4 h-4 shrink-0" />
                 <Input
                   type="date"
                   value={startDate}
@@ -936,9 +934,9 @@ const SalesPage = () => {
                     if (e.target.value) setSelectedMonth('');
                   }}
                   placeholder="Data início"
-                  className="w-40"
+                  className="w-full"
                 />
-                <span className="text-gray-500">até</span>
+                <span className="text-gray-500 shrink-0">até</span>
                 <Input
                   type="date"
                   value={endDate}
@@ -947,14 +945,14 @@ const SalesPage = () => {
                     if (e.target.value) setSelectedMonth('');
                   }}
                   placeholder="Data fim"
-                  className="w-40"
+                  className="w-full"
                 />
               </div>
               {!startDate && !endDate && (
                 <select 
                   value={selectedMonth} 
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="p-2 border rounded-md w-48"
+                  className="p-2 border rounded-md w-full"
                 >
                   <option value="">Todos os meses</option>
                   {getMonthOptions().map((option) => (

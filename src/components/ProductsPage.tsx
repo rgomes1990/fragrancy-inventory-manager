@@ -507,12 +507,12 @@ const ProductsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Produtos</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-foreground min-w-0">Produtos</h1>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <OrderProductsPDFReport />
           <StockProductsPDFReport />
-          <Button onClick={() => setShowForm(true)}>
+          <Button onClick={() => setShowForm(true)} className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
             Novo Produto / Entrada
           </Button>
@@ -738,29 +738,29 @@ const ProductsPage = () => {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center space-x-2">
               <Package className="w-5 h-5" />
               <span>Lista de Produtos</span>
             </CardTitle>
-            <div className="flex space-x-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:space-x-3 w-full sm:w-auto">
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="p-2 border rounded-md bg-background"
+                className="p-2 border rounded-md bg-background w-full sm:w-auto"
               >
                 <option value="">Todos os tipos</option>
                 <option value="Encomenda">Encomenda</option>
                 <option value="Estoque">Estoque</option>
                 <option value="Sem Estoque">Sem Estoque</option>
               </select>
-              <div className="relative">
+              <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar produtos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-64"
+                  className="pl-9 w-full"
                 />
               </div>
             </div>
