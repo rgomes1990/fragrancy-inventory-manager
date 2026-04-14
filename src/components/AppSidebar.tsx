@@ -36,6 +36,8 @@ interface AppSidebarProps {
 const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) => {
   const location = useLocation();
   const { isAdmin } = useAuth();
+  const isMobile = useIsMobile();
+  const { setOpenMobile } = useSidebar();
 
   const menuItems = [
     { title: 'Dashboard', url: '/', icon: Home, page: '', adminOnly: false },
