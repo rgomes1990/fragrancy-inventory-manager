@@ -71,7 +71,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) =>
               {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.page)}>
-                    <Link to={item.url}>
+                    <Link to={item.url} onClick={() => { if (isMobile) setOpenMobile(false); }}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>
