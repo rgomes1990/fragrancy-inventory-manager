@@ -334,7 +334,7 @@ const Dashboard = () => {
 
       const top5Products = Object.values(productSales)
         .sort((a, b) => b.total_quantity - a.total_quantity)
-        .slice(0, 5);
+        .slice(0, 15);
 
       const top5Customers = Object.values(customerPurchases)
         .sort((a, b) => b.total_spent - a.total_spent)
@@ -636,12 +636,12 @@ const Dashboard = () => {
 
       {/* Cards de TOP 5 e Rankings */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* TOP 5 Produtos */}
+        {/* TOP 15 Produtos */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Trophy className="w-5 h-5 text-yellow-500" />
-              <span>Top 5 Produtos</span>
+              <span>Top 15 Produtos</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
