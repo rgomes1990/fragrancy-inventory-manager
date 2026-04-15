@@ -252,7 +252,7 @@ const Dashboard = () => {
           products(name)
         `)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(15);
       recentSalesQuery = applyTenantFilter(recentSalesQuery);
       const { data: recentSalesData } = await recentSalesQuery;
 
@@ -338,7 +338,7 @@ const Dashboard = () => {
 
       const top5Customers = Object.values(customerPurchases)
         .sort((a, b) => b.total_spent - a.total_spent)
-        .slice(0, 5);
+        .slice(0, 15);
 
       // Calcular vendas mensais para o gráfico (últimos 12 meses)
       let allSalesForChartQuery = supabase
@@ -676,12 +676,12 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* TOP 5 Clientes */}
+        {/* TOP 15 Clientes */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Crown className="w-5 h-5 text-purple-500" />
-              <span>Top 5 Clientes</span>
+              <span>Top 15 Clientes</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
