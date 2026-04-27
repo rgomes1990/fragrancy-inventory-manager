@@ -189,6 +189,9 @@ const ProductsPage = () => {
         }
       });
     }
+    if (categoryFilter) {
+      filtered = filtered.filter(row => row.category_name === categoryFilter);
+    }
     setDisplayRows(filtered);
   };
 
