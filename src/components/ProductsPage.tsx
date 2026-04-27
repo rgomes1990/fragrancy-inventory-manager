@@ -44,6 +44,7 @@ const ProductsPage = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   // Unified form: new product + stock entry
   const [formData, setFormData] = useState({
