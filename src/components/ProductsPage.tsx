@@ -130,7 +130,7 @@ const ProductsPage = () => {
 
   useEffect(() => {
     buildDisplayRows();
-  }, [products, orderRequests, searchTerm, typeFilter]);
+  }, [products, orderRequests, searchTerm, typeFilter, categoryFilter]);
 
   const buildDisplayRows = () => {
     const rows: DisplayRow[] = [];
