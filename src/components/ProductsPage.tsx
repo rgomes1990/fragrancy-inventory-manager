@@ -44,6 +44,7 @@ const ProductsPage = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   // Unified form: new product + stock entry
   const [formData, setFormData] = useState({
@@ -129,7 +130,7 @@ const ProductsPage = () => {
 
   useEffect(() => {
     buildDisplayRows();
-  }, [products, orderRequests, searchTerm, typeFilter]);
+  }, [products, orderRequests, searchTerm, typeFilter, categoryFilter]);
 
   const buildDisplayRows = () => {
     const rows: DisplayRow[] = [];
@@ -187,6 +188,9 @@ const ProductsPage = () => {
           default: return true;
         }
       });
+    }
+    if (categoryFilter) {
+      filtered = filtered.filter(row => row.category_name === categoryFilter);
     }
     setDisplayRows(filtered);
   };
@@ -753,6 +757,17 @@ const ProductsPage = () => {
                 <option value="Encomenda">Encomenda</option>
                 <option value="Estoque">Estoque</option>
                 <option value="Sem Estoque">Sem Estoque</option>
+              </select>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="p-2 border rounded-md bg-background w-full sm:w-auto"
+              >
+                <option value="">Todas as categorias</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+                <option value="Sem categoria">Sem categoria</option>
               </select>
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
