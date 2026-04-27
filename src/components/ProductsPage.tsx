@@ -758,6 +758,17 @@ const ProductsPage = () => {
                 <option value="Estoque">Estoque</option>
                 <option value="Sem Estoque">Sem Estoque</option>
               </select>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="p-2 border rounded-md bg-background w-full sm:w-auto"
+              >
+                <option value="">Todas as categorias</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+                <option value="Sem categoria">Sem categoria</option>
+              </select>
               <div className="relative w-full sm:w-64">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
