@@ -29,6 +29,8 @@ const CustomersPage = () => {
     name: '',
     whatsapp: '',
     email: '',
+    birthday_day: '',
+    birthday_month: '',
   });
 
   useEffect(() => {
