@@ -27,15 +27,15 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen flex w-full bg-gray-50">
+      <div className="min-h-screen flex w-full bg-background">
         <AppSidebar currentPage={currentPage} onPageChange={onPageChange} />
         
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header com trigger do sidebar sempre visível */}
-          <header className="h-14 border-b bg-white flex items-center justify-between px-4 lg:px-6 sticky top-0 z-10">
+          <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6 sticky top-0 z-10">
             <div className="flex items-center">
               <SidebarTrigger className="mr-4" />
-              <h2 className="text-lg font-semibold text-gray-900 truncate">
+              <h2 className="text-lg font-serif font-semibold text-foreground truncate">
                 {getPageTitle(currentPage)}
               </h2>
             </div>

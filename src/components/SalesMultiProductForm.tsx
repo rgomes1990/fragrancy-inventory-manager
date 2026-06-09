@@ -123,52 +123,63 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
   const kitOptions = kits.map(k => ({ value: k.id, label: `${k.name} (Disp: ${kitAvailability(k)})` }));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <ShoppingCart className="w-5 h-5" />
-          <span>Nova Venda (Produtos e Kits)</span>
+    <Card className="border-border/60 shadow-[var(--shadow-card)] rounded-2xl overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-accent/50 to-transparent border-b border-border/60">
+        <CardTitle className="flex items-center gap-3">
+          <span className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md"
+                style={{ background: 'var(--gradient-primary)' }}>
+            <ShoppingCart className="w-5 h-5" />
+          </span>
+          <div className="leading-tight">
+            <div className="text-xl font-serif">PDV / Caixa</div>
+            <div className="text-xs text-muted-foreground font-normal">Registrar nova venda</div>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <CardContent className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-7">
+          {/* Dados gerais */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <Label>Cliente</Label>
+              <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Cliente</Label>
               <SearchableSelect
                 options={customers.filter(c => c?.id && c?.name).map(c => ({ value: c.id, label: c.name }))}
-                value={customerID} onChange={setCustomerID} placeholder="Selecione o cliente" required
+                value={customerID} onChange={setCustomerID} placeholder="Buscar cliente..." required
               />
             </div>
             <div>
-              <Label>Data da Venda</Label>
-              <Input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} required />
+              <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Data</Label>
+              <Input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} required className="rounded-lg" />
             </div>
             <div>
-              <Label>Vendedor</Label>
-              <select value={seller} onChange={(e) => setSeller(e.target.value)} className="w-full p-2 border rounded-md" required>
-                <option value="">Selecione o vendedor</option>
+              <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Vendedor</Label>
+              <select value={seller} onChange={(e) => setSeller(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm" required>
+                <option value="">Selecione...</option>
                 {sellers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
             </div>
             <div>
-              <Label>Tipo de Pagamento</Label>
-              <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} className="w-full p-2 border rounded-md">
-                <option value="">Selecione o tipo</option>
+              <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Pagamento</Label>
+              <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)}
+                className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm">
+                <option value="">Selecione...</option>
                 {paymentTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Itens da Venda</h3>
-              <Button type="button" onClick={addItem} size="sm">
-                <Plus className="w-4 h-4 mr-2" /> Adicionar Item
+          {/* Carrinho */}
+          <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-muted/30">
+              <h3 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">Carrinho</h3>
+              <Button type="button" onClick={addItem} size="sm" variant="ghost"
+                className="text-primary hover:text-primary hover:bg-accent rounded-lg h-8">
+                <Plus className="w-4 h-4 mr-1" /> Adicionar item
               </Button>
             </div>
 
-            <div className="space-y-4">
+            <div className="divide-y divide-border/50">
               {items.map((item, index) => {
                 const selectedProduct = item.product_id ? products.find(p => p.id === item.product_id) : null;
                 const selectedKit = item.kit_id ? kits.find(k => k.id === item.kit_id) : null;
@@ -176,42 +187,44 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
                   ? (selectedProduct?.quantity || 999)
                   : (selectedKit ? kitAvailability(selectedKit) : 999);
                 return (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-7 gap-3 p-4 border rounded-lg">
-                    <div>
-                      <Label>Tipo</Label>
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 hover:bg-muted/20 transition-colors">
+                    <div className="md:col-span-2">
+                      <Label className="text-[10px] font-semibold uppercase text-muted-foreground">Tipo</Label>
                       <select value={item.item_type} onChange={(e) => changeType(index, e.target.value as any)}
-                        className="w-full p-2 border rounded-md">
-                        <option value="product">Produto</option>
-                        <option value="kit">Kit</option>
+                        className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm">
+                        <option value="product">🌸 Produto</option>
+                        <option value="kit">🎁 Kit</option>
                       </select>
                     </div>
-                    <div className="md:col-span-2">
-                      <Label>{item.item_type === 'kit' ? 'Kit' : 'Produto'}</Label>
+                    <div className="md:col-span-4">
+                      <Label className="text-[10px] font-semibold uppercase text-muted-foreground">{item.item_type === 'kit' ? 'Kit' : 'Produto'}</Label>
                       {item.item_type === 'product' ? (
                         <SearchableSelect options={productOptions} value={item.product_id || ''}
-                          onChange={(v) => handleProductChange(index, v)} placeholder="Selecione o produto" />
+                          onChange={(v) => handleProductChange(index, v)} placeholder="Buscar produto..." />
                       ) : (
                         <SearchableSelect options={kitOptions} value={item.kit_id || ''}
-                          onChange={(v) => handleKitChange(index, v)} placeholder="Selecione o kit" />
+                          onChange={(v) => handleKitChange(index, v)} placeholder="Buscar kit..." />
                       )}
                     </div>
-                    <div>
-                      <Label>Quantidade</Label>
+                    <div className="md:col-span-2">
+                      <Label className="text-[10px] font-semibold uppercase text-muted-foreground">Qtd</Label>
                       <Input type="number" min="1" max={maxQty} value={item.quantity}
-                        onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })} required />
+                        onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })} required className="rounded-lg" />
                     </div>
-                    <div>
-                      <Label>Preço Unit.</Label>
+                    <div className="md:col-span-2">
+                      <Label className="text-[10px] font-semibold uppercase text-muted-foreground">Preço</Label>
                       <Input type="number" step="0.01" value={item.unit_price}
-                        onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })} required />
+                        onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })} required className="rounded-lg" />
                     </div>
-                    <div>
-                      <Label>Subtotal</Label>
-                      <Input type="text" value={`R$ ${item.subtotal.toFixed(2)}`} readOnly className="bg-gray-50" />
+                    <div className="md:col-span-1">
+                      <Label className="text-[10px] font-semibold uppercase text-muted-foreground">Total</Label>
+                      <div className="h-10 px-3 flex items-center font-semibold text-primary text-sm rounded-lg bg-accent/50">
+                        {item.subtotal.toFixed(2)}
+                      </div>
                     </div>
-                    <div className="flex items-end">
-                      <Button type="button" variant="outline" size="sm" onClick={() => removeItem(index)}
-                        disabled={items.length === 1} className="w-full">
+                    <div className="md:col-span-1 flex items-end">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}
+                        disabled={items.length === 1} className="w-full h-10 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-lg">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
@@ -220,51 +233,61 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
               })}
             </div>
 
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                <div className="text-xl font-bold text-foreground">
-                  Total da Venda: <span className="text-green-600">R$ {calculateTotal().toFixed(2)}</span>
-                </div>
-                {paymentReceived && partialPaymentAmount && parseFloat(partialPaymentAmount) > 0 && (
-                  <div className="flex flex-col md:flex-row gap-4 text-sm">
-                    <div className="px-3 py-2 bg-green-100 text-green-800 rounded-md">
-                      <span className="font-medium">Valor Pago:</span> R$ {parseFloat(partialPaymentAmount).toFixed(2)}
-                    </div>
-                    <div className="px-3 py-2 bg-amber-100 text-amber-800 rounded-md">
-                      <span className="font-medium">Pendente:</span> R$ {(calculateTotal() - parseFloat(partialPaymentAmount)).toFixed(2)}
-                    </div>
-                  </div>
-                )}
-                {!paymentReceived && (
-                  <div className="px-3 py-2 bg-red-100 text-red-800 rounded-md text-sm">
-                    <span className="font-medium">Pendente:</span> R$ {calculateTotal().toFixed(2)} (sem recebimento)
-                  </div>
-                )}
+            {/* Totais */}
+            <div className="px-5 py-4 bg-gradient-to-r from-accent/40 to-transparent border-t border-border/60">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm text-muted-foreground">Subtotal</span>
+                <span className="text-sm font-medium">R$ {calculateTotal().toFixed(2)}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-base font-semibold">Total</span>
+                <span className="text-2xl font-bold text-primary">R$ {calculateTotal().toFixed(2)}</span>
+              </div>
+              {paymentReceived && partialPaymentAmount && parseFloat(partialPaymentAmount) > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3 text-xs">
+                  <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">
+                    Pago: R$ {parseFloat(partialPaymentAmount).toFixed(2)}
+                  </span>
+                  <span className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-full font-medium">
+                    Pendente: R$ {(calculateTotal() - parseFloat(partialPaymentAmount)).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {!paymentReceived && (
+                <div className="mt-3">
+                  <span className="px-3 py-1.5 bg-rose-100 text-rose-700 rounded-full text-xs font-medium">
+                    Pendente: R$ {calculateTotal().toFixed(2)} (sem recebimento)
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mb-4">
-            <div className="flex items-center space-x-2">
+          {/* Pagamento */}
+          <div className="rounded-2xl border border-border/60 p-5 bg-card space-y-4">
+            <h3 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">Recebimento</h3>
+            <div className="flex items-center gap-3">
               <input id="payment_received_multi" type="checkbox" checked={paymentReceived}
                 onChange={(e) => setPaymentReceived(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
-              <Label htmlFor="payment_received_multi" className="text-sm font-medium cursor-pointer">
-                Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
+                className="h-4 w-4 rounded border-input text-primary focus:ring-primary" />
+              <Label htmlFor="payment_received_multi" className="text-sm cursor-pointer">
+                Recebimento confirmado <span className="text-muted-foreground">(desmarque apenas para dar baixa no estoque)</span>
               </Label>
             </div>
             {paymentReceived && (
-              <div className="mt-4">
-                <Label>Valor pago parcialmente (deixe em branco para pagamento total)</Label>
+              <div>
+                <Label className="text-xs text-muted-foreground">Valor pago parcialmente (deixe em branco para pagamento total)</Label>
                 <Input type="number" step="0.01" value={partialPaymentAmount}
-                  onChange={(e) => setPartialPaymentAmount(e.target.value)} placeholder="Valor pago" />
+                  onChange={(e) => setPartialPaymentAmount(e.target.value)} placeholder="Valor pago" className="rounded-lg max-w-xs" />
               </div>
             )}
           </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-            <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600" disabled={!isFormValid()}>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onCancel} className="rounded-lg">Cancelar</Button>
+            <Button type="submit" disabled={!isFormValid()}
+              className="rounded-lg text-white shadow-md hover:shadow-lg transition-shadow"
+              style={{ background: 'var(--gradient-primary)' }}>
               Registrar Venda
             </Button>
           </div>
