@@ -293,6 +293,29 @@ const CustomersPage = () => {
                   placeholder="cliente@email.com"
                 />
               </div>
+              <div className="md:col-span-2">
+                <Label>Aniversário (opcional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    placeholder="Dia"
+                    value={formData.birthday_day}
+                    onChange={(e) => setFormData({ ...formData, birthday_day: e.target.value })}
+                    className="w-24"
+                  />
+                  <Input
+                    type="number"
+                    min={1}
+                    max={12}
+                    placeholder="Mês"
+                    value={formData.birthday_month}
+                    onChange={(e) => setFormData({ ...formData, birthday_month: e.target.value })}
+                    className="w-24"
+                  />
+                </div>
+              </div>
               <div className="md:col-span-2 flex space-x-2">
                 <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600">
                   {editingCustomer ? 'Atualizar' : 'Cadastrar'}
