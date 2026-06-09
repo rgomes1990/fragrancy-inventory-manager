@@ -193,10 +193,14 @@ const CustomersPage = () => {
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
+    const bday = (customer as any).birthday as string | null | undefined;
+    const [bd = '', bm = ''] = bday ? bday.split('/') : [];
     setFormData({
       name: customer.name,
       whatsapp: customer.whatsapp || '',
       email: customer.email || '',
+      birthday_day: bd,
+      birthday_month: bm,
     });
     setShowForm(true);
   };
