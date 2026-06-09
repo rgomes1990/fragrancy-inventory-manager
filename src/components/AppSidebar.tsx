@@ -128,9 +128,8 @@ const AppSidebar: React.FC<AppSidebarProps> = () => {
           </div>
           <div className="leading-tight">
             <div className="text-[17px] font-serif font-semibold" style={{ color: 'hsl(var(--brand-gold))' }}>
-              Essenza
+              Sistema de Perfumes
             </div>
-            <div className="text-xs text-muted-foreground -mt-0.5">Perfumaria</div>
           </div>
         </div>
 
