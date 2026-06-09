@@ -368,6 +368,27 @@ const SalesPage = () => {
         description: "Venda registrada com sucesso!",
       });
 
+      // Build success summary
+      const customer = customers.find(c => c.id === saleData.customer_id);
+      const summaryItems = saleData.items.map(it => {
+        if (it.item_type === 'kit') {
+          const k = kits.find(x => x.id === it.kit_id);
+          return { name: k?.name || 'Kit', quantity: it.quantity, subtotal: it.subtotal, isKit: true };
+        }
+        const p = products.find(x => x.id === it.product_id);
+        return { name: p?.name || 'Produto', quantity: it.quantity, subtotal: it.subtotal, isKit: false };
+      });
+      setSuccessData({
+        customerName: customer?.name || '',
+        customerWhatsapp: (customer as any)?.whatsapp || null,
+        items: summaryItems,
+        total: totalAllItems,
+        paymentType: saleData.payment_type,
+        paymentAmount: saleData.partial_payment_amount && saleData.partial_payment_amount > 0
+          ? saleData.partial_payment_amount
+          : (saleData.payment_received ? totalAllItems : null),
+      });
+
       setShowMultiForm(false);
       setInitialKitId(null);
       fetchData();
