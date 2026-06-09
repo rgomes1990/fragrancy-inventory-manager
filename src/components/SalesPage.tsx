@@ -13,6 +13,7 @@ import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 import SalesMultiProductForm from './SalesMultiProductForm';
 import SearchableSelect from './SearchableSelect';
+import SaleSuccessDialog, { SaleSuccessData } from './SaleSuccessDialog';
 
 const SalesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
