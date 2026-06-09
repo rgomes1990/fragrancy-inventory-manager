@@ -13,6 +13,7 @@ import CategoriesPage from '@/components/CategoriesPage';
 import CustomersPage from '@/components/CustomersPage';
 import SalesPage from '@/components/SalesPage';
 import SellersPage from '@/components/SellersPage';
+import SuppliersPage from '@/components/SuppliersPage';
 import ExpensesPage from '@/components/ExpensesPage';
 import ProfitReportPage from '@/components/ProfitReportPage';
 import AuditLogPage from '@/components/AuditLogPage';
@@ -53,6 +54,7 @@ const App = () => {
                         <Route path="/customers" element={<CustomersPage />} />
                         <Route path="/sales" element={<SalesPage />} />
                         <Route path="/sellers" element={<SellersPage />} />
+                        <Route path="/suppliers" element={<SuppliersPage />} />
                         <Route path="/product-order-requests" element={<ProductOrderRequestsPage />} />
                         <Route path="/expenses" element={<ExpensesPage />} />
                         <Route path="/users" element={<UsersPage />} />
