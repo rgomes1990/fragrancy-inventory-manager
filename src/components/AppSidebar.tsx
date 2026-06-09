@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import logoImg from '@/assets/logo.png';
 import {
   Home,
   Package,
@@ -15,7 +16,6 @@ import {
   UserCheck,
   FileBarChart,
   Truck,
-  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
