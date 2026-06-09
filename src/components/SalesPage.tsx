@@ -53,6 +53,11 @@ const SalesPage = () => {
     if (customerParam) {
       setSelectedCustomerId(customerParam);
     }
+    const newKitParam = searchParams.get('newKit');
+    if (newKitParam) {
+      setInitialKitId(newKitParam);
+      setShowMultiForm(true);
+    }
   }, [searchParams]);
   
   const [formData, setFormData] = useState({
