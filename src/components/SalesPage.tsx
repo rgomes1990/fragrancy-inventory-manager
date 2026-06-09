@@ -268,7 +268,9 @@ const SalesPage = () => {
   const handleMultiProductSubmit = async (saleData: {
     customer_id: string;
     items: Array<{
-      product_id: string;
+      item_type: 'product' | 'kit';
+      product_id: string | null;
+      kit_id: string | null;
       quantity: number;
       unit_price: number;
       subtotal: number;
@@ -279,56 +281,55 @@ const SalesPage = () => {
     partial_payment_amount: number | null;
     payment_type: string | null;
   }) => {
-    // CRÍTICO: Usuário não-admin PRECISA ter tenantId para salvar vendas
     const tenantIdToUse = getTenantIdForInsert();
     if (!isAdmin && !tenantIdToUse) {
-      toast({
-        title: "Erro",
-        description: "Empresa não identificada. Por favor, faça login novamente.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Empresa não identificada. Por favor, faça login novamente.", variant: "destructive" });
       return;
     }
     try {
+      // Compute total decrement required per product (combining direct + kit components)
+      const productDecrement: Record<string, number> = {};
       for (const item of saleData.items) {
-        const product = products.find(p => p.id === item.product_id);
-        if (!product) {
-          toast({
-            title: "Erro",
-            description: `Produto não encontrado.`,
-            variant: "destructive",
-          });
+        if (item.item_type === 'product' && item.product_id) {
+          productDecrement[item.product_id] = (productDecrement[item.product_id] || 0) + item.quantity;
+        } else if (item.item_type === 'kit' && item.kit_id) {
+          const kit = kits.find(k => k.id === item.kit_id);
+          if (!kit || !kit.kit_items) {
+            toast({ title: "Erro", description: "Kit não encontrado.", variant: "destructive" });
+            return;
+          }
+          for (const ki of kit.kit_items) {
+            productDecrement[ki.product_id] = (productDecrement[ki.product_id] || 0) + (ki.quantity * item.quantity);
+          }
+        }
+      }
+
+      // Validate stock
+      for (const [pid, qty] of Object.entries(productDecrement)) {
+        const p = products.find(x => x.id === pid);
+        if (!p) {
+          toast({ title: "Erro", description: "Produto não encontrado.", variant: "destructive" });
           return;
         }
-        
-        if (item.quantity > product.quantity) {
-          toast({
-            title: "Erro",
-            description: `Quantidade insuficiente em estoque para ${product.name}.`,
-            variant: "destructive",
-          });
+        if (qty > p.quantity) {
+          toast({ title: "Erro", description: `Quantidade insuficiente em estoque para ${p.name}.`, variant: "destructive" });
           return;
         }
       }
 
-      // Obter cliente com header do usuário atual
       const supabaseClient = supabaseWithUser();
-      
-      // Gerar um sale_group_id compartilhado para agrupar itens da mesma venda múltipla
       const groupId = saleData.items.length > 1 ? crypto.randomUUID() : null;
-      
-      // Calcular o total de todos os itens para distribuir o pagamento parcial proporcionalmente
       const totalAllItems = saleData.items.reduce((sum, item) => sum + item.subtotal, 0);
-      
+
       for (const item of saleData.items) {
-        // Se houver pagamento parcial, calcular proporcionalmente para cada item
-        const itemPartialPayment = saleData.partial_payment_amount 
+        const itemPartialPayment = saleData.partial_payment_amount
           ? (item.subtotal / totalAllItems) * saleData.partial_payment_amount
           : null;
-        
+
         const saleRecord: any = {
           customer_id: saleData.customer_id,
-          product_id: item.product_id,
+          product_id: item.item_type === 'product' ? item.product_id : null,
+          kit_id: item.item_type === 'kit' ? item.kit_id : null,
           quantity: item.quantity,
           unit_price: item.unit_price,
           total_price: item.subtotal,
@@ -341,43 +342,21 @@ const SalesPage = () => {
           sale_group_id: groupId,
         };
 
-        const { error: saleError } = await supabaseClient
-          .from('sales')
-          .insert([saleRecord]);
-
+        const { error: saleError } = await supabaseClient.from('sales').insert([saleRecord]);
         if (saleError) throw saleError;
-
-        const product = products.find(p => p.id === item.product_id);
-        if (product) {
-          const newQuantity = product.quantity - item.quantity;
-          const updateData: any = { quantity: newQuantity };
-
-          console.log(`[MULTI-VENDA] Atualizando estoque do produto ${product.name}:`, {
-            estoqueAnterior: product.quantity,
-            quantidadeVendida: item.quantity,
-            novoEstoque: newQuantity,
-            productId: item.product_id
-          });
-
-          if (item.unit_price !== product.sale_price) {
-            updateData.sale_price = item.unit_price;
-          }
-
-          const { error: updateError } = await supabaseClient
-            .from('products')
-            .update(updateData)
-            .eq('id', item.product_id);
-
-          if (updateError) {
-            console.error('[MULTI-VENDA] Erro ao atualizar estoque:', updateError);
-            throw updateError;
-          }
-
-          console.log(`[MULTI-VENDA] Estoque atualizado com sucesso para ${product.name}`);
-        } else {
-          console.error('[MULTI-VENDA] Produto não encontrado para ID:', item.product_id);
-        }
       }
+
+      // Apply stock decrements
+      for (const [pid, qty] of Object.entries(productDecrement)) {
+        const p = products.find(x => x.id === pid);
+        if (!p) continue;
+        const { error: updateError } = await supabaseClient
+          .from('products')
+          .update({ quantity: p.quantity - qty })
+          .eq('id', pid);
+        if (updateError) throw updateError;
+      }
+
 
       toast({
         title: "Sucesso",
