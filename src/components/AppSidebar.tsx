@@ -16,6 +16,7 @@ import {
   UserCheck,
   FileBarChart,
   Truck,
+  Wallet,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -49,6 +50,7 @@ const PRINCIPAL: MenuItem[] = [
   { title: 'Produtos', url: '/products', page: 'products', icon: Package, tone: 'bg-amber-100 text-amber-600' },
   { title: 'Categorias', url: '/categories', page: 'categories', icon: ClipboardList, tone: 'bg-sky-100 text-sky-600' },
   { title: 'Vendas (PDV)', url: '/sales', page: 'sales', icon: ShoppingCart, tone: 'bg-violet-100 text-violet-600' },
+  { title: 'A Receber', url: '/receivables', page: 'receivables', icon: Wallet, tone: 'bg-emerald-100 text-emerald-600' },
 ];
 
 const GESTAO: MenuItem[] = [
