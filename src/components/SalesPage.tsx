@@ -38,6 +38,9 @@ const SalesPage = () => {
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [filteredTotal, setFilteredTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [successData, setSuccessData] = useState<SaleSuccessData | null>(null);
+  
+
   
 
   // Ler parâmetros da URL na inicialização
