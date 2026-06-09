@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +14,8 @@ import {
   Building2,
   UserCheck,
   FileBarChart,
-  Truck
+  Truck,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -34,55 +34,109 @@ interface AppSidebarProps {
   onPageChange?: (page: string) => void;
 }
 
-const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) => {
+type MenuItem = {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  page: string;
+  adminOnly?: boolean;
+  /** tailwind classes for icon tile background + icon color */
+  tone: string;
+};
+
+const PRINCIPAL: MenuItem[] = [
+  { title: 'Dashboard', url: '/', page: '', icon: Home, tone: 'bg-indigo-100 text-indigo-600' },
+  { title: 'Produtos', url: '/products', page: 'products', icon: Package, tone: 'bg-amber-100 text-amber-600' },
+  { title: 'Categorias', url: '/categories', page: 'categories', icon: ClipboardList, tone: 'bg-sky-100 text-sky-600' },
+  { title: 'Vendas (PDV)', url: '/sales', page: 'sales', icon: ShoppingCart, tone: 'bg-violet-100 text-violet-600' },
+];
+
+const GESTAO: MenuItem[] = [
+  { title: 'Clientes', url: '/customers', page: 'customers', icon: Users, tone: 'bg-rose-100 text-rose-600' },
+  { title: 'Vendedores', url: '/sellers', page: 'sellers', icon: UserCheck, tone: 'bg-emerald-100 text-emerald-600' },
+  { title: 'Fornecedores', url: '/suppliers', page: 'suppliers', icon: Truck, tone: 'bg-orange-100 text-orange-600' },
+  { title: 'Despesas', url: '/expenses', page: 'expenses', icon: Receipt, tone: 'bg-pink-100 text-pink-600' },
+];
+
+const OUTROS: MenuItem[] = [
+  { title: 'Relatório de Custos', url: '/sales-cost-report', page: 'sales-cost-report', icon: FileBarChart, tone: 'bg-teal-100 text-teal-600' },
+  { title: 'Empresas', url: '/tenants', page: 'tenants', icon: Building2, adminOnly: true, tone: 'bg-slate-100 text-slate-600' },
+  { title: 'Usuários', url: '/users', page: 'users', icon: UserCog, adminOnly: true, tone: 'bg-fuchsia-100 text-fuchsia-600' },
+  { title: 'Auditoria', url: '/audit-log', page: 'audit-log', icon: Shield, adminOnly: true, tone: 'bg-yellow-100 text-yellow-700' },
+];
+
+const AppSidebar: React.FC<AppSidebarProps> = () => {
   const location = useLocation();
   const { isAdmin } = useAuth();
   const isMobile = useIsMobile();
   const { setOpenMobile } = useSidebar();
-
-  const menuItems = [
-    { title: 'Dashboard', url: '/', icon: Home, page: '', adminOnly: false },
-    { title: 'Produtos', url: '/products', icon: Package, page: 'products', adminOnly: false },
-    { title: 'Categorias', url: '/categories', icon: ClipboardList, page: 'categories', adminOnly: false },
-    { title: 'Clientes', url: '/customers', icon: Users, page: 'customers', adminOnly: false },
-    { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales', adminOnly: false },
-    { title: 'Vendedores', url: '/sellers', icon: UserCheck, page: 'sellers', adminOnly: false },
-    { title: 'Fornecedores', url: '/suppliers', icon: Truck, page: 'suppliers', adminOnly: false },
-    { title: 'Despesas', url: '/expenses', icon: Receipt, page: 'expenses', adminOnly: false },
-    { title: 'Relatório de Custos', url: '/sales-cost-report', icon: FileBarChart, page: 'sales-cost-report', adminOnly: false },
-    { title: 'Empresas', url: '/tenants', icon: Building2, page: 'tenants', adminOnly: true },
-    { title: 'Usuários', url: '/users', icon: UserCog, page: 'users', adminOnly: true },
-    { title: 'Auditoria', url: '/audit-log', icon: Shield, page: 'audit-log', adminOnly: true },
-  ];
-
-  // Filtrar itens baseado no tipo de usuário
-  const visibleMenuItems = menuItems.filter(item => !item.adminOnly || isAdmin);
 
   const isActive = (page: string) => {
     if (page === '') return location.pathname === '/';
     return location.pathname.includes(page);
   };
 
-  return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Sistema de Perfumes</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleMenuItems.map((item) => (
+  const filter = (items: MenuItem[]) => items.filter(i => !i.adminOnly || isAdmin);
+
+  const renderGroup = (label: string, items: MenuItem[]) => {
+    const visible = filter(items);
+    if (visible.length === 0) return null;
+    return (
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-[11px] font-semibold tracking-[0.14em] text-muted-foreground/70 px-3 mt-2">
+          {label}
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {visible.map((item) => {
+              const active = isActive(item.page);
+              return (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.page)}>
-                    <Link to={item.url} onClick={() => { if (isMobile) setOpenMobile(false); }}>
-                      <item.icon />
-                      <span>{item.title}</span>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={active}
+                    className={`h-11 rounded-xl my-0.5 transition-all ${
+                      active
+                        ? 'bg-accent text-accent-foreground font-semibold shadow-sm'
+                        : 'hover:bg-muted/70'
+                    }`}
+                  >
+                    <Link to={item.url} onClick={() => { if (isMobile) setOpenMobile(false); }} className="flex items-center gap-3 px-2">
+                      <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.tone}`}>
+                        <item.icon className="w-[18px] h-[18px]" />
+                      </span>
+                      <span className="text-[14px]">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  };
+
+  return (
+    <Sidebar className="border-r border-sidebar-border">
+      <SidebarContent className="px-2">
+        {/* Brand */}
+        <div className="flex items-center gap-3 px-3 pt-5 pb-4">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white shadow-md"
+               style={{ background: 'var(--gradient-primary)' }}>
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div className="leading-tight">
+            <div className="text-[17px] font-serif font-semibold" style={{ color: 'hsl(var(--brand-gold))' }}>
+              Essenza
+            </div>
+            <div className="text-xs text-muted-foreground -mt-0.5">Perfumaria</div>
+          </div>
+        </div>
+
+        {renderGroup('PRINCIPAL', PRINCIPAL)}
+        {renderGroup('GESTÃO', GESTAO)}
+        {renderGroup('OUTROS', OUTROS)}
       </SidebarContent>
     </Sidebar>
   );
