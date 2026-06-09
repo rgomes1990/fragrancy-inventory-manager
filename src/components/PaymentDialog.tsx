@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Trash2, Pencil, Check, X } from 'lucide-react';
+import SaleSuccessDialog, { SaleSuccessData } from './SaleSuccessDialog';
 
 export interface PaymentDialogProps {
   open: boolean;
@@ -26,6 +28,7 @@ const formatBRL = (v: number) =>
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   open, onClose, saleGroupId, tenantId, total, paid, customerName, onSaved,
 }) => {
+  const navigate = useNavigate();
   const remaining = Math.max(total - paid, 0);
   const [amount, setAmount] = useState('');
   const [paymentType, setPaymentType] = useState('Pix');
@@ -33,6 +36,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [successData, setSuccessData] = useState<SaleSuccessData | null>(null);
 
   const loadHistory = async () => {
     const { data } = await (supabase as any)
@@ -54,6 +58,53 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, saleGroupId]);
 
+  const buildAndShowSuccess = async (paidNow: number, payType: string, newPaidTotal: number) => {
+    try {
+      // Busca itens da venda (sale_group_id ou id quando venda simples)
+      const { data: salesItems } = await supabase
+        .from('sales')
+        .select('quantity, total_price, customer_id, products(name), kits(name)')
+        .or(`sale_group_id.eq.${saleGroupId},id.eq.${saleGroupId}`);
+
+      const items = (salesItems || []).map((s: any) => ({
+        name: s.kits?.name || s.products?.name || 'Item',
+        quantity: s.quantity,
+        subtotal: Number(s.total_price),
+        isKit: !!s.kits,
+      }));
+
+      const customerId = (salesItems?.[0] as any)?.customer_id;
+      let whatsapp: string | null = null;
+      let cName = customerName || '';
+      if (customerId) {
+        const { data: c } = await supabase
+          .from('customers')
+          .select('name, whatsapp')
+          .eq('id', customerId)
+          .maybeSingle();
+        if (c) {
+          whatsapp = (c as any).whatsapp || null;
+          if (!cName) cName = (c as any).name;
+        }
+      }
+
+      const remainingAfter = Math.max(total - newPaidTotal, 0);
+      setSuccessData({
+        customerName: cName,
+        customerWhatsapp: whatsapp,
+        items,
+        total,
+        paymentType: payType,
+        paidNow,
+        paidToDate: newPaidTotal,
+        remaining: remainingAfter,
+        isFullyPaid: remainingAfter <= 0.001,
+      });
+    } catch (e) {
+      console.error('Erro ao montar resumo:', e);
+    }
+  };
+
   const handleSave = async () => {
     const value = parseFloat(amount.replace(',', '.'));
     if (!value || value <= 0) {
@@ -73,16 +124,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       }]);
       if (error) throw error;
       toast({ title: 'Pagamento registrado!', description: formatBRL(value) });
+      const newPaid = currentPaid + value;
       await loadHistory();
       onSaved?.();
-      // se quitou, fecha
-      const newPaid = paid + value;
-      if (newPaid >= total) {
-        onClose();
-      } else {
-        setAmount('');
-        setNotes('');
-      }
+      // Sempre mostra o popup de resumo (parcial ou final)
+      await buildAndShowSuccess(value, paymentType, newPaid);
     } catch (e: any) {
       console.error(e);
       toast({ title: 'Erro', description: e.message || 'Falha ao salvar.', variant: 'destructive' });
@@ -90,6 +136,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setSaving(false);
     }
   };
+
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este recebimento?')) return;
@@ -109,75 +156,96 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const currentRemaining = Math.max(total - currentPaid, 0);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Registrar Pagamento</DialogTitle>
-          {customerName && <p className="text-sm text-muted-foreground">{customerName}</p>}
-        </DialogHeader>
+    <>
+      <Dialog open={open && !successData} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+            {customerName && <p className="text-sm text-muted-foreground">{customerName}</p>}
+          </DialogHeader>
 
-        <div className="grid grid-cols-3 gap-2 text-center bg-muted/40 rounded-lg p-3 mb-2">
-          <div>
-            <div className="text-xs text-muted-foreground">Total</div>
-            <div className="font-semibold">{formatBRL(total)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Pago</div>
-            <div className="font-semibold text-emerald-600">{formatBRL(currentPaid)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Falta</div>
-            <div className="font-semibold text-rose-600">{formatBRL(currentRemaining)}</div>
-          </div>
-        </div>
-
-        {currentRemaining > 0 && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Valor recebido *</Label>
-                <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-              <div>
-                <Label>Forma de pagamento</Label>
-                <select className="w-full h-10 px-3 border rounded-md bg-background"
-                  value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
-                  {PAYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label>Data</Label>
-                <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
-              </div>
-              <div>
-                <Label>Observação</Label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="opcional" />
-              </div>
+          <div className="grid grid-cols-3 gap-2 text-center bg-muted/40 rounded-lg p-3 mb-2">
+            <div>
+              <div className="text-xs text-muted-foreground">Total</div>
+              <div className="font-semibold">{formatBRL(total)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Pago</div>
+              <div className="font-semibold text-emerald-600">{formatBRL(currentPaid)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Falta</div>
+              <div className="font-semibold text-rose-600">{formatBRL(currentRemaining)}</div>
             </div>
           </div>
-        )}
 
-        {history.length > 0 && (
-          <div className="mt-4">
-            <div className="text-sm font-semibold mb-2">Histórico de recebimentos</div>
-            <div className="max-h-56 overflow-y-auto space-y-1">
-              {history.map((h) => (
-                <HistoryRow key={h.id} item={h} onDelete={handleDelete} onUpdated={loadHistory} onSavedExternal={onSaved} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
           {currentRemaining > 0 && (
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando...' : 'Registrar Pagamento'}
-            </Button>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Valor recebido *</Label>
+                  <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Forma de pagamento</Label>
+                  <select className="w-full h-10 px-3 border rounded-md bg-background"
+                    value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
+                    {PAYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Data</Label>
+                  <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Observação</Label>
+                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="opcional" />
+                </div>
+              </div>
+            </div>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          {history.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm font-semibold mb-2">Histórico de recebimentos</div>
+              <div className="max-h-56 overflow-y-auto space-y-1">
+                {history.map((h) => (
+                  <HistoryRow key={h.id} item={h} onDelete={handleDelete} onUpdated={loadHistory} onSavedExternal={onSaved} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            {currentRemaining > 0 && (
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Salvando...' : 'Registrar Pagamento'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <SaleSuccessDialog
+        open={!!successData}
+        data={successData}
+        onClose={() => {
+          setSuccessData(null);
+          if (successData?.isFullyPaid) onClose();
+          else {
+            // reseta o formulário, mantém modal de pagamento aberto para próximo recebimento
+            setAmount('');
+            setNotes('');
+          }
+        }}
+        onNewSale={() => {
+          setSuccessData(null);
+          onClose();
+          navigate('/sales');
+        }}
+      />
+    </>
   );
 };
 
