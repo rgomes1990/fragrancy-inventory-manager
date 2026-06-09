@@ -1016,7 +1016,9 @@ const SalesPage = () => {
                       {sale.customers?.name || 'Cliente não encontrado'}
                     </TableCell>
                     <TableCell>
-                      {sale.products?.name || 'Produto não encontrado'}
+                      {(sale as any).kits?.name
+                        ? <span>🎁 {(sale as any).kits.name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
+                        : (sale.products?.name || 'Produto não encontrado')}
                     </TableCell>
                     <TableCell>{sale.quantity}</TableCell>
                     <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
