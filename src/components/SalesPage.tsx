@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Sale, Product, Customer } from '@/types/database';
+import { Sale, Product, Customer, Kit } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 import SalesMultiProductForm from './SalesMultiProductForm';
