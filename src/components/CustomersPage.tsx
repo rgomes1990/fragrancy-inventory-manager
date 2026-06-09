@@ -29,6 +29,8 @@ const CustomersPage = () => {
     name: '',
     whatsapp: '',
     email: '',
+    birthday_day: '',
+    birthday_month: '',
   });
 
   useEffect(() => {
@@ -129,10 +131,15 @@ const CustomersPage = () => {
     e.preventDefault();
     
     try {
+      const birthday =
+        formData.birthday_day && formData.birthday_month
+          ? `${formData.birthday_day.padStart(2, '0')}/${formData.birthday_month.padStart(2, '0')}`
+          : null;
       const customerData: any = {
         name: formData.name,
         whatsapp: formData.whatsapp || null,
         email: formData.email || null,
+        birthday,
       };
 
       // Adicionar tenant_id para novos registros - com validação
@@ -186,10 +193,14 @@ const CustomersPage = () => {
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
+    const bday = (customer as any).birthday as string | null | undefined;
+    const [bd = '', bm = ''] = bday ? bday.split('/') : [];
     setFormData({
       name: customer.name,
       whatsapp: customer.whatsapp || '',
       email: customer.email || '',
+      birthday_day: bd,
+      birthday_month: bm,
     });
     setShowForm(true);
   };
@@ -225,6 +236,8 @@ const CustomersPage = () => {
       name: '',
       whatsapp: '',
       email: '',
+      birthday_day: '',
+      birthday_month: '',
     });
     setEditingCustomer(null);
     setShowForm(false);
@@ -279,6 +292,29 @@ const CustomersPage = () => {
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   placeholder="cliente@email.com"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <Label>Aniversário (opcional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    placeholder="Dia"
+                    value={formData.birthday_day}
+                    onChange={(e) => setFormData({ ...formData, birthday_day: e.target.value })}
+                    className="w-24"
+                  />
+                  <Input
+                    type="number"
+                    min={1}
+                    max={12}
+                    placeholder="Mês"
+                    value={formData.birthday_month}
+                    onChange={(e) => setFormData({ ...formData, birthday_month: e.target.value })}
+                    className="w-24"
+                  />
+                </div>
               </div>
               <div className="md:col-span-2 flex space-x-2">
                 <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600">

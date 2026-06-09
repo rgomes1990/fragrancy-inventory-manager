@@ -127,6 +127,7 @@ export type Database = {
       }
       customers: {
         Row: {
+          birthday: string | null
           created_at: string | null
           email: string | null
           id: string
@@ -136,6 +137,7 @@ export type Database = {
           whatsapp: string | null
         }
         Insert: {
+          birthday?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -145,6 +147,7 @@ export type Database = {
           whatsapp?: string | null
         }
         Update: {
+          birthday?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
