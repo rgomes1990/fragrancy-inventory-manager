@@ -868,7 +868,6 @@ const ProductsPage = () => {
           </Table>
         </CardContent>
       </Card>
-      </div>
       </TabsContent>
       <TabsContent value="kits">
         <KitsPage />
