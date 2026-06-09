@@ -27,7 +27,7 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen flex w-full bg-gray-50">
+      <div className="min-h-screen flex w-full bg-background">
         <AppSidebar currentPage={currentPage} onPageChange={onPageChange} />
         
         <div className="flex-1 flex flex-col min-w-0">
