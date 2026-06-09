@@ -512,7 +512,12 @@ const ProductsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="products" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="products">Produtos</TabsTrigger>
+        <TabsTrigger value="kits">Kits</TabsTrigger>
+      </TabsList>
+      <TabsContent value="products" className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-foreground min-w-0">Produtos</h1>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
