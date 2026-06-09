@@ -538,11 +538,28 @@ const SalesPage = () => {
           description: "Venda atualizada com sucesso!",
         });
       } else {
-        const { error: saleError } = await supabaseClient
+        const { data: insertedSale, error: saleError } = await supabaseClient
           .from('sales')
-          .insert([saleData]);
+          .insert([saleData])
+          .select('id')
+          .single();
 
         if (saleError) throw saleError;
+
+        // Registrar pagamento inicial (venda simples)
+        const initialPaid = partialAmount && partialAmount > 0
+          ? partialAmount
+          : (formData.payment_received ? total_price : 0);
+        if (initialPaid > 0 && insertedSale) {
+          await (supabaseClient as any).from('sale_payments').insert([{
+            sale_group_id: (insertedSale as any).id,
+            tenant_id: saleData.tenant_id,
+            amount: initialPaid,
+            payment_type: formData.payment_type || null,
+            payment_date: formData.sale_date + 'T12:00:00.000Z',
+            notes: 'Recebimento no ato da venda',
+          }]);
+        }
 
         const newQuantity = product.quantity - quantity;
         const updateData: any = { quantity: newQuantity };
