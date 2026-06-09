@@ -24,6 +24,7 @@ import LoginForm from '@/components/LoginForm';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
 import SalesCostReport from '@/components/SalesCostReport';
+import ReceivablesPage from '@/components/ReceivablesPage';
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,7 @@ const App = () => {
                         <Route path="/tenants" element={<TenantsPage />} />
                         <Route path="/profit-report" element={<ProfitReportPage />} />
                         <Route path="/sales-cost-report" element={<SalesCostReport />} />
+                        <Route path="/receivables" element={<ReceivablesPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
