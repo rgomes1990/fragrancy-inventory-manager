@@ -131,10 +131,15 @@ const CustomersPage = () => {
     e.preventDefault();
     
     try {
+      const birthday =
+        formData.birthday_day && formData.birthday_month
+          ? `${formData.birthday_day.padStart(2, '0')}/${formData.birthday_month.padStart(2, '0')}`
+          : null;
       const customerData: any = {
         name: formData.name,
         whatsapp: formData.whatsapp || null,
         email: formData.email || null,
+        birthday,
       };
 
       // Adicionar tenant_id para novos registros - com validação
