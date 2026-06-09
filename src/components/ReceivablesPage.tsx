@@ -62,16 +62,24 @@ const ReceivablesPage: React.FC = () => {
 
   useEffect(() => { fetchData(); /* eslint-disable-next-line */ }, [tenantId, isAdmin]);
 
+  const OVERDUE_DAYS = 7;
+  const daysSince = (date: string) => Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+  const isOverdue = (r: Row) => daysSince(r.sale_date) > OVERDUE_DAYS;
+
   const filtered = useMemo(() => rows.filter(r => {
-    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (statusFilter === 'vencidos') {
+      if (!isOverdue(r)) return false;
+    } else if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     if (search && !(r.customer_name || '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }), [rows, statusFilter, search]);
 
   const totals = useMemo(() => {
     const totalReceber = filtered.reduce((s, r) => s + r.remaining, 0);
-    return { totalReceber, qtde: filtered.length };
-  }, [filtered]);
+    const overdueRows = rows.filter(isOverdue);
+    const overdueTotal = overdueRows.reduce((s, r) => s + r.remaining, 0);
+    return { totalReceber, qtde: filtered.length, overdueQtde: overdueRows.length, overdueTotal };
+  }, [filtered, rows]);
 
   return (
     <div className="space-y-4">
@@ -83,6 +91,19 @@ const ReceivablesPage: React.FC = () => {
           <p className="text-sm text-muted-foreground">Pedidos com pagamento pendente ou parcial</p>
         </div>
       </div>
+
+      {totals.overdueQtde > 0 && (
+        <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold text-rose-700">{totals.overdueQtde} pedido(s) vencido(s)</span>
+            <span className="text-rose-600"> — mais de {OVERDUE_DAYS} dias em aberto, totalizando {formatBRL(totals.overdueTotal)}.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setStatusFilter('vencidos')}>
+            Ver vencidos
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card>
@@ -99,13 +120,15 @@ const ReceivablesPage: React.FC = () => {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-emerald-500" />
-            <div className="text-sm text-muted-foreground">
-              Registre recebimentos parciais até quitar o pedido.
+            <AlertTriangle className="w-7 h-7 text-rose-500" />
+            <div>
+              <div className="text-xs text-muted-foreground">Vencidos (&gt;{OVERDUE_DAYS}d)</div>
+              <div className="text-xl font-bold text-rose-600">{totals.overdueQtde}</div>
             </div>
           </CardContent>
         </Card>
       </div>
+
 
       <Card>
         <CardHeader className="pb-3">
@@ -114,10 +137,10 @@ const ReceivablesPage: React.FC = () => {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="Buscar cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
-            <div className="flex gap-1">
-              {(['all','pendente','parcial'] as const).map(s => (
+            <div className="flex gap-1 flex-wrap">
+              {(['all','pendente','parcial','vencidos'] as const).map(s => (
                 <Button key={s} size="sm" variant={statusFilter === s ? 'default' : 'outline'} onClick={() => setStatusFilter(s)}>
-                  {s === 'all' ? 'Todos' : s === 'pendente' ? 'Pendentes' : 'Parciais'}
+                  {s === 'all' ? 'Todos' : s === 'pendente' ? 'Pendentes' : s === 'parcial' ? 'Parciais' : 'Vencidos'}
                 </Button>
               ))}
             </div>
@@ -143,28 +166,37 @@ const ReceivablesPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(r => (
-                  <TableRow key={r.sale_group_id}>
-                    <TableCell className="font-medium">{r.customer_name}</TableCell>
-                    <TableCell>{new Date(r.sale_date).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell>{r.seller || '—'}</TableCell>
-                    <TableCell className="text-right">{formatBRL(r.total)}</TableCell>
-                    <TableCell className="text-right text-emerald-600">{formatBRL(r.paid)}</TableCell>
-                    <TableCell className="text-right text-rose-600 font-semibold">{formatBRL(r.remaining)}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        r.status === 'parcial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                      }`}>
-                        {r.status === 'parcial' ? 'Parcial' : 'Pendente'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" onClick={() => setSelected(r)}>
-                        Receber
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filtered.map(r => {
+                  const overdue = isOverdue(r);
+                  const days = daysSince(r.sale_date);
+                  return (
+                    <TableRow key={r.sale_group_id} className={overdue ? 'bg-rose-50/40' : ''}>
+                      <TableCell className="font-medium">
+                        {r.customer_name}
+                        {overdue && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">
+                            <AlertTriangle className="w-3 h-3" /> {days}d
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>{new Date(r.sale_date).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell>{r.seller || '—'}</TableCell>
+                      <TableCell className="text-right">{formatBRL(r.total)}</TableCell>
+                      <TableCell className="text-right text-emerald-600">{formatBRL(r.paid)}</TableCell>
+                      <TableCell className="text-right text-rose-600 font-semibold">{formatBRL(r.remaining)}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          r.status === 'parcial' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                        }`}>
+                          {r.status === 'parcial' ? 'Parcial' : 'Pendente'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" onClick={() => setSelected(r)}>Receber</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
