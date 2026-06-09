@@ -364,6 +364,7 @@ const SalesPage = () => {
       });
 
       setShowMultiForm(false);
+      setInitialKitId(null);
       fetchData();
     } catch (error) {
       console.error('Erro ao salvar venda:', error);
