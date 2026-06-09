@@ -326,6 +326,7 @@ const SalesPage = () => {
       const groupId = saleData.items.length > 1 ? crypto.randomUUID() : null;
       const totalAllItems = saleData.items.reduce((sum, item) => sum + item.subtotal, 0);
 
+      let firstSaleId: string | null = null;
       for (const item of saleData.items) {
         const itemPartialPayment = saleData.partial_payment_amount
           ? (item.subtotal / totalAllItems) * saleData.partial_payment_amount
@@ -347,8 +348,27 @@ const SalesPage = () => {
           sale_group_id: groupId,
         };
 
-        const { error: saleError } = await supabaseClient.from('sales').insert([saleRecord]);
+        const { data: inserted, error: saleError } = await supabaseClient.from('sales').insert([saleRecord]).select('id').single();
         if (saleError) throw saleError;
+        if (!firstSaleId && inserted) firstSaleId = (inserted as any).id;
+      }
+
+      // Registrar pagamento inicial em sale_payments (se houve recebimento)
+      const initialPaid = saleData.partial_payment_amount && saleData.partial_payment_amount > 0
+        ? saleData.partial_payment_amount
+        : (saleData.payment_received ? totalAllItems : 0);
+      if (initialPaid > 0) {
+        const paymentGroupId = groupId || firstSaleId;
+        if (paymentGroupId) {
+          await (supabaseClient as any).from('sale_payments').insert([{
+            sale_group_id: paymentGroupId,
+            tenant_id: tenantIdToUse,
+            amount: initialPaid,
+            payment_type: saleData.payment_type || null,
+            payment_date: saleData.sale_date + 'T12:00:00.000Z',
+            notes: 'Recebimento no ato da venda',
+          }]);
+        }
       }
 
       // Apply stock decrements
