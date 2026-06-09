@@ -684,8 +684,10 @@ const SalesPage = () => {
         <SalesMultiProductForm
           customers={validCustomers}
           products={availableProducts}
+          kits={kits}
+          initialKitId={initialKitId}
           onSubmit={handleMultiProductSubmit}
-          onCancel={() => setShowMultiForm(false)}
+          onCancel={() => { setShowMultiForm(false); setInitialKitId(null); }}
           sellers={sellers}
         />
       )}
