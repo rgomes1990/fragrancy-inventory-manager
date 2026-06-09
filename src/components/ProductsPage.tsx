@@ -30,6 +30,8 @@ interface DisplayRow {
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
+import KitsPage from './KitsPage';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const ProductsPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
