@@ -156,75 +156,96 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const currentRemaining = Math.max(total - currentPaid, 0);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Registrar Pagamento</DialogTitle>
-          {customerName && <p className="text-sm text-muted-foreground">{customerName}</p>}
-        </DialogHeader>
+    <>
+      <Dialog open={open && !successData} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+            {customerName && <p className="text-sm text-muted-foreground">{customerName}</p>}
+          </DialogHeader>
 
-        <div className="grid grid-cols-3 gap-2 text-center bg-muted/40 rounded-lg p-3 mb-2">
-          <div>
-            <div className="text-xs text-muted-foreground">Total</div>
-            <div className="font-semibold">{formatBRL(total)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Pago</div>
-            <div className="font-semibold text-emerald-600">{formatBRL(currentPaid)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Falta</div>
-            <div className="font-semibold text-rose-600">{formatBRL(currentRemaining)}</div>
-          </div>
-        </div>
-
-        {currentRemaining > 0 && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Valor recebido *</Label>
-                <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-              <div>
-                <Label>Forma de pagamento</Label>
-                <select className="w-full h-10 px-3 border rounded-md bg-background"
-                  value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
-                  {PAYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label>Data</Label>
-                <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
-              </div>
-              <div>
-                <Label>Observação</Label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="opcional" />
-              </div>
+          <div className="grid grid-cols-3 gap-2 text-center bg-muted/40 rounded-lg p-3 mb-2">
+            <div>
+              <div className="text-xs text-muted-foreground">Total</div>
+              <div className="font-semibold">{formatBRL(total)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Pago</div>
+              <div className="font-semibold text-emerald-600">{formatBRL(currentPaid)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Falta</div>
+              <div className="font-semibold text-rose-600">{formatBRL(currentRemaining)}</div>
             </div>
           </div>
-        )}
 
-        {history.length > 0 && (
-          <div className="mt-4">
-            <div className="text-sm font-semibold mb-2">Histórico de recebimentos</div>
-            <div className="max-h-56 overflow-y-auto space-y-1">
-              {history.map((h) => (
-                <HistoryRow key={h.id} item={h} onDelete={handleDelete} onUpdated={loadHistory} onSavedExternal={onSaved} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
           {currentRemaining > 0 && (
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando...' : 'Registrar Pagamento'}
-            </Button>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Valor recebido *</Label>
+                  <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Forma de pagamento</Label>
+                  <select className="w-full h-10 px-3 border rounded-md bg-background"
+                    value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
+                    {PAYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Data</Label>
+                  <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Observação</Label>
+                  <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="opcional" />
+                </div>
+              </div>
+            </div>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          {history.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm font-semibold mb-2">Histórico de recebimentos</div>
+              <div className="max-h-56 overflow-y-auto space-y-1">
+                {history.map((h) => (
+                  <HistoryRow key={h.id} item={h} onDelete={handleDelete} onUpdated={loadHistory} onSavedExternal={onSaved} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+            {currentRemaining > 0 && (
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Salvando...' : 'Registrar Pagamento'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <SaleSuccessDialog
+        open={!!successData}
+        data={successData}
+        onClose={() => {
+          setSuccessData(null);
+          if (successData?.isFullyPaid) onClose();
+          else {
+            // reseta o formulário, mantém modal de pagamento aberto para próximo recebimento
+            setAmount('');
+            setNotes('');
+          }
+        }}
+        onNewSale={() => {
+          setSuccessData(null);
+          onClose();
+          navigate('/sales');
+        }}
+      />
+    </>
   );
 };
 
