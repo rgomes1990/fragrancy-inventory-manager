@@ -14,7 +14,8 @@ import {
   UserCog,
   Building2,
   UserCheck,
-  FileBarChart
+  FileBarChart,
+  Truck
 } from 'lucide-react';
 import {
   Sidebar,
@@ -46,6 +47,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ currentPage, onPageChange }) =>
     { title: 'Clientes', url: '/customers', icon: Users, page: 'customers', adminOnly: false },
     { title: 'Vendas', url: '/sales', icon: ShoppingCart, page: 'sales', adminOnly: false },
     { title: 'Vendedores', url: '/sellers', icon: UserCheck, page: 'sellers', adminOnly: false },
+    { title: 'Fornecedores', url: '/suppliers', icon: Truck, page: 'suppliers', adminOnly: false },
     { title: 'Despesas', url: '/expenses', icon: Receipt, page: 'expenses', adminOnly: false },
     { title: 'Relatório de Custos', url: '/sales-cost-report', icon: FileBarChart, page: 'sales-cost-report', adminOnly: false },
     { title: 'Empresas', url: '/tenants', icon: Building2, page: 'tenants', adminOnly: true },
