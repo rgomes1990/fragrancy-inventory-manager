@@ -243,6 +243,7 @@ const SalesPage = () => {
         return (
           sale.customers?.name?.toLowerCase().includes(searchLower) ||
           sale.products?.name?.toLowerCase().includes(searchLower) ||
+          (sale as any).kits?.name?.toLowerCase().includes(searchLower) ||
           sale.quantity.toString().includes(searchLower) ||
           sale.unit_price.toString().includes(searchLower) ||
           sale.total_price.toString().includes(searchLower) ||
