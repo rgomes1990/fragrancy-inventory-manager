@@ -35,7 +35,7 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
           <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6 sticky top-0 z-10">
             <div className="flex items-center">
               <SidebarTrigger className="mr-4" />
-              <h2 className="text-lg font-semibold text-gray-900 truncate">
+              <h2 className="text-lg font-serif font-semibold text-foreground truncate">
                 {getPageTitle(currentPage)}
               </h2>
             </div>
