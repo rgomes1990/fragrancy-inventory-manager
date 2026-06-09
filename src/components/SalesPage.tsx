@@ -94,7 +94,8 @@ const SalesPage = () => {
         .select(`
           *,
           customers(id, name, whatsapp, email, created_at, updated_at),
-          products(id, name, cost_price, sale_price, quantity, category_id, created_at, updated_at, categories(id, name, created_at, updated_at))
+          products(id, name, cost_price, sale_price, quantity, category_id, created_at, updated_at, categories(id, name, created_at, updated_at)),
+          kits(id, name, sale_price)
         `);
       
       let productsQuery = supabase
@@ -112,30 +113,39 @@ const SalesPage = () => {
         .from('sellers')
         .select('id, name');
 
+      let kitsQuery = supabase
+        .from('kits')
+        .select('*, kit_items(*, products(id, name, quantity, cost_price, sale_price))')
+        .eq('active', true);
+
       // Aplicar filtro de tenant para usuários não-admin
       if (!isAdmin && tenantId) {
         salesQuery = salesQuery.eq('tenant_id', tenantId);
         productsQuery = productsQuery.eq('tenant_id', tenantId);
         customersQuery = customersQuery.eq('tenant_id', tenantId);
         sellersQuery = sellersQuery.eq('tenant_id', tenantId);
+        kitsQuery = kitsQuery.eq('tenant_id', tenantId);
       }
 
-      const [salesRes, productsRes, customersRes, sellersRes] = await Promise.all([
+      const [salesRes, productsRes, customersRes, sellersRes, kitsRes] = await Promise.all([
         salesQuery.order('created_at', { ascending: false }),
         productsQuery.order('name'),
         customersQuery.order('name'),
-        sellersQuery.order('name')
+        sellersQuery.order('name'),
+        kitsQuery.order('name'),
       ]);
 
       if (salesRes.error) throw salesRes.error;
       if (productsRes.error) throw productsRes.error;
       if (customersRes.error) throw customersRes.error;
       if (sellersRes.error) throw sellersRes.error;
+      if (kitsRes.error) throw kitsRes.error;
 
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
       setCustomers(customersRes.data || []);
       setSellers(sellersRes.data || []);
+      setKits((kitsRes.data || []) as any);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
       toast({
