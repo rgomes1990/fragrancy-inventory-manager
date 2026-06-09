@@ -122,6 +122,34 @@ export interface Reinvestment {
   updated_at: string;
 }
 
+export interface Kit {
+  id: string;
+  tenant_id?: string | null;
+  name: string;
+  description?: string | null;
+  sale_price: number;
+  image_url?: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  kit_items?: KitItem[];
+}
+
+export interface KitItem {
+  id: string;
+  kit_id: string;
+  product_id: string;
+  quantity: number;
+  created_at: string;
+  products?: {
+    id: string;
+    name: string;
+    quantity: number;
+    cost_price: number;
+    sale_price: number;
+  };
+}
+
 export interface ProductOrderRequest {
   id: string;
   product_id: string;

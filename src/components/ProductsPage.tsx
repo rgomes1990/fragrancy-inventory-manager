@@ -30,6 +30,8 @@ interface DisplayRow {
 import ImageModal from './ImageModal';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
+import KitsPage from './KitsPage';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const ProductsPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
@@ -510,7 +512,12 @@ const ProductsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="products" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="products">Produtos</TabsTrigger>
+        <TabsTrigger value="kits">Kits</TabsTrigger>
+      </TabsList>
+      <TabsContent value="products" className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-foreground min-w-0">Produtos</h1>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -861,7 +868,11 @@ const ProductsPage = () => {
           </Table>
         </CardContent>
       </Card>
-    </div>
+      </TabsContent>
+      <TabsContent value="kits">
+        <KitsPage />
+      </TabsContent>
+    </Tabs>
   );
 };
 
