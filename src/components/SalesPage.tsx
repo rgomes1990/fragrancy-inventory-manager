@@ -698,6 +698,13 @@ const SalesPage = () => {
 
   return (
     <div className="space-y-6">
+      <SaleSuccessDialog
+        open={!!successData}
+        onClose={() => setSuccessData(null)}
+        onNewSale={() => { setSuccessData(null); setShowMultiForm(true); }}
+        data={successData}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-gray-900 min-w-0">Vendas</h1>
         <Button 
