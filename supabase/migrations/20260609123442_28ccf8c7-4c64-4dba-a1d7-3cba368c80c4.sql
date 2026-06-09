@@ -1,0 +1,1 @@
+ALTER TABLE public.sellers ADD COLUMN IF NOT EXISTS commission_percentage NUMERIC NOT NULL DEFAULT 0;

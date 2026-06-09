@@ -619,6 +619,7 @@ export type Database = {
       }
       sellers: {
         Row: {
+          commission_percentage: number
           created_at: string
           id: string
           name: string
@@ -626,6 +627,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          commission_percentage?: number
           created_at?: string
           id?: string
           name: string
@@ -633,6 +635,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          commission_percentage?: number
           created_at?: string
           id?: string
           name?: string
