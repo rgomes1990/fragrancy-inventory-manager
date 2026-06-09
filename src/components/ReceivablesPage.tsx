@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
-import { DollarSign, Search, Wallet } from 'lucide-react';
+import { DollarSign, Search, Wallet, AlertTriangle } from 'lucide-react';
 import PaymentDialog from './PaymentDialog';
 
 interface Row {
@@ -28,7 +28,7 @@ const ReceivablesPage: React.FC = () => {
   const { tenantId, isAdmin } = useTenantFilter();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'parcial'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'parcial' | 'vencidos'>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
 
