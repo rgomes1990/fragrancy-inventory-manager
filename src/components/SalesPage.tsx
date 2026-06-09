@@ -565,28 +565,30 @@ const SalesPage = () => {
     try {
       const supabaseClient = supabaseWithUser();
       
-      const product = products.find(p => p.id === sale.product_id);
-      if (product) {
-        const novoEstoque = product.quantity + sale.quantity;
-        
-        console.log(`[EXCLUSÃO VENDA] Devolvendo estoque do produto ${product.name}:`, {
-          estoqueAtual: product.quantity,
-          quantidadeDevolvida: sale.quantity,
-          novoEstoque: novoEstoque,
-          productId: sale.product_id
-        });
-
-        const { error: updateError } = await supabaseClient
-          .from('products')
-          .update({ quantity: novoEstoque })
-          .eq('id', sale.product_id);
-
-        if (updateError) {
-          console.error('[EXCLUSÃO VENDA] Erro ao devolver estoque:', updateError);
-          throw updateError;
+      const saleKitId = (sale as any).kit_id as string | null;
+      if (saleKitId) {
+        // Devolver estoque de cada componente do kit
+        const kit = kits.find(k => k.id === saleKitId);
+        if (kit?.kit_items) {
+          for (const ki of kit.kit_items) {
+            const p = products.find(x => x.id === ki.product_id);
+            if (p) {
+              const novo = p.quantity + (ki.quantity * sale.quantity);
+              const { error: upErr } = await supabaseClient.from('products').update({ quantity: novo }).eq('id', p.id);
+              if (upErr) throw upErr;
+            }
+          }
         }
-
-        console.log(`[EXCLUSÃO VENDA] Estoque devolvido com sucesso para ${product.name}`);
+      } else {
+        const product = products.find(p => p.id === sale.product_id);
+        if (product) {
+          const novoEstoque = product.quantity + sale.quantity;
+          const { error: updateError } = await supabaseClient
+            .from('products')
+            .update({ quantity: novoEstoque })
+            .eq('id', sale.product_id);
+          if (updateError) throw updateError;
+        }
       }
 
       const { error } = await supabaseClient
