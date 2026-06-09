@@ -537,6 +537,42 @@ export type Database = {
           },
         ]
       }
+      sale_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_type: string | null
+          sale_group_id: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string | null
+          sale_group_id: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_type?: string | null
+          sale_group_id?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sales: {
         Row: {
           created_at: string | null
@@ -881,7 +917,20 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_sales_balance: {
+        Row: {
+          customer_id: string | null
+          paid: number | null
+          remaining: number | null
+          sale_date: string | null
+          sale_group_id: string | null
+          seller: string | null
+          status: string | null
+          tenant_id: string | null
+          total: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       set_config: {
