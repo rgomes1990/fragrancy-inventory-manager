@@ -1,69 +1,78 @@
-## Funcionalidade: Kits de Produtos
+# Gestão de Pagamentos Pendentes e Parciais
 
-### 1. Banco de dados (migração)
+## Problema
+Hoje a venda guarda apenas **um** valor pago (`partial_payment_amount`). Quando o cliente paga em várias parcelas ao longo do tempo, não há como registrar cada recebimento, ver histórico, nem saber automaticamente quanto ainda falta. Precisamos de uma estrutura que suporte **N recebimentos por venda** até quitar.
 
-**Nova tabela `kits`** (multi-tenant, RLS por tenant_id)
-- `name`, `description`, `sale_price`, `image_url`, `active`, `tenant_id`
+## Solução proposta
 
-**Nova tabela `kit_items`**
-- `kit_id` (FK kits), `product_id` (FK products), `quantity`
+### 1. Nova tabela `sale_payments` (recebimentos)
+Cada linha = um pagamento que o cliente fez para uma venda.
 
-**Alterar tabela `sales`**
-- Adicionar coluna `kit_id` (nullable, FK kits) — identifica vendas oriundas de um Kit
-- Tornar `product_id` nullable — para permitir uma linha única representando a venda do Kit
-- Audit trigger já existente continua funcionando
+Campos principais:
+- `sale_group_id` (vincula ao pedido inteiro, não a um item)
+- `amount` (valor pago naquele recebimento)
+- `payment_type` (Pix, Débito, Crédito, Dinheiro, Link)
+- `payment_date` (data em que o cliente pagou)
+- `notes` (observação opcional: "1ª parcela", "via PIX da esposa", etc.)
+- `tenant_id`, `created_at`
 
-### 2. Nova tela "Kits" (aba dentro de Produtos)
+Vantagens: histórico completo, várias formas de pagamento por venda, relatórios fiéis ao caixa real.
 
-Em `ProductsPage`, adicionar abas no topo: **Produtos** | **Kits**.
+### 2. Status calculado automaticamente
+A venda deixa de depender só do checkbox "recebido". O status passa a vir da soma dos pagamentos vs. `total_price`:
 
-A aba **Kits** renderiza `KitsPage`, no estilo do mockup:
-- Cabeçalho "Kits — Produtos compostos com baixa automática" + botão **+ Criar Kit**
-- Banner explicativo: "Ao vender um Kit, o sistema dá baixa automática em cada produto individual."
-- Grid de cards (1/2/3/4 colunas conforme tela):
-  - Nome + preço
-  - Descrição
-  - Lista "Itens: produto x qtd"
-  - Badge **Disponível: N** (calculado: `min(floor(estoque_componente / qtd_componente))`)
-  - Botões **Vender** (desabilitado se Disponível = 0) e **Excluir**
-- Dialog "Criar/Editar Kit": nome, descrição, preço (com botão "Sugerir soma dos itens"), lista dinâmica de componentes (produto + quantidade), salvar.
-- Excluir kit faz soft check (não permite se houver vendas vinculadas) ou apenas marca `active=false`.
+- **Pago** — soma dos recebimentos ≥ total
+- **Parcial** — soma > 0 e < total
+- **Pendente** — soma = 0
 
-### 3. Integração com vendas
+Sem coluna nova de status — sempre calculado, nunca desatualiza.
 
-`SalesMultiProductForm` ganha um seletor de **tipo de item** por linha: `Produto` ou `Kit`.
-- Quando Kit: SearchableSelect mostra apenas kits com `Disponível > 0`; preço unitário sugerido = `sale_price` do kit.
-- Quantidade máxima = disponibilidade calculada do kit.
-- Pode misturar produtos e kits no mesmo formulário.
+### 3. Fluxo no PDV (nova venda)
+Ao finalizar a venda continua igual, mas o campo "Valor recebido" cria automaticamente o **primeiro registro** em `sale_payments`. Se o cliente não pagou nada, nenhum recebimento é criado e a venda nasce **Pendente** — o estoque é baixado normalmente.
 
-`handleMultiProductSubmit` em `SalesPage`:
-- Mesmo `sale_group_id` agrupa tudo (já existe).
-- Para item tipo Kit: insere **1 linha em `sales`** com `kit_id` preenchido, `product_id = null`, total = preço × qtd, e decrementa o estoque de **cada componente** pela `qtd_componente × qtd_kit`.
-- Para item tipo Produto: comportamento atual.
-- Validação de estoque considera componentes do kit antes de gravar.
+### 4. Nova página/aba "A Receber"
+Menu lateral com badge mostrando quantidade de pedidos em aberto. Lista mostra:
 
-### 4. Exibição de vendas
+```text
+Cliente            Pedido     Total      Pago     Falta    Status
+Maria Silva        #1024      R$ 450,00  R$ 200   R$ 250   Parcial
+João Souza         #1031      R$ 180,00  R$ 0     R$ 180   Pendente
+```
 
-Em `SalesPage` (lista e agrupamento), quando `kit_id` presente:
-- Mostrar nome do kit como rótulo do item (em vez de `products.name`).
-- Custo do item (para relatórios de lucro) = soma `kit_items.quantity × products.cost_price` no momento da venda.
+Filtros: cliente, período, status (Pendente/Parcial), vendedor.
+Totalizador no topo: **Total a receber: R$ X.XXX**.
 
-`ProfitReportPage` e `SalesCostReport` ajustados para usar custo do kit quando `product_id` for nulo.
+### 5. Modal "Registrar Pagamento"
+Botão em cada linha da lista "A Receber" (e também dentro do detalhe da venda). Abre um popup com:
 
-### 5. Arquivos afetados
+- Valor falta (preenchido como sugestão, editável)
+- Forma de pagamento
+- Data
+- Observação
+- Histórico dos recebimentos anteriores logo abaixo, com opção de excluir/editar um lançamento errado
 
-**Criar**
-- `src/components/KitsPage.tsx`
-- `src/components/KitFormDialog.tsx`
+Ao salvar, recalcula status; se quitou, marca visualmente como **Pago** e some da lista "A Receber".
 
-**Editar**
-- `src/components/ProductsPage.tsx` — adicionar tabs Produtos/Kits
-- `src/components/SalesMultiProductForm.tsx` — seletor tipo Produto/Kit
-- `src/components/SalesPage.tsx` — submissão e exibição com kits
-- `src/components/ProfitReportPage.tsx`, `src/components/SalesCostReport.tsx` — custo de kits
-- `src/types/database.ts` — tipos Kit / KitItem
+### 6. Ajustes em telas existentes
+- **Detalhe da venda / SaleSuccessDialog**: mostra "Pago: R$ X / Falta: R$ Y" e lista de recebimentos.
+- **Dashboard "Caixa"**: continua somando recebimentos (já é a regra hoje), mas agora a fonte é `sale_payments.amount` — fica mais preciso porque entradas parciais futuras também entram no caixa do dia em que foram pagas, não no dia da venda.
+- **Filtros atuais da página de Vendas** ("Recebido/Pendente/Parcial") continuam funcionando, agora baseados na soma calculada.
 
-### Detalhes técnicos
-- Multi-tenant via `tenant_id` e `useTenantFilter` (mesmo padrão dos demais módulos).
-- Disponibilidade calculada no client a partir de `kit_items` + `products.quantity`.
-- `kit_id` em `sales` é nullable para não quebrar vendas existentes; índice em `(kit_id)` e `(sale_group_id)`.
+### 7. Migração dos dados atuais
+Para cada venda existente com `partial_payment_amount > 0` ou `payment_received = true`, cria-se 1 linha em `sale_payments` com o valor já registrado, preservando histórico.
+
+---
+
+## Detalhes técnicos
+
+- Tabela `sale_payments` com RLS por `tenant_id` (mesma policy padrão das outras), GRANTs para `authenticated` e `service_role`.
+- View `v_sales_balance` (ou função) que retorna por `sale_group_id`: `total`, `paid`, `remaining`, `status` — usada na lista "A Receber" e nos filtros.
+- Hook `useSalePayments(saleGroupId)` para buscar/inserir/excluir recebimentos.
+- Componente `PaymentDialog` reutilizável (novo recebimento) e `PaymentsHistoryList`.
+- Nova rota `/receivables` + item no `AppSidebar` com badge de contagem.
+- Manter colunas legadas `payment_received` e `partial_payment_amount` na tabela `sales` por compatibilidade (não removemos agora) — apenas paramos de usá-las como fonte da verdade.
+
+## Decisões em aberto
+1. Quer permitir **editar/excluir** recebimentos já lançados, ou só adicionar (mais seguro contra erros do usuário)?
+2. A página "A Receber" deve ser **menu próprio** no sidebar ou uma **aba dentro de Vendas**?
+3. Quer **alerta/notificação** de pedidos vencidos (ex.: pendente há mais de X dias)?
