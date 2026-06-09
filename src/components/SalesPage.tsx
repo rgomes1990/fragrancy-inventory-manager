@@ -21,6 +21,8 @@ const SalesPage = () => {
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [kits, setKits] = useState<Kit[]>([]);
+  const [initialKitId, setInitialKitId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showMultiForm, setShowMultiForm] = useState(false);
