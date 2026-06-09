@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil, Check, X } from 'lucide-react';
 
 export interface PaymentDialogProps {
   open: boolean;
@@ -160,18 +160,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         {history.length > 0 && (
           <div className="mt-4">
             <div className="text-sm font-semibold mb-2">Histórico de recebimentos</div>
-            <div className="max-h-48 overflow-y-auto space-y-1">
+            <div className="max-h-56 overflow-y-auto space-y-1">
               {history.map((h) => (
-                <div key={h.id} className="flex items-center justify-between text-sm bg-muted/30 px-3 py-2 rounded">
-                  <div>
-                    <span className="font-medium">{formatBRL(Number(h.amount))}</span>
-                    <span className="text-muted-foreground"> • {h.payment_type || '—'} • {new Date(h.payment_date).toLocaleDateString('pt-BR')}</span>
-                    {h.notes && <div className="text-xs text-muted-foreground">{h.notes}</div>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => handleDelete(h.id)}>
-                    <Trash2 className="w-4 h-4 text-rose-500" />
-                  </Button>
-                </div>
+                <HistoryRow key={h.id} item={h} onDelete={handleDelete} onUpdated={loadHistory} onSavedExternal={onSaved} />
               ))}
             </div>
           </div>
@@ -191,3 +182,87 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 };
 
 export default PaymentDialog;
+
+interface HistoryRowProps {
+  item: any;
+  onDelete: (id: string) => void;
+  onUpdated: () => void;
+  onSavedExternal?: () => void;
+}
+
+const HistoryRow: React.FC<HistoryRowProps> = ({ item, onDelete, onUpdated, onSavedExternal }) => {
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState(String(item.amount));
+  const [paymentType, setPaymentType] = useState(item.payment_type || 'Pix');
+  const [paymentDate, setPaymentDate] = useState(new Date(item.payment_date).toISOString().split('T')[0]);
+  const [notes, setNotes] = useState(item.notes || '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const value = parseFloat(amount.replace(',', '.'));
+    if (!value || value <= 0) {
+      toast({ title: 'Erro', description: 'Valor inválido.', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const client = supabaseWithUser();
+      const { error } = await (client as any).from('sale_payments').update({
+        amount: value,
+        payment_type: paymentType || null,
+        payment_date: paymentDate + 'T12:00:00.000Z',
+        notes: notes || null,
+      }).eq('id', item.id);
+      if (error) throw error;
+      toast({ title: 'Recebimento atualizado' });
+      setEditing(false);
+      await onUpdated();
+      onSavedExternal?.();
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="bg-muted/40 px-3 py-2 rounded space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor" />
+          <select className="h-9 px-2 border rounded-md bg-background text-sm"
+            value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
+            {['Dinheiro','Pix','Débito','Crédito','Link'].map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="obs." />
+        </div>
+        <div className="flex justify-end gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}><X className="w-4 h-4" /></Button>
+          <Button size="sm" onClick={save} disabled={saving}><Check className="w-4 h-4" /></Button>
+        </div>
+      </div>
+    );
+  }
+
+  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  return (
+    <div className="flex items-center justify-between text-sm bg-muted/30 px-3 py-2 rounded">
+      <div>
+        <span className="font-medium">{formatBRL(Number(item.amount))}</span>
+        <span className="text-muted-foreground"> • {item.payment_type || '—'} • {new Date(item.payment_date).toLocaleDateString('pt-BR')}</span>
+        {item.notes && <div className="text-xs text-muted-foreground">{item.notes}</div>}
+      </div>
+      <div className="flex gap-1">
+        <Button size="sm" variant="ghost" onClick={() => setEditing(true)} title="Editar">
+          <Pencil className="w-4 h-4 text-sky-600" />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => onDelete(item.id)} title="Excluir">
+          <Trash2 className="w-4 h-4 text-rose-500" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
