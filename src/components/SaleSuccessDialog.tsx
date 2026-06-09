@@ -19,6 +19,14 @@ export interface SaleSuccessData {
   total: number;
   paymentType?: string | null;
   paymentAmount?: number | null;
+  /** valor recebido especificamente neste lançamento (parcial) */
+  paidNow?: number | null;
+  /** acumulado já pago no pedido (após este recebimento) */
+  paidToDate?: number | null;
+  /** quanto ainda falta após este recebimento */
+  remaining?: number | null;
+  /** true = venda 100% quitada; false = ainda parcial/pendente */
+  isFullyPaid?: boolean;
 }
 
 interface Props {
@@ -32,7 +40,8 @@ const fmt = (n: number) => `R$ ${n.toFixed(2).replace('.', ',')}`;
 
 const buildMessage = (d: SaleSuccessData) => {
   const lines: string[] = [];
-  lines.push(`*Resumo do Pedido*`);
+  const isPartial = d.isFullyPaid === false;
+  lines.push(isPartial ? `*Recebimento de Pagamento*` : `*Resumo do Pedido*`);
   lines.push(`Cliente: ${d.customerName}`);
   lines.push('');
   for (const it of d.items) {
@@ -40,10 +49,15 @@ const buildMessage = (d: SaleSuccessData) => {
   }
   if (d.discount && d.discount > 0) lines.push(`Desconto: - ${fmt(d.discount)}`);
   lines.push('');
-  lines.push(`*Total: ${fmt(d.total)}*`);
-  if (d.paymentType && d.paymentAmount) {
+  lines.push(`*Total do pedido: ${fmt(d.total)}*`);
+  if (d.paidNow != null) {
+    lines.push(`Recebido agora: ${fmt(d.paidNow)}${d.paymentType ? ` (${d.paymentType})` : ''}`);
+  } else if (d.paymentType && d.paymentAmount) {
     lines.push(`Pagamento: ${d.paymentType} ${fmt(d.paymentAmount)}`);
   }
+  if (d.paidToDate != null) lines.push(`Total pago: ${fmt(d.paidToDate)}`);
+  if (d.remaining != null && d.remaining > 0) lines.push(`*Saldo a pagar: ${fmt(d.remaining)}*`);
+  if (d.isFullyPaid) lines.push(`✅ Pedido quitado!`);
   return lines.join('\n');
 };
 
@@ -103,22 +117,30 @@ const SaleSuccessDialog: React.FC<Props> = ({ open, onClose, onNewSale, data }) 
     w.document.close();
   };
 
+  const isPartial = data.isFullyPaid === false;
+  const title = isPartial ? 'Pagamento Recebido!' : 'Venda Finalizada!';
+  const headerColor = isPartial ? 'bg-amber-500' : 'bg-green-500';
+  const headerText = isPartial ? 'text-amber-600' : 'text-green-600';
+  const cardBg = isPartial ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100';
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md p-0 overflow-hidden">
         <div className="p-6">
           <div className="flex justify-center mb-4">
-            <div className="w-14 h-14 rounded-xl bg-green-500 flex items-center justify-center shadow-md">
+            <div className={`w-14 h-14 rounded-xl ${headerColor} flex items-center justify-center shadow-md`}>
               <Check className="w-8 h-8 text-white" strokeWidth={3} />
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-center text-green-600 mb-3">Venda Finalizada!</h2>
-          <div className="text-center mb-1 text-2xl font-semibold">{fmt(data.total)}</div>
+          <h2 className={`text-2xl font-bold text-center ${headerText} mb-3`}>{title}</h2>
+          <div className="text-center mb-1 text-2xl font-semibold">
+            {fmt(data.paidNow != null ? data.paidNow : data.total)}
+          </div>
           <div className="text-center text-sm text-muted-foreground mb-5">{data.customerName}</div>
 
-          <div className="bg-green-50 border border-green-100 rounded-lg p-4 mb-5">
+          <div className={`${cardBg} border rounded-lg p-4 mb-5`}>
             <div className="flex items-center gap-2 text-sm font-medium mb-3">
-              <ClipboardList className="w-4 h-4" /> Resumo
+              <ClipboardList className="w-4 h-4" /> Resumo do Pedido
             </div>
             <div className="space-y-2 text-sm">
               {data.items.map((it, i) => (
@@ -134,12 +156,35 @@ const SaleSuccessDialog: React.FC<Props> = ({ open, onClose, onNewSale, data }) 
                 </div>
               ) : null}
             </div>
-            <div className="border-t border-green-200 my-3" />
+            <div className="border-t border-current opacity-20 my-3" />
             <div className="flex justify-between font-semibold">
-              <span>Total</span>
+              <span>Total do pedido</span>
               <span>{fmt(data.total)}</span>
             </div>
-            {data.paymentType && data.paymentAmount ? (
+            {data.paidNow != null && (
+              <div className="flex justify-between text-sm mt-1">
+                <span>Recebido agora{data.paymentType ? ` (${data.paymentType})` : ''}</span>
+                <span className="font-semibold text-emerald-700">{fmt(data.paidNow)}</span>
+              </div>
+            )}
+            {data.paidToDate != null && (
+              <div className="flex justify-between text-sm">
+                <span>Total pago</span>
+                <span className="text-emerald-700">{fmt(data.paidToDate)}</span>
+              </div>
+            )}
+            {data.remaining != null && data.remaining > 0 && (
+              <div className="flex justify-between text-sm font-bold">
+                <span>Saldo a pagar</span>
+                <span className="text-rose-600">{fmt(data.remaining)}</span>
+              </div>
+            )}
+            {data.isFullyPaid && (
+              <div className="mt-2 text-center text-sm font-semibold text-emerald-700">
+                ✅ Pedido 100% quitado
+              </div>
+            )}
+            {data.paidNow == null && data.paymentType && data.paymentAmount ? (
               <div className="text-xs text-muted-foreground mt-1">
                 · {data.paymentType.toLowerCase()}: {fmt(data.paymentAmount)}
               </div>
