@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Trash2, Pencil, Check, X } from 'lucide-react';
+import SaleSuccessDialog, { SaleSuccessData } from './SaleSuccessDialog';
 
 export interface PaymentDialogProps {
   open: boolean;
@@ -26,6 +28,7 @@ const formatBRL = (v: number) =>
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   open, onClose, saleGroupId, tenantId, total, paid, customerName, onSaved,
 }) => {
+  const navigate = useNavigate();
   const remaining = Math.max(total - paid, 0);
   const [amount, setAmount] = useState('');
   const [paymentType, setPaymentType] = useState('Pix');
@@ -33,6 +36,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [successData, setSuccessData] = useState<SaleSuccessData | null>(null);
 
   const loadHistory = async () => {
     const { data } = await (supabase as any)
@@ -54,6 +58,53 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, saleGroupId]);
 
+  const buildAndShowSuccess = async (paidNow: number, payType: string, newPaidTotal: number) => {
+    try {
+      // Busca itens da venda (sale_group_id ou id quando venda simples)
+      const { data: salesItems } = await supabase
+        .from('sales')
+        .select('quantity, total_price, customer_id, products(name), kits(name)')
+        .or(`sale_group_id.eq.${saleGroupId},id.eq.${saleGroupId}`);
+
+      const items = (salesItems || []).map((s: any) => ({
+        name: s.kits?.name || s.products?.name || 'Item',
+        quantity: s.quantity,
+        subtotal: Number(s.total_price),
+        isKit: !!s.kits,
+      }));
+
+      const customerId = (salesItems?.[0] as any)?.customer_id;
+      let whatsapp: string | null = null;
+      let cName = customerName || '';
+      if (customerId) {
+        const { data: c } = await supabase
+          .from('customers')
+          .select('name, whatsapp')
+          .eq('id', customerId)
+          .maybeSingle();
+        if (c) {
+          whatsapp = (c as any).whatsapp || null;
+          if (!cName) cName = (c as any).name;
+        }
+      }
+
+      const remainingAfter = Math.max(total - newPaidTotal, 0);
+      setSuccessData({
+        customerName: cName,
+        customerWhatsapp: whatsapp,
+        items,
+        total,
+        paymentType: payType,
+        paidNow,
+        paidToDate: newPaidTotal,
+        remaining: remainingAfter,
+        isFullyPaid: remainingAfter <= 0.001,
+      });
+    } catch (e) {
+      console.error('Erro ao montar resumo:', e);
+    }
+  };
+
   const handleSave = async () => {
     const value = parseFloat(amount.replace(',', '.'));
     if (!value || value <= 0) {
@@ -73,16 +124,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       }]);
       if (error) throw error;
       toast({ title: 'Pagamento registrado!', description: formatBRL(value) });
+      const newPaid = currentPaid + value;
       await loadHistory();
       onSaved?.();
-      // se quitou, fecha
-      const newPaid = paid + value;
-      if (newPaid >= total) {
-        onClose();
-      } else {
-        setAmount('');
-        setNotes('');
-      }
+      // Sempre mostra o popup de resumo (parcial ou final)
+      await buildAndShowSuccess(value, paymentType, newPaid);
     } catch (e: any) {
       console.error(e);
       toast({ title: 'Erro', description: e.message || 'Falha ao salvar.', variant: 'destructive' });
@@ -90,6 +136,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setSaving(false);
     }
   };
+
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este recebimento?')) return;
