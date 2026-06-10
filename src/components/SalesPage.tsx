@@ -282,6 +282,8 @@ const SalesPage = () => {
     }>;
     sale_date: string;
     seller: string;
+    payments?: Array<{ type: string; amount: number }>;
+    discount_amount?: number;
     payment_received: boolean;
     partial_payment_amount: number | null;
     payment_type: string | null;
@@ -324,12 +326,23 @@ const SalesPage = () => {
 
       const supabaseClient = supabaseWithUser();
       const groupId = saleData.items.length > 1 ? crypto.randomUUID() : null;
-      const totalAllItems = saleData.items.reduce((sum, item) => sum + item.subtotal, 0);
+
+      // Aplica desconto rateado entre itens (proporcional ao subtotal)
+      const discount = Number(saleData.discount_amount) || 0;
+      const subtotalAll = saleData.items.reduce((s, it) => s + it.subtotal, 0);
+      const itemsWithDiscount = saleData.items.map((it) => {
+        const ratio = subtotalAll > 0 ? it.subtotal / subtotalAll : 0;
+        const itemDisc = discount * ratio;
+        const newSubtotal = Math.max(it.subtotal - itemDisc, 0);
+        const newUnit = it.quantity > 0 ? newSubtotal / it.quantity : it.unit_price;
+        return { ...it, unit_price: newUnit, subtotal: newSubtotal };
+      });
+      const totalAllItems = itemsWithDiscount.reduce((sum, item) => sum + item.subtotal, 0);
 
       let firstSaleId: string | null = null;
-      for (const item of saleData.items) {
+      for (const item of itemsWithDiscount) {
         const itemPartialPayment = saleData.partial_payment_amount
-          ? (item.subtotal / totalAllItems) * saleData.partial_payment_amount
+          ? (item.subtotal / Math.max(totalAllItems, 0.01)) * saleData.partial_payment_amount
           : null;
 
         const saleRecord: any = {
@@ -353,13 +366,27 @@ const SalesPage = () => {
         if (!firstSaleId && inserted) firstSaleId = (inserted as any).id;
       }
 
-      // Registrar pagamento inicial em sale_payments (se houve recebimento)
-      const initialPaid = saleData.partial_payment_amount && saleData.partial_payment_amount > 0
-        ? saleData.partial_payment_amount
-        : (saleData.payment_received ? totalAllItems : 0);
-      if (initialPaid > 0) {
-        const paymentGroupId = groupId || firstSaleId;
-        if (paymentGroupId) {
+      // Registrar cada forma de pagamento em sale_payments
+      // Crediário NÃO entra em sale_payments (fica como saldo "A Receber")
+      const paymentGroupId = groupId || firstSaleId;
+      const paymentsList = (saleData.payments || []).filter(p => p.type !== 'Crediário' && p.amount > 0);
+
+      if (paymentGroupId && paymentsList.length > 0) {
+        const rows = paymentsList.map(p => ({
+          sale_group_id: paymentGroupId,
+          tenant_id: tenantIdToUse,
+          amount: p.amount,
+          payment_type: p.type,
+          payment_date: saleData.sale_date + 'T12:00:00.000Z',
+          notes: 'Recebimento no ato da venda',
+        }));
+        await (supabaseClient as any).from('sale_payments').insert(rows);
+      } else if (paymentGroupId && !saleData.payments && saleData.payment_received) {
+        // Compat com chamadas legadas
+        const initialPaid = saleData.partial_payment_amount && saleData.partial_payment_amount > 0
+          ? saleData.partial_payment_amount
+          : totalAllItems;
+        if (initialPaid > 0) {
           await (supabaseClient as any).from('sale_payments').insert([{
             sale_group_id: paymentGroupId,
             tenant_id: tenantIdToUse,
