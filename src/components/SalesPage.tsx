@@ -132,12 +132,16 @@ const SalesPage = () => {
         kitsQuery = kitsQuery.eq('tenant_id', tenantId);
       }
 
-      const [salesRes, productsRes, customersRes, sellersRes, kitsRes] = await Promise.all([
+      let balanceQuery = (supabase as any).from('v_sales_balance').select('sale_group_id, tenant_id, total, paid, remaining, status');
+      if (!isAdmin && tenantId) balanceQuery = balanceQuery.eq('tenant_id', tenantId);
+
+      const [salesRes, productsRes, customersRes, sellersRes, kitsRes, balanceRes] = await Promise.all([
         salesQuery.order('created_at', { ascending: false }),
         productsQuery.order('name'),
         customersQuery.order('name'),
         sellersQuery.order('name'),
         kitsQuery.order('name'),
+        balanceQuery,
       ]);
 
       if (salesRes.error) throw salesRes.error;
@@ -145,6 +149,17 @@ const SalesPage = () => {
       if (customersRes.error) throw customersRes.error;
       if (sellersRes.error) throw sellersRes.error;
       if (kitsRes.error) throw kitsRes.error;
+
+      const bmap: Record<string, any> = {};
+      (balanceRes?.data || []).forEach((b: any) => {
+        bmap[b.sale_group_id] = {
+          total: Number(b.total),
+          paid: Number(b.paid),
+          remaining: Number(b.remaining),
+          status: b.status,
+        };
+      });
+      setBalanceMap(bmap);
 
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
