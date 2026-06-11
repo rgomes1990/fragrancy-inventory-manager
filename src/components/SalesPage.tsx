@@ -20,6 +20,7 @@ const SalesPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
+  const [balanceMap, setBalanceMap] = useState<Record<string, { total: number; paid: number; remaining: number; status: string }>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
@@ -131,12 +132,16 @@ const SalesPage = () => {
         kitsQuery = kitsQuery.eq('tenant_id', tenantId);
       }
 
-      const [salesRes, productsRes, customersRes, sellersRes, kitsRes] = await Promise.all([
+      let balanceQuery = (supabase as any).from('v_sales_balance').select('sale_group_id, tenant_id, total, paid, remaining, status');
+      if (!isAdmin && tenantId) balanceQuery = balanceQuery.eq('tenant_id', tenantId);
+
+      const [salesRes, productsRes, customersRes, sellersRes, kitsRes, balanceRes] = await Promise.all([
         salesQuery.order('created_at', { ascending: false }),
         productsQuery.order('name'),
         customersQuery.order('name'),
         sellersQuery.order('name'),
         kitsQuery.order('name'),
+        balanceQuery,
       ]);
 
       if (salesRes.error) throw salesRes.error;
@@ -144,6 +149,17 @@ const SalesPage = () => {
       if (customersRes.error) throw customersRes.error;
       if (sellersRes.error) throw sellersRes.error;
       if (kitsRes.error) throw kitsRes.error;
+
+      const bmap: Record<string, any> = {};
+      (balanceRes?.data || []).forEach((b: any) => {
+        bmap[b.sale_group_id] = {
+          total: Number(b.total),
+          paid: Number(b.paid),
+          remaining: Number(b.remaining),
+          status: b.status,
+        };
+      });
+      setBalanceMap(bmap);
 
       setSales(salesRes.data || []);
       setProducts(productsRes.data || []);
@@ -171,7 +187,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
+  }, [sales, balanceMap, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
@@ -219,24 +235,22 @@ const SalesPage = () => {
 
     if (selectedStatus) {
       filtered = filtered.filter(sale => {
-        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
-        const totalPrice = Number(sale.total_price) || 0;
-        
-        if (selectedStatus === 'recebido') {
-          // Recebido totalmente: payment_received = true e (sem partial_payment_amount OU partial_payment_amount >= total_price)
-          return sale.payment_received === true && (partialAmount === 0 || partialAmount >= totalPrice);
-        } else if (selectedStatus === 'pendente') {
-          // Pendente totalmente: payment_received = false (independente de partial_payment_amount)
-          return sale.payment_received === false;
-        } else if (selectedStatus === 'parcial') {
-          // Parcial: payment_received = true e partial_payment_amount > 0 e < total_price
-          return sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
-        } else if (selectedStatus === 'a-receber') {
-          // Total a Receber: pendentes + parciais (tudo que ainda falta receber)
-          const isPendente = sale.payment_received === false;
-          const isParcial = sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
-          return isPendente || isParcial;
+        const groupKey = (sale as any).sale_group_id || sale.id;
+        const bal = balanceMap[groupKey];
+        // Fallback para lógica legada caso a venda não esteja na view (não deve acontecer)
+        if (!bal) {
+          const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+          const totalPrice = Number(sale.total_price) || 0;
+          if (selectedStatus === 'recebido') return sale.payment_received === true && (partialAmount === 0 || partialAmount >= totalPrice);
+          if (selectedStatus === 'pendente') return sale.payment_received === false;
+          if (selectedStatus === 'parcial') return sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
+          if (selectedStatus === 'a-receber') return sale.payment_received === false || (sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice);
+          return true;
         }
+        if (selectedStatus === 'recebido') return bal.status === 'pago';
+        if (selectedStatus === 'pendente') return bal.status === 'pendente';
+        if (selectedStatus === 'parcial') return bal.status === 'parcial';
+        if (selectedStatus === 'a-receber') return bal.status !== 'pago';
         return true;
       });
     }
@@ -257,9 +271,22 @@ const SalesPage = () => {
     }
 
     setFilteredSales(filtered);
-    
-    // Calcular o total dos resultados filtrados
-    const total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
+
+    // Total dos resultados filtrados
+    let total = 0;
+    if (selectedStatus === 'pendente' || selectedStatus === 'parcial' || selectedStatus === 'a-receber') {
+      // Para "a receber", soma o que falta receber, deduplicando por grupo
+      const seen = new Set<string>();
+      filtered.forEach(sale => {
+        const groupKey = (sale as any).sale_group_id || sale.id;
+        if (seen.has(groupKey)) return;
+        seen.add(groupKey);
+        const bal = balanceMap[groupKey];
+        total += bal ? bal.remaining : Number(sale.total_price);
+      });
+    } else {
+      total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
+    }
     setFilteredTotal(total);
     
     // Manter o cálculo mensal para compatibilidade
