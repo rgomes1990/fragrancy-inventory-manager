@@ -187,7 +187,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     filterSalesBySearch();
-  }, [sales, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
+  }, [sales, balanceMap, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
 
   const filterSalesBySearch = () => {
     let filtered = sales;
