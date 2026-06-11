@@ -20,6 +20,7 @@ const SalesPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
+  const [balanceMap, setBalanceMap] = useState<Record<string, { total: number; paid: number; remaining: number; status: string }>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
