@@ -148,6 +148,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       if (error) throw error;
       toast({ title: 'Pagamento registrado!', description: formatBRL(value) });
       const newPaid = currentPaid + value;
+      await syncSalesPaymentStatus(newPaid);
       await loadHistory();
       onSaved?.();
       // Sempre mostra o popup de resumo (parcial ou final)
