@@ -169,6 +169,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       const { error } = await (client as any).from('sale_payments').delete().eq('id', id);
       if (error) throw error;
       toast({ title: 'Recebimento excluído' });
+      const removed = history.find((h: any) => h.id === id);
+      const newPaid = Math.max(currentPaid - Number(removed?.amount || 0), 0);
+      await syncSalesPaymentStatus(newPaid);
       await loadHistory();
       onSaved?.();
     } catch (e: any) {
