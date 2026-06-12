@@ -136,7 +136,7 @@ const SalesPage = () => {
       if (!isAdmin && tenantId) balanceQuery = balanceQuery.eq('tenant_id', tenantId);
 
       const [salesRes, productsRes, customersRes, sellersRes, kitsRes, balanceRes] = await Promise.all([
-        salesQuery.order('created_at', { ascending: false }),
+        salesQuery.order('sale_date', { ascending: false }).order('created_at', { ascending: false }),
         productsQuery.order('name'),
         customersQuery.order('name'),
         sellersQuery.order('name'),
