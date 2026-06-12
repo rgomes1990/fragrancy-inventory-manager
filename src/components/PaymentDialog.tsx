@@ -47,6 +47,29 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setHistory(data || []);
   };
 
+  // Sincroniza sales.payment_received com o saldo atual do grupo.
+  // Marca todas as linhas como pagas quando o total já foi quitado, e desmarca caso contrário.
+  const syncSalesPaymentStatus = async (paidTotal: number) => {
+    try {
+      const fullyPaid = paidTotal + 0.01 >= total;
+      const client = supabaseWithUser();
+      // Tenta atualizar pelo sale_group_id; se não houver linhas (venda simples), atualiza pelo id.
+      const { data: byGroup } = await (client as any)
+        .from('sales')
+        .update({ payment_received: fullyPaid })
+        .eq('sale_group_id', saleGroupId)
+        .select('id');
+      if (!byGroup || byGroup.length === 0) {
+        await (client as any)
+          .from('sales')
+          .update({ payment_received: fullyPaid })
+          .eq('id', saleGroupId);
+      }
+    } catch (e) {
+      console.error('Erro ao sincronizar status da venda:', e);
+    }
+  };
+
   useEffect(() => {
     if (open) {
       setAmount(remaining > 0 ? remaining.toFixed(2) : '');
