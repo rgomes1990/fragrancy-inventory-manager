@@ -1145,72 +1145,72 @@ const SalesPage = () => {
                   return (
                     <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
                       <TableCell>
-                      {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
+                        {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="font-medium">
-                      {sale.customers?.name || 'Cliente não encontrado'}
+                        {sale.customers?.name || 'Cliente não encontrado'}
                       </TableCell>
                       <TableCell>
-                      {(sale as any).kits?.name
-                        ? <span>🎁 {(sale as any).kits.name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
-                        : (sale.products?.name || 'Produto não encontrado')}
+                        {(sale as any).kits?.name
+                          ? <span>🎁 {(sale as any).kits.name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
+                          : (sale.products?.name || 'Produto não encontrado')}
                       </TableCell>
                       <TableCell>{sale.quantity}</TableCell>
                       <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
                       <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
                       <TableCell>{sale.seller || '-'}</TableCell>
                       <TableCell>
-                      {isGrouped && isFirst && groupTotal !== undefined ? (
-                        <div className="space-y-1">
+                        {isGrouped && isFirst && groupTotal !== undefined ? (
+                          <div className="space-y-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              status === 'pendente' || status === 'parcial'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {status === 'pendente'
+                                ? `Pendente (Total: R$ ${groupTotal.toFixed(2)})`
+                                : status === 'parcial'
+                                ? `Pendente - Pago: R$ ${(groupPaid || 0).toFixed(2)} | Falta: R$ ${(groupTotal - (groupPaid || 0)).toFixed(2)}`
+                                : `Recebido (Total: R$ ${groupTotal.toFixed(2)})`}
+                            </span>
+                            <div className="text-xs text-muted-foreground">
+                              Venda com {groupSize} itens
+                            </div>
+                          </div>
+                        ) : isGrouped ? (
+                          <span className="text-xs text-muted-foreground">↳ mesmo grupo</span>
+                        ) : (
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                             status === 'pendente' || status === 'parcial'
                               ? 'bg-yellow-100 text-yellow-800'
                               : 'bg-green-100 text-green-800'
                           }`}>
                             {status === 'pendente'
-                              ? `Pendente (Total: R$ ${groupTotal.toFixed(2)})`
+                              ? 'Pendente'
                               : status === 'parcial'
-                              ? `Pendente - Pago: R$ ${(groupPaid || 0).toFixed(2)} | Falta: R$ ${(groupTotal - (groupPaid || 0)).toFixed(2)}`
-                              : `Recebido (Total: R$ ${groupTotal.toFixed(2)})`}
+                              ? `Pendente parcial`
+                              : 'Recebido'}
                           </span>
-                          <div className="text-xs text-muted-foreground">
-                            Venda com {groupSize} itens
-                          </div>
-                        </div>
-                      ) : isGrouped ? (
-                        <span className="text-xs text-muted-foreground">↳ mesmo grupo</span>
-                      ) : (
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          status === 'pendente' || status === 'parcial'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}>
-                          {status === 'pendente'
-                            ? 'Pendente'
-                            : status === 'parcial'
-                            ? `Pendente parcial`
-                            : 'Recebido'}
-                        </span>
-                      )}
+                        )}
                       </TableCell>
                       <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(sale)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(sale)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(sale)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(sale)}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -1219,7 +1219,7 @@ const SalesPage = () => {
                 const rows: React.ReactNode[] = [];
 
                 // Renderizar vendas agrupadas
-                  groupedSales.forEach((groupSales) => {
+                groupedSales.forEach((groupSales) => {
                   const groupTotal = groupSales.reduce((sum, s) => sum + Number(s.total_price), 0);
                   const groupKey = (groupSales[0] as any)?.sale_group_id || groupSales[0]?.id;
                   const groupPaid = groupKey ? Number(balanceMap[groupKey]?.paid || 0) : 0;
