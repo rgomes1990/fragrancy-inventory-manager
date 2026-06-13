@@ -1144,22 +1144,22 @@ const SalesPage = () => {
 
                   return (
                     <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
-                    <TableCell>
+                      <TableCell>
                       {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
-                    </TableCell>
-                    <TableCell className="font-medium">
+                      </TableCell>
+                      <TableCell className="font-medium">
                       {sale.customers?.name || 'Cliente não encontrado'}
-                    </TableCell>
-                    <TableCell>
+                      </TableCell>
+                      <TableCell>
                       {(sale as any).kits?.name
                         ? <span>🎁 {(sale as any).kits.name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
                         : (sale.products?.name || 'Produto não encontrado')}
-                    </TableCell>
-                    <TableCell>{sale.quantity}</TableCell>
-                    <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
-                    <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
-                    <TableCell>{sale.seller || '-'}</TableCell>
-                    <TableCell>
+                      </TableCell>
+                      <TableCell>{sale.quantity}</TableCell>
+                      <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
+                      <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
+                      <TableCell>{sale.seller || '-'}</TableCell>
+                      <TableCell>
                       {isGrouped && isFirst && groupTotal !== undefined ? (
                         <div className="space-y-1">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -1192,8 +1192,8 @@ const SalesPage = () => {
                             : 'Recebido'}
                         </span>
                       )}
-                    </TableCell>
-                    <TableCell>
+                      </TableCell>
+                      <TableCell>
                       <div className="flex space-x-2">
                         <Button
                           variant="outline"
@@ -1211,7 +1211,7 @@ const SalesPage = () => {
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
-                    </TableCell>
+                      </TableCell>
                     </TableRow>
                   );
                 };
