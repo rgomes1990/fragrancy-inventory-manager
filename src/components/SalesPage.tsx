@@ -189,6 +189,23 @@ const SalesPage = () => {
     filterSalesBySearch();
   }, [sales, balanceMap, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
 
+  const getSaleBalance = (sale: Sale) => {
+    const groupKey = (sale as any).sale_group_id || sale.id;
+    return balanceMap[groupKey];
+  };
+
+  const getDisplayStatus = (sale: Sale): 'pago' | 'parcial' | 'pendente' => {
+    const bal = getSaleBalance(sale);
+    if (bal) return bal.status as 'pago' | 'parcial' | 'pendente';
+
+    const partialAmount = Number((sale as any).partial_payment_amount) || 0;
+    const totalPrice = Number(sale.total_price) || 0;
+
+    if (sale.payment_received === true && (partialAmount === 0 || partialAmount >= totalPrice)) return 'pago';
+    if (partialAmount > 0 && partialAmount < totalPrice) return 'parcial';
+    return 'pendente';
+  };
+
   const filterSalesBySearch = () => {
     let filtered = sales;
 
@@ -235,22 +252,11 @@ const SalesPage = () => {
 
     if (selectedStatus) {
       filtered = filtered.filter(sale => {
-        const groupKey = (sale as any).sale_group_id || sale.id;
-        const bal = balanceMap[groupKey];
-        // Fallback para lógica legada caso a venda não esteja na view (não deve acontecer)
-        if (!bal) {
-          const partialAmount = Number((sale as any).partial_payment_amount) || 0;
-          const totalPrice = Number(sale.total_price) || 0;
-          if (selectedStatus === 'recebido') return sale.payment_received === true && (partialAmount === 0 || partialAmount >= totalPrice);
-          if (selectedStatus === 'pendente') return sale.payment_received === false;
-          if (selectedStatus === 'parcial') return sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice;
-          if (selectedStatus === 'a-receber') return sale.payment_received === false || (sale.payment_received === true && partialAmount > 0 && partialAmount < totalPrice);
-          return true;
-        }
-        if (selectedStatus === 'recebido') return bal.status === 'pago';
-        if (selectedStatus === 'pendente') return bal.status === 'pendente';
-        if (selectedStatus === 'parcial') return bal.status === 'parcial';
-        if (selectedStatus === 'a-receber') return bal.status !== 'pago';
+        const status = getDisplayStatus(sale);
+        if (selectedStatus === 'recebido') return status === 'pago';
+        if (selectedStatus === 'pendente') return status === 'pendente' || status === 'parcial';
+        if (selectedStatus === 'parcial') return status === 'parcial';
+        if (selectedStatus === 'a-receber') return status !== 'pago';
         return true;
       });
     }
