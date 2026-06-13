@@ -1219,9 +1219,10 @@ const SalesPage = () => {
                 const rows: React.ReactNode[] = [];
 
                 // Renderizar vendas agrupadas
-                groupedSales.forEach((groupSales) => {
+                  groupedSales.forEach((groupSales) => {
                   const groupTotal = groupSales.reduce((sum, s) => sum + Number(s.total_price), 0);
-                  const groupPaid = groupSales.reduce((sum, s) => sum + (Number((s as any).partial_payment_amount) || 0), 0);
+                  const groupKey = (groupSales[0] as any)?.sale_group_id || groupSales[0]?.id;
+                  const groupPaid = groupKey ? Number(balanceMap[groupKey]?.paid || 0) : 0;
                   groupSales.forEach((sale, idx) => {
                     rows.push(renderSaleRow(sale, true, idx === 0, groupTotal, groupPaid, groupSales.length));
                   });
