@@ -1139,7 +1139,10 @@ const SalesPage = () => {
                   }
                 });
 
-                const renderSaleRow = (sale: Sale, isGrouped: boolean = false, isFirst: boolean = false, groupTotal?: number, groupPaid?: number, groupSize?: number) => (
+                const renderSaleRow = (sale: Sale, isGrouped: boolean = false, isFirst: boolean = false, groupTotal?: number, groupPaid?: number, groupSize?: number) => {
+                  const status = getDisplayStatus(sale);
+
+                  return (
                   <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
                     <TableCell>
                       {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
@@ -1160,16 +1163,14 @@ const SalesPage = () => {
                       {isGrouped && isFirst && groupTotal !== undefined ? (
                         <div className="space-y-1">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            !sale.payment_received 
+                            status === 'pendente' || status === 'parcial'
                               ? 'bg-yellow-100 text-yellow-800'
-                              : (groupPaid || 0) > 0 && (groupPaid || 0) < groupTotal
-                              ? 'bg-blue-100 text-blue-800'
                               : 'bg-green-100 text-green-800'
                           }`}>
-                            {!sale.payment_received 
-                              ? `Pendente (Total: R$ ${groupTotal.toFixed(2)})` 
-                              : (groupPaid || 0) > 0 && (groupPaid || 0) < groupTotal
-                              ? `Parcial - Pago: R$ ${(groupPaid || 0).toFixed(2)} | Pendente: R$ ${(groupTotal - (groupPaid || 0)).toFixed(2)}`
+                            {status === 'pendente'
+                              ? `Pendente (Total: R$ ${groupTotal.toFixed(2)})`
+                              : status === 'parcial'
+                              ? `Pendente - Pago: R$ ${(groupPaid || 0).toFixed(2)} | Falta: R$ ${(groupTotal - (groupPaid || 0)).toFixed(2)}`
                               : `Recebido (Total: R$ ${groupTotal.toFixed(2)})`}
                           </span>
                           <div className="text-xs text-muted-foreground">
@@ -1180,16 +1181,14 @@ const SalesPage = () => {
                         <span className="text-xs text-muted-foreground">↳ mesmo grupo</span>
                       ) : (
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          !sale.payment_received 
+                          status === 'pendente' || status === 'parcial'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
-                            ? 'bg-blue-100 text-blue-800'
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {!sale.payment_received 
-                            ? 'Pendente' 
-                            : sale.partial_payment_amount && sale.partial_payment_amount < sale.total_price
-                            ? `Parcial (R$ ${sale.partial_payment_amount.toFixed(2)})`
+                          {status === 'pendente'
+                            ? 'Pendente'
+                            : status === 'parcial'
+                            ? `Pendente parcial`
                             : 'Recebido'}
                         </span>
                       )}
@@ -1214,7 +1213,8 @@ const SalesPage = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                );
+                  );
+                };
 
                 const rows: React.ReactNode[] = [];
 
