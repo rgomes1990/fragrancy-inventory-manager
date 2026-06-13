@@ -1143,7 +1143,7 @@ const SalesPage = () => {
                   const status = getDisplayStatus(sale);
 
                   return (
-                  <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
+                    <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
                     <TableCell>
                       {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
                     </TableCell>
@@ -1212,7 +1212,7 @@ const SalesPage = () => {
                         </Button>
                       </div>
                     </TableCell>
-                  </TableRow>
+                    </TableRow>
                   );
                 };
 
