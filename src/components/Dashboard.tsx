@@ -121,19 +121,54 @@ const Dashboard = () => {
       
       const totalRevenue = allSalesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
 
-      // Caixa: somar TODOS os recebimentos (sale_payments) a partir de 29/08/2025
-      // Fonte da verdade: sale_payments (inclui pagamentos parciais feitos via "A Receber")
-      let paymentsQuery = (supabase as any)
-        .from('sale_payments')
-        .select('amount, payment_date, tenant_id')
-        .gte('payment_date', '2025-08-29');
-      if (!isAdmin && tenantId) paymentsQuery = paymentsQuery.eq('tenant_id', tenantId);
-      const { data: paymentsData } = await paymentsQuery;
+      // Caixa: lógica legada (vendas com payment_received=true a partir de 29/08/2025
+      // + partial_payment_amount registrados na própria venda) — mantém histórico estável.
+      // A partir de 13/06/2026 também somamos pagamentos registrados via "A Receber"
+      // (sale_payments) que ainda não foram refletidos no payment_received da venda,
+      // para que novos recebimentos parciais entrem no caixa sem reprocessar o histórico.
+      const CAIXA_LEGACY_START = '2025-08-29';
+      const SALE_PAYMENTS_CUTOFF = '2026-06-13';
 
-      const revenueFromDate = (paymentsData || []).reduce(
-        (sum: number, p: any) => sum + Number(p.amount || 0),
-        0,
-      );
+      let legacySalesQuery = supabase
+        .from('sales')
+        .select('total_price, payment_received, partial_payment_amount, sale_date')
+        .gte('sale_date', CAIXA_LEGACY_START);
+      legacySalesQuery = applyTenantFilter(legacySalesQuery);
+      const { data: legacySales } = await legacySalesQuery;
+      const legacyRevenue = (legacySales || []).reduce((sum: number, row: any) => {
+        if (row.payment_received) return sum + Number(row.total_price || 0);
+        return sum + Number(row.partial_payment_amount || 0);
+      }, 0);
+
+      let newPaymentsQuery = (supabase as any)
+        .from('sale_payments')
+        .select('amount, tenant_id, created_at, sale_group_id')
+        .gte('created_at', SALE_PAYMENTS_CUTOFF);
+      if (!isAdmin && tenantId) newPaymentsQuery = newPaymentsQuery.eq('tenant_id', tenantId);
+      const { data: newPaymentsData } = await newPaymentsQuery;
+
+      // Exclui pagamentos cuja venda já está marcada como payment_received=true
+      // (já contabilizada via legacyRevenue) para evitar duplicidade.
+      const groupIds = Array.from(new Set((newPaymentsData || []).map((p: any) => p.sale_group_id).filter(Boolean)));
+      const paidGroupIds = new Set<string>();
+      if (groupIds.length > 0) {
+        const { data: paidSales } = await supabase
+          .from('sales')
+          .select('id, sale_group_id, payment_received')
+          .or(`sale_group_id.in.(${groupIds.join(',')}),id.in.(${groupIds.join(',')})`)
+          .eq('payment_received', true);
+        (paidSales || []).forEach((s: any) => {
+          if (s.sale_group_id) paidGroupIds.add(s.sale_group_id);
+          if (s.id) paidGroupIds.add(s.id);
+        });
+      }
+
+      const newPaymentsRevenue = (newPaymentsData || []).reduce((sum: number, p: any) => {
+        if (paidGroupIds.has(p.sale_group_id)) return sum;
+        return sum + Number(p.amount || 0);
+      }, 0);
+
+      const revenueFromDate = legacyRevenue + newPaymentsRevenue;
 
       // Separar despesas (saídas) e entradas de caixa
       let expensesDataQuery = supabase
