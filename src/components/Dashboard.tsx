@@ -121,33 +121,20 @@ const Dashboard = () => {
       
       const totalRevenue = allSalesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
 
-      // Buscar vendas a partir de 29/08/2025 para o cálculo do Caixa da Empresa
-      let salesFromDateQuery = supabase
-        .from('sales')
-        .select('total_price, sale_date, payment_received, partial_payment_amount')
-        .gte('sale_date', '2025-08-29');
-      salesFromDateQuery = applyTenantFilter(salesFromDateQuery);
-      const { data: salesFromDateData } = await salesFromDateQuery;
-      
-      // Calcular receita para o Caixa: vendas totalmente pagas + valor pago das parciais
-      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
-        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
-        const totalPrice = Number(sale.total_price) || 0;
-        
-        if (sale.payment_received) {
-          if (partialAmount > 0 && partialAmount < totalPrice) {
-            // Venda parcial: somar apenas o valor efetivamente pago
-            return sum + partialAmount;
-          } else {
-            // Venda totalmente paga: somar o total
-            return sum + totalPrice;
-          }
-        }
-        
-        // Vendas pendentes (payment_received = false) não entram no caixa
-        return sum;
-      }, 0) || 0;
-      
+      // Caixa: somar TODOS os recebimentos (sale_payments) a partir de 29/08/2025
+      // Fonte da verdade: sale_payments (inclui pagamentos parciais feitos via "A Receber")
+      let paymentsQuery = (supabase as any)
+        .from('sale_payments')
+        .select('amount, payment_date, tenant_id')
+        .gte('payment_date', '2025-08-29');
+      if (!isAdmin && tenantId) paymentsQuery = paymentsQuery.eq('tenant_id', tenantId);
+      const { data: paymentsData } = await paymentsQuery;
+
+      const revenueFromDate = (paymentsData || []).reduce(
+        (sum: number, p: any) => sum + Number(p.amount || 0),
+        0,
+      );
+
       // Separar despesas (saídas) e entradas de caixa
       let expensesDataQuery = supabase
         .from('expenses')
@@ -169,46 +156,24 @@ const Dashboard = () => {
         return sum;
       }, 0) || 0;
 
-      // Buscar vendas com pagamentos pendentes (payment_received = false)
-      let pendingSalesQuery = supabase
-        .from('sales')
-        .select('*')
-        .eq('payment_received', false);
-      pendingSalesQuery = applyTenantFilter(pendingSalesQuery);
-      const { data: pendingSalesData } = await pendingSalesQuery;
-
-      // Buscar vendas com pagamentos parciais (payment_received = true e partial_payment_amount > 0)
-      let partialSalesQuery = supabase
-        .from('sales')
-        .select('*')
-        .eq('payment_received', true)
-        .not('partial_payment_amount', 'is', null);
-      partialSalesQuery = applyTenantFilter(partialSalesQuery);
-      const { data: partialSalesData } = await partialSalesQuery;
+      // Total a Receber: usar a view v_sales_balance (saldo real, em tempo real)
+      let balanceQuery = (supabase as any)
+        .from('v_sales_balance')
+        .select('remaining, status, tenant_id')
+        .neq('status', 'pago');
+      if (!isAdmin && tenantId) balanceQuery = balanceQuery.eq('tenant_id', tenantId);
+      const { data: balanceRows } = await balanceQuery;
 
       let totalPendingPayments = 0;
       let totalPartialPayments = 0;
-
-      // Vendas totalmente pendentes
-      pendingSalesData?.forEach((sale) => {
-        const totalPrice = Number(sale.total_price) || 0;
-        totalPendingPayments += totalPrice;
+      (balanceRows || []).forEach((r: any) => {
+        const rem = Number(r.remaining) || 0;
+        if (r.status === 'parcial') totalPartialPayments += rem;
+        else totalPendingPayments += rem;
       });
 
-      // Vendas parcialmente pagas
-      partialSalesData?.forEach((sale) => {
-        const totalPrice = Number(sale.total_price) || 0;
-        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
-
-        // Apenas considerar como parcial se o valor pago for menor que o total
-        if (partialAmount > 0 && partialAmount < totalPrice) {
-          const amountToReceive = totalPrice - partialAmount;
-          totalPartialPayments += amountToReceive;
-        }
-      });
-
-      // Total a Receber = Pendentes + Parciais
       const totalToReceive = totalPendingPayments + totalPartialPayments;
+
 
       let costSaleSumQuery = supabase.from('products').select('cost_price, sale_price, quantity, is_order_product');
       if (stockFilter === 'in-stock') {
