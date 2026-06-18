@@ -93,6 +93,48 @@ export type Database = {
           },
         ]
       }
+      cash_closings: {
+        Row: {
+          closed_at: string
+          closing_balance: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          opening_balance: number
+          period_end: string
+          period_start: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string
+          closing_balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number
+          period_end: string
+          period_start: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string
+          closing_balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number
+          period_end?: string
+          period_start?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string

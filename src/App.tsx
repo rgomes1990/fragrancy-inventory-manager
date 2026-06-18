@@ -25,6 +25,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
 import SalesCostReport from '@/components/SalesCostReport';
 import ReceivablesPage from '@/components/ReceivablesPage';
+import CashClosingsPage from '@/components/CashClosingsPage';
 
 const queryClient = new QueryClient();
 
@@ -63,6 +64,7 @@ const App = () => {
                         <Route path="/profit-report" element={<ProfitReportPage />} />
                         <Route path="/sales-cost-report" element={<SalesCostReport />} />
                         <Route path="/receivables" element={<ReceivablesPage />} />
+                        <Route path="/cash-closings" element={<CashClosingsPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
