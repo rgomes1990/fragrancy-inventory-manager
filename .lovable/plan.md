@@ -1,78 +1,53 @@
-# Gestão de Pagamentos Pendentes e Parciais
+# Fechamento de Caixa
 
-## Problema
-Hoje a venda guarda apenas **um** valor pago (`partial_payment_amount`). Quando o cliente paga em várias parcelas ao longo do tempo, não há como registrar cada recebimento, ver histórico, nem saber automaticamente quanto ainda falta. Precisamos de uma estrutura que suporte **N recebimentos por venda** até quitar.
+Funcionalidade para o usuário do tenant registrar manualmente, a qualquer momento, um "fechamento de caixa" que congela o saldo apurado naquele instante. Os fechamentos ficam como histórico imutável (somente leitura). O cálculo do "Caixa da Empresa" no Dashboard continua igual (não zera).
 
-## Solução proposta
+## 1. Banco de dados
 
-### 1. Nova tabela `sale_payments` (recebimentos)
-Cada linha = um pagamento que o cliente fez para uma venda.
+Nova tabela `cash_closings` (migração):
 
-Campos principais:
-- `sale_group_id` (vincula ao pedido inteiro, não a um item)
-- `amount` (valor pago naquele recebimento)
-- `payment_type` (Pix, Débito, Crédito, Dinheiro, Link)
-- `payment_date` (data em que o cliente pagou)
-- `notes` (observação opcional: "1ª parcela", "via PIX da esposa", etc.)
-- `tenant_id`, `created_at`
+- `id` uuid PK
+- `tenant_id` uuid (NOT NULL) — isolamento multi-tenant
+- `closed_at` timestamptz default now() — momento do fechamento
+- `opening_balance` numeric — saldo inicial informado pelo usuário (saldo do fechamento anterior, pré-preenchido)
+- `closing_balance` numeric — saldo final calculado (snapshot do "Caixa da Empresa")
+- `period_start` timestamptz — data/hora do fechamento anterior (ou 29/08/2025 se for o primeiro)
+- `period_end` timestamptz — igual a closed_at
+- `notes` text nullable — observações opcionais
+- `created_by` text — username
+- `created_at` / `updated_at`
 
-Vantagens: histórico completo, várias formas de pagamento por venda, relatórios fiéis ao caixa real.
+GRANTs para `authenticated` + `service_role`. RLS: SELECT/INSERT permitidos quando `tenant_id` bate com o tenant do usuário; UPDATE/DELETE bloqueados (somente leitura após criar). Trigger de auditoria padrão.
 
-### 2. Status calculado automaticamente
-A venda deixa de depender só do checkbox "recebido". O status passa a vir da soma dos pagamentos vs. `total_price`:
+## 2. Frontend
 
-- **Pago** — soma dos recebimentos ≥ total
-- **Parcial** — soma > 0 e < total
-- **Pendente** — soma = 0
+### 2.1 Nova página `/cash-closings` (componente `CashClosingsPage.tsx`)
 
-Sem coluna nova de status — sempre calculado, nunca desatualiza.
+- Botão **"Novo Fechamento"** abre dialog:
+  - Mostra "Saldo inicial" (= closing_balance do último fechamento do tenant, ou 0)
+  - Mostra "Saldo final apurado" (= cálculo atual do Caixa da Empresa, mesmo formula do Dashboard)
+  - Campo opcional "Observações"
+  - Botão **Confirmar fechamento** → insere em `cash_closings`
+- Lista de fechamentos (tabela): Data/hora, Saldo inicial, Saldo final, Período, Usuário, Observações. Sem editar/excluir (somente leitura). Paginação simples.
 
-### 3. Fluxo no PDV (nova venda)
-Ao finalizar a venda continua igual, mas o campo "Valor recebido" cria automaticamente o **primeiro registro** em `sale_payments`. Se o cliente não pagou nada, nenhum recebimento é criado e a venda nasce **Pendente** — o estoque é baixado normalmente.
+### 2.2 Navegação
 
-### 4. Nova página/aba "A Receber"
-Menu lateral com badge mostrando quantidade de pedidos em aberto. Lista mostra:
+- Adicionar item "Fechamento de Caixa" no `AppSidebar.tsx` (visível para usuário do tenant; Admin Master também vê).
+- Adicionar rota em `App.tsx`.
 
-```text
-Cliente            Pedido     Total      Pago     Falta    Status
-Maria Silva        #1024      R$ 450,00  R$ 200   R$ 250   Parcial
-João Souza         #1031      R$ 180,00  R$ 0     R$ 180   Pendente
-```
+### 2.3 Cálculo do saldo final
 
-Filtros: cliente, período, status (Pendente/Parcial), vendedor.
-Totalizador no topo: **Total a receber: R$ X.XXX**.
+Reaproveitar a mesma lógica usada hoje no `Dashboard.tsx` (vendas pagas desde 29/08/2025 + pagamentos parciais − despesas + entradas de caixa), filtrada por `tenant_id`. Extrair para um helper `src/lib/cashBalance.ts` para garantir consistência entre Dashboard e Fechamento.
 
-### 5. Modal "Registrar Pagamento"
-Botão em cada linha da lista "A Receber" (e também dentro do detalhe da venda). Abre um popup com:
+## 3. Comportamento
 
-- Valor falta (preenchido como sugestão, editável)
-- Forma de pagamento
-- Data
-- Observação
-- Histórico dos recebimentos anteriores logo abaixo, com opção de excluir/editar um lançamento errado
+- Não altera nada nas tabelas existentes (vendas, despesas, sale_payments).
+- O Dashboard continua mostrando o "Caixa da Empresa" sempre acumulado desde 29/08/2025.
+- O fechamento serve apenas como **fotografia auditável** do saldo num momento específico — útil para conferência mensal/diária quando o usuário quiser.
 
-Ao salvar, recalcula status; se quitou, marca visualmente como **Pago** e some da lista "A Receber".
+## 4. Detalhes técnicos
 
-### 6. Ajustes em telas existentes
-- **Detalhe da venda / SaleSuccessDialog**: mostra "Pago: R$ X / Falta: R$ Y" e lista de recebimentos.
-- **Dashboard "Caixa"**: continua somando recebimentos (já é a regra hoje), mas agora a fonte é `sale_payments.amount` — fica mais preciso porque entradas parciais futuras também entram no caixa do dia em que foram pagas, não no dia da venda.
-- **Filtros atuais da página de Vendas** ("Recebido/Pendente/Parcial") continuam funcionando, agora baseados na soma calculada.
-
-### 7. Migração dos dados atuais
-Para cada venda existente com `partial_payment_amount > 0` ou `payment_received = true`, cria-se 1 linha em `sale_payments` com o valor já registrado, preservando histórico.
-
----
-
-## Detalhes técnicos
-
-- Tabela `sale_payments` com RLS por `tenant_id` (mesma policy padrão das outras), GRANTs para `authenticated` e `service_role`.
-- View `v_sales_balance` (ou função) que retorna por `sale_group_id`: `total`, `paid`, `remaining`, `status` — usada na lista "A Receber" e nos filtros.
-- Hook `useSalePayments(saleGroupId)` para buscar/inserir/excluir recebimentos.
-- Componente `PaymentDialog` reutilizável (novo recebimento) e `PaymentsHistoryList`.
-- Nova rota `/receivables` + item no `AppSidebar` com badge de contagem.
-- Manter colunas legadas `payment_received` e `partial_payment_amount` na tabela `sales` por compatibilidade (não removemos agora) — apenas paramos de usá-las como fonte da verdade.
-
-## Decisões em aberto
-1. Quer permitir **editar/excluir** recebimentos já lançados, ou só adicionar (mais seguro contra erros do usuário)?
-2. A página "A Receber" deve ser **menu próprio** no sidebar ou uma **aba dentro de Vendas**?
-3. Quer **alerta/notificação** de pedidos vencidos (ex.: pendente há mais de X dias)?
+- Componentes shadcn já existentes: Dialog, Table, Button, Input, Textarea.
+- Usar `useTenantFilter` para listar/inserir.
+- Formato de moeda igual ao restante do app (Intl pt-BR).
+- Memória do projeto: atualizar índice com referência a `mem://features/cash-closing`.
