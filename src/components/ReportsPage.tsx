@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { BarChart3, TrendingUp, Calendar, DollarSign } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { salesApi } from '@/services/apiClient';
 
 interface SalesReport {
   period: string;
@@ -58,15 +58,10 @@ const ReportsPage = () => {
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - parseInt(period));
 
-    const { data, error } = await supabase
-      .from('sales')
-      .select('sale_date, total_price')
-      .gte('sale_date', daysAgo.toISOString());
-
-    if (error) throw error;
+    const data = await salesApi.list({ date_from: daysAgo.toISOString() });
 
     // Agrupar por dia
-    const grouped = data.reduce((acc: any, sale) => {
+    const grouped = (data || []).reduce((acc: any, sale: any) => {
       const date = new Date(sale.sale_date).toLocaleDateString('pt-BR');
       if (!acc[date]) {
         acc[date] = { total_sales: 0, total_revenue: 0 };
@@ -90,19 +85,10 @@ const ReportsPage = () => {
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - parseInt(period));
 
-    const { data, error } = await supabase
-      .from('sales')
-      .select(`
-        quantity,
-        total_price,
-        products(name)
-      `)
-      .gte('sale_date', daysAgo.toISOString());
+    const data = await salesApi.list({ date_from: daysAgo.toISOString() });
 
-    if (error) throw error;
-
-    const grouped = data.reduce((acc: any, sale) => {
-      const productName = sale.products?.name || 'Produto não encontrado';
+    const grouped = (data || []).reduce((acc: any, sale: any) => {
+      const productName = sale.product_name || 'Produto não encontrado';
       if (!acc[productName]) {
         acc[productName] = { total_quantity: 0, total_revenue: 0 };
       }
@@ -124,18 +110,10 @@ const ReportsPage = () => {
     const daysAgo = new Date();
     daysAgo.setDate(daysAgo.getDate() - parseInt(period));
 
-    const { data, error } = await supabase
-      .from('sales')
-      .select(`
-        total_price,
-        customers(name)
-      `)
-      .gte('sale_date', daysAgo.toISOString());
+    const data = await salesApi.list({ date_from: daysAgo.toISOString() });
 
-    if (error) throw error;
-
-    const grouped = data.reduce((acc: any, sale) => {
-      const customerName = sale.customers?.name || 'Cliente não encontrado';
+    const grouped = (data || []).reduce((acc: any, sale: any) => {
+      const customerName = sale.customer_name || 'Cliente não encontrado';
       if (!acc[customerName]) {
         acc[customerName] = { total_purchases: 0, total_spent: 0 };
       }

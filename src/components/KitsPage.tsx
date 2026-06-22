@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Plus, ShoppingCart, Trash2, Edit } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { kitsApi, productsApi, salesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Kit, Product } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -21,20 +21,12 @@ const KitsPage: React.FC = () => {
   const fetchData = async () => {
     if (!isAdmin && !tenantId) { setLoading(false); return; }
     try {
-      let kitsQ = supabase.from('kits').select('*, kit_items(*, products(id, name, quantity, cost_price, sale_price))');
-      let prodQ = supabase.from('products').select('*');
-      if (!isAdmin && tenantId) {
-        kitsQ = kitsQ.eq('tenant_id', tenantId);
-        prodQ = prodQ.eq('tenant_id', tenantId);
-      }
-      const [kitsRes, prodRes] = await Promise.all([
-        kitsQ.order('created_at', { ascending: false }),
-        prodQ.order('name'),
+      const [kitsData, prodData] = await Promise.all([
+        kitsApi.list(),
+        productsApi.list(),
       ]);
-      if (kitsRes.error) throw kitsRes.error;
-      if (prodRes.error) throw prodRes.error;
-      setKits((kitsRes.data || []) as any);
-      setProducts(prodRes.data || []);
+      setKits((kitsData || []) as any);
+      setProducts(prodData || []);
     } catch (e) {
       console.error(e);
       toast({ title: 'Erro', description: 'Não foi possível carregar os kits.', variant: 'destructive' });
@@ -49,7 +41,7 @@ const KitsPage: React.FC = () => {
     if (!kit.kit_items || kit.kit_items.length === 0) return 0;
     let min = Infinity;
     for (const it of kit.kit_items) {
-      const stock = it.products?.quantity ?? 0;
+      const stock = it.products?.quantity ?? it.product_quantity ?? 0;
       const possible = Math.floor(stock / it.quantity);
       if (possible < min) min = possible;
     }
@@ -58,14 +50,14 @@ const KitsPage: React.FC = () => {
 
   const handleDelete = async (kit: Kit) => {
     try {
-      const { data: salesData } = await supabaseWithUser().from('sales').select('id').eq('kit_id', kit.id);
-      if ((salesData?.length || 0) > 0) {
+      const salesData = await salesApi.list();
+      const kitSales = (salesData || []).filter((s: any) => s.kit_id === kit.id);
+      if (kitSales.length > 0) {
         toast({ title: 'Exclusão bloqueada', description: 'Kit possui vendas vinculadas.', variant: 'destructive' });
         return;
       }
       if (!confirm(`Excluir o kit "${kit.name}"?`)) return;
-      const { error } = await supabaseWithUser().from('kits').delete().eq('id', kit.id);
-      if (error) throw error;
+      await kitsApi.delete(kit.id);
       toast({ title: 'Sucesso', description: 'Kit excluído.' });
       fetchData();
     } catch (e) {
@@ -104,7 +96,7 @@ const KitsPage: React.FC = () => {
           {kits.map(kit => {
             const avail = availability(kit);
             const itemsText = (kit.kit_items || [])
-              .map(it => `${it.products?.name || '?'} x${it.quantity}`)
+              .map(it => `${it.product_name || it.products?.name || '?'} x${it.quantity}`)
               .join(', ') || '—';
             return (
               <Card key={kit.id} className="overflow-hidden">

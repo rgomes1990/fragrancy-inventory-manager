@@ -1,0 +1,46 @@
+# =====================================================
+# .htaccess para a raiz do public_html na Hostinger
+# Copie este arquivo para public_html/.htaccess
+# =====================================================
+
+RewriteEngine On
+
+# Forcar HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Requisicoes para /api/ vao para a pasta api/
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# Se o arquivo ou diretorio existe, servir diretamente (JS, CSS, imagens)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Todas as outras rotas vao para index.html (React Router)
+RewriteRule ^(.*)$ index.html [QSA,L]
+
+# Prevenir cache de respostas da API
+<IfModule mod_headers.c>
+    <FilesMatch "index\.php$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+# Compressao GZIP
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
+</IfModule>
+
+# Cache de assets estaticos
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>

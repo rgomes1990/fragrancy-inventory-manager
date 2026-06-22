@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon, ArrowDownToLine } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { productsApi, categoriesApi, productOrderRequestsApi, stockEntriesApi, salesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Product, Category, ProductOrderRequest } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -43,7 +43,6 @@ const ProductsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [imageUploading, setImageUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -90,37 +89,18 @@ const ProductsPage = () => {
     }
 
     try {
-      let productsQuery = supabase
-        .from('products')
-        .select(`*, categories(id, name, created_at, updated_at)`);
-      let categoriesQuery = supabase.from('categories').select('*');
-      let orderRequestsQuery = supabase
-        .from('product_order_requests')
-        .select(`*, products(id, name, cost_price, sale_price, quantity, category_id, image_url, created_at, updated_at, is_order_product, categories(id, name, created_at, updated_at))`)
-        .order('created_at', { ascending: false });
-
-      if (!isAdmin && tenantId) {
-        productsQuery = productsQuery.eq('tenant_id', tenantId);
-        categoriesQuery = categoriesQuery.eq('tenant_id', tenantId);
-        orderRequestsQuery = orderRequestsQuery.eq('tenant_id', tenantId);
-      }
-
-      const [productsRes, categoriesRes, orderRequestsRes] = await Promise.all([
-        productsQuery.order('created_at', { ascending: false }),
-        categoriesQuery.order('name'),
-        orderRequestsQuery
+      const [productsData, categoriesData, orderRequestsData] = await Promise.all([
+        productsApi.list(),
+        categoriesApi.list(),
+        productOrderRequestsApi.list(),
       ]);
 
-      if (productsRes.error) throw productsRes.error;
-      if (categoriesRes.error) throw categoriesRes.error;
-      if (orderRequestsRes.error) throw orderRequestsRes.error;
-
-      setProducts(productsRes.data || []);
-      setCategories(categoriesRes.data || []);
-      setOrderRequests(orderRequestsRes.data || []);
+      setProducts(productsData || []);
+      setCategories(categoriesData || []);
+      setOrderRequests(orderRequestsData || []);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
-      toast({ title: "Erro", description: "Não foi possível carregar os dados.", variant: "destructive" });
+      toast({ title: "Erro", description: "Nao foi possivel carregar os dados.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -143,7 +123,7 @@ const ProductsPage = () => {
         type: 'product',
         id: product.id,
         name: product.name,
-        category_name: product.categories?.name || 'Sem categoria',
+        category_name: (product as any).category_name || 'Sem categoria',
         cost_price: Number(product.cost_price),
         sale_price: Number(product.sale_price),
         quantity: product.quantity,
@@ -158,12 +138,12 @@ const ProductsPage = () => {
       rows.push({
         type: 'order_request',
         id: req.id,
-        name: req.products?.name || 'Produto não encontrado',
-        category_name: req.products?.categories?.name || 'Sem categoria',
-        cost_price: Number(req.cost_price || req.products?.cost_price || 0),
-        sale_price: Number(req.sale_price || req.products?.sale_price || 0),
+        name: (req as any).product_name || 'Produto nao encontrado',
+        category_name: (req as any).category_name || 'Sem categoria',
+        cost_price: Number(req.cost_price || 0),
+        sale_price: Number(req.sale_price || 0),
         quantity: req.requested_quantity,
-        image_url: req.products?.image_url,
+        image_url: (req as any).product_image_url,
         badge: 'Encomenda',
         orderRequest: req,
       });
@@ -258,12 +238,7 @@ const ProductsPage = () => {
           is_order_product: formData.is_order_product || false,
         };
 
-        const { error } = await supabaseWithUser()
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id);
-
-        if (error) throw error;
+        await productsApi.update(editingProduct.id, productData);
         toast({ title: "Sucesso", description: "Produto atualizado com sucesso!" });
 
       // CASE 2: Selected existing product
@@ -272,22 +247,19 @@ const ProductsPage = () => {
         const cost = parseFloat(formData.cost_price);
 
         if (!qty || qty <= 0 || isNaN(cost)) {
-          toast({ title: "Erro", description: "Informe quantidade e custo válidos.", variant: "destructive" });
+          toast({ title: "Erro", description: "Informe quantidade e custo validos.", variant: "destructive" });
           return;
         }
 
         const tenantId = getTenantIdForInsert();
         if (!isAdmin && !tenantId) {
-          toast({ title: "Erro", description: "Empresa não identificada.", variant: "destructive" });
+          toast({ title: "Erro", description: "Empresa nao identificada.", variant: "destructive" });
           return;
         }
 
         // Update sale_price if changed
         if (formData.sale_price && parseFloat(formData.sale_price) !== Number(selectedExistingProduct.sale_price)) {
-          await supabaseWithUser()
-            .from('products')
-            .update({ sale_price: parseFloat(formData.sale_price) })
-            .eq('id', selectedExistingProduct.id);
+          await productsApi.update(selectedExistingProduct.id, { sale_price: parseFloat(formData.sale_price) });
         }
 
         // Update category/image if changed
@@ -299,48 +271,39 @@ const ProductsPage = () => {
           updateFields.image_url = formData.image_url || null;
         }
         if (Object.keys(updateFields).length > 0) {
-          await supabaseWithUser()
-            .from('products')
-            .update(updateFields)
-            .eq('id', selectedExistingProduct.id);
+          await productsApi.update(selectedExistingProduct.id, updateFields);
         }
 
         if (formData.is_order_product) {
           // ENCOMENDA: create a product_order_requests record, do NOT add to stock
-          const { error } = await supabaseWithUser()
-            .from('product_order_requests')
-            .insert([{
-              product_id: selectedExistingProduct.id,
-              customer_name: 'Encomenda',
-              requested_quantity: qty,
-              cost_price: cost,
-              sale_price: formData.sale_price ? parseFloat(formData.sale_price) : Number(selectedExistingProduct.sale_price),
-              status: 'Pendente',
-              tenant_id: tenantId,
-            }]);
+          await productOrderRequestsApi.create({
+            product_id: selectedExistingProduct.id,
+            customer_name: 'Encomenda',
+            requested_quantity: qty,
+            cost_price: cost,
+            sale_price: formData.sale_price ? parseFloat(formData.sale_price) : Number(selectedExistingProduct.sale_price),
+            status: 'Pendente',
+            tenant_id: tenantId,
+          });
 
-          if (error) throw error;
-          toast({ title: "Sucesso", description: "Encomenda registrada! As unidades existentes em estoque não foram alteradas." });
+          toast({ title: "Sucesso", description: "Encomenda registrada! As unidades existentes em estoque nao foram alteradas." });
         } else {
-          // ESTOQUE: insert stock entry → trigger recalculates cost_price & quantity
-          const { error } = await supabaseWithUser()
-            .from('stock_entries')
-            .insert([{
-              product_id: selectedExistingProduct.id,
-              quantity: qty,
-              unit_cost: cost,
-              tenant_id: tenantId,
-            }]);
+          // ESTOQUE: insert stock entry -> trigger recalculates cost_price & quantity
+          await stockEntriesApi.create({
+            product_id: selectedExistingProduct.id,
+            quantity: qty,
+            unit_cost: cost,
+            tenant_id: tenantId,
+          });
 
-          if (error) throw error;
-          toast({ title: "Sucesso", description: "Entrada de estoque registrada! Custo médio recalculado automaticamente." });
+          toast({ title: "Sucesso", description: "Entrada de estoque registrada! Custo medio recalculado automaticamente." });
         }
 
       // CASE 3: Brand new product
       } else {
         const tenantIdForProduct = getTenantIdForInsert();
         if (!isAdmin && !tenantIdForProduct) {
-          toast({ title: "Erro", description: "Empresa não identificada.", variant: "destructive" });
+          toast({ title: "Erro", description: "Empresa nao identificada.", variant: "destructive" });
           return;
         }
 
@@ -355,11 +318,7 @@ const ProductsPage = () => {
           tenant_id: tenantIdForProduct,
         };
 
-        const { error } = await supabaseWithUser()
-          .from('products')
-          .insert([productData]);
-
-        if (error) throw error;
+        await productsApi.create(productData);
         toast({ title: "Sucesso", description: "Produto criado com sucesso!" });
       }
 
@@ -367,7 +326,7 @@ const ProductsPage = () => {
       fetchData();
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      toast({ title: "Erro", description: "Não foi possível salvar o produto.", variant: "destructive" });
+      toast({ title: "Erro", description: "Nao foi possivel salvar o produto.", variant: "destructive" });
     }
   };
 
@@ -388,10 +347,12 @@ const ProductsPage = () => {
 
   const handleDelete = async (product: Product) => {
     try {
-      // Check dependent records
-      const { data: stockData } = await supabaseWithUser().from('stock_entries').select('id').eq('product_id', product.id);
-      const { data: orderData } = await supabaseWithUser().from('product_order_requests').select('id').eq('product_id', product.id);
-      const { data: salesData } = await supabaseWithUser().from('sales').select('id').eq('product_id', product.id);
+      // Check dependent records via API lists
+      const [stockData, orderData, salesData] = await Promise.all([
+        stockEntriesApi.list({ product_id: product.id } as any),
+        productOrderRequestsApi.list({ product_id: product.id } as any),
+        salesApi.list({ product_id: product.id } as any),
+      ]);
 
       const stockCount = stockData?.length || 0;
       const orderCount = orderData?.length || 0;
@@ -404,8 +365,8 @@ const ProductsPage = () => {
         if (salesCount > 0) deps.push(`${salesCount} venda(s)`);
 
         toast({
-          title: "Exclusão bloqueada",
-          description: `O produto "${product.name}" possui dependências e não pode ser excluído. Dependências encontradas: ${deps.join(', ')}.`,
+          title: "Exclusao bloqueada",
+          description: `O produto "${product.name}" possui dependencias e nao pode ser excluido. Dependencias encontradas: ${deps.join(', ')}.`,
           variant: "destructive",
         });
         return;
@@ -413,34 +374,13 @@ const ProductsPage = () => {
 
       if (!confirm('Tem certeza que deseja excluir este produto?')) return;
 
-      const { error } = await supabaseWithUser().from('products').delete().eq('id', product.id);
-      if (error) throw error;
+      await productsApi.delete(product.id);
 
-      toast({ title: "Sucesso", description: "Produto excluído com sucesso!" });
+      toast({ title: "Sucesso", description: "Produto excluido com sucesso!" });
       fetchData();
     } catch (error) {
       console.error('Erro ao excluir produto:', error);
-      toast({ title: "Erro", description: "Não foi possível excluir o produto.", variant: "destructive" });
-    }
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setImageUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('product-images').upload(fileName, file);
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
-      setFormData({ ...formData, image_url: data.publicUrl });
-      toast({ title: "Sucesso", description: "Imagem enviada com sucesso!" });
-    } catch (error) {
-      console.error('Erro ao enviar imagem:', error);
-      toast({ title: "Erro", description: "Erro ao enviar imagem", variant: "destructive" });
-    } finally {
-      setImageUploading(false);
+      toast({ title: "Erro", description: "Nao foi possivel excluir o produto.", variant: "destructive" });
     }
   };
 
@@ -454,32 +394,25 @@ const ProductsPage = () => {
 
   // Convert an order request into a stock entry (merge into product stock)
   const handleConvertOrderToStock = async (req: ProductOrderRequest) => {
-    if (!confirm(`Converter encomenda de ${req.requested_quantity} un. para estoque? As unidades serão adicionadas ao estoque do produto.`)) return;
+    if (!confirm(`Converter encomenda de ${req.requested_quantity} un. para estoque? As unidades serao adicionadas ao estoque do produto.`)) return;
     try {
       const tenantIdInsert = getTenantIdForInsert();
-      // Insert stock entry → trigger recalculates cost_price & quantity on the product
-      const { error: stockError } = await supabaseWithUser()
-        .from('stock_entries')
-        .insert([{
-          product_id: req.product_id,
-          quantity: req.requested_quantity,
-          unit_cost: req.cost_price || 0,
-          tenant_id: tenantIdInsert,
-        }]);
-      if (stockError) throw stockError;
+      // Insert stock entry -> trigger recalculates cost_price & quantity on the product
+      await stockEntriesApi.create({
+        product_id: req.product_id,
+        quantity: req.requested_quantity,
+        unit_cost: req.cost_price || 0,
+        tenant_id: tenantIdInsert,
+      });
 
       // Delete the order request
-      const { error: deleteError } = await supabaseWithUser()
-        .from('product_order_requests')
-        .delete()
-        .eq('id', req.id);
-      if (deleteError) throw deleteError;
+      await productOrderRequestsApi.delete(req.id);
 
-      toast({ title: "Sucesso", description: "Encomenda convertida em estoque! Custo médio recalculado." });
+      toast({ title: "Sucesso", description: "Encomenda convertida em estoque! Custo medio recalculado." });
       fetchData();
     } catch (error) {
       console.error('Erro ao converter encomenda:', error);
-      toast({ title: "Erro", description: "Não foi possível converter a encomenda.", variant: "destructive" });
+      toast({ title: "Erro", description: "Nao foi possivel converter a encomenda.", variant: "destructive" });
     }
   };
 
@@ -487,16 +420,12 @@ const ProductsPage = () => {
   const handleDeleteOrderRequest = async (req: ProductOrderRequest) => {
     if (!confirm('Tem certeza que deseja excluir esta encomenda?')) return;
     try {
-      const { error } = await supabaseWithUser()
-        .from('product_order_requests')
-        .delete()
-        .eq('id', req.id);
-      if (error) throw error;
-      toast({ title: "Sucesso", description: "Encomenda excluída com sucesso!" });
+      await productOrderRequestsApi.delete(req.id);
+      toast({ title: "Sucesso", description: "Encomenda excluida com sucesso!" });
       fetchData();
     } catch (error) {
       console.error('Erro ao excluir encomenda:', error);
-      toast({ title: "Erro", description: "Não foi possível excluir a encomenda.", variant: "destructive" });
+      toast({ title: "Erro", description: "Nao foi possivel excluir a encomenda.", variant: "destructive" });
     }
   };
 
@@ -538,7 +467,7 @@ const ProductsPage = () => {
             </CardTitle>
             {!editingProduct && !selectedExistingProduct && (
               <p className="text-sm text-muted-foreground">
-                Digite o nome do produto. Se ele já existir, selecione para dar entrada no estoque. Caso contrário, será criado como novo.
+                Digite o nome do produto. Se ele ja existir, selecione para dar entrada no estoque. Caso contrario, sera criado como novo.
               </p>
             )}
           </CardHeader>
@@ -573,7 +502,7 @@ const ProductsPage = () => {
                       setFormData({ ...formData, name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false });
                     }}
                   >
-                    Limpar seleção
+                    Limpar selecao
                   </Button>
                 )}
                 {showSuggestions && nameSuggestions.length > 0 && (
@@ -604,12 +533,12 @@ const ProductsPage = () => {
                   <p className="font-medium text-foreground">Produto existente selecionado</p>
                   <p>Custo atual: <strong>R$ {Number(selectedExistingProduct.cost_price).toFixed(2)}</strong></p>
                   <p>Estoque atual: <strong>{selectedExistingProduct.quantity}</strong></p>
-                  <p>Preço de venda atual: <strong>R$ {Number(selectedExistingProduct.sale_price).toFixed(2)}</strong></p>
+                  <p>Preco de venda atual: <strong>R$ {Number(selectedExistingProduct.sale_price).toFixed(2)}</strong></p>
                   {weightedPreview && (
                     <>
                       <hr className="my-2 border-border" />
                       <p className="text-primary font-medium">
-                        Novo custo médio estimado: <strong>R$ {weightedPreview.avgCost}</strong>
+                        Novo custo medio estimado: <strong>R$ {weightedPreview.avgCost}</strong>
                       </p>
                       <p className="text-primary">
                         Novo estoque total: <strong>{weightedPreview.totalQty}</strong>
@@ -621,7 +550,7 @@ const ProductsPage = () => {
 
               <div>
                 <Label htmlFor="cost_price">
-                  {selectedExistingProduct ? 'Custo Unitário desta Compra' : 'Preço de Custo'}
+                  {selectedExistingProduct ? 'Custo Unitario desta Compra' : 'Preco de Custo'}
                 </Label>
                 <Input
                   id="cost_price"
@@ -634,7 +563,7 @@ const ProductsPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="sale_price">Preço de Venda</Label>
+                <Label htmlFor="sale_price">Preco de Venda</Label>
                 <Input
                   id="sale_price"
                   type="number"
@@ -682,9 +611,14 @@ const ProductsPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="image">Imagem do Produto</Label>
-                <Input id="image" type="file" accept="image/*" onChange={handleImageUpload} className="cursor-pointer" />
-                {imageUploading && <p className="text-sm text-muted-foreground mt-1">Enviando imagem...</p>}
+                <Label htmlFor="image_url">URL da Imagem do Produto</Label>
+                <Input
+                  id="image_url"
+                  type="url"
+                  placeholder="https://exemplo.com/imagem.jpg"
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                />
                 {formData.image_url && (
                   <div className="mt-2">
                     <img src={formData.image_url} alt="Preview" className="w-20 h-20 object-cover rounded border cursor-pointer" onClick={() => setSelectedImage(formData.image_url)} />
@@ -707,10 +641,10 @@ const ProductsPage = () => {
 
               {formData.is_order_product && selectedExistingProduct && (
                 <div className="md:col-span-2 bg-accent/50 border border-border p-3 rounded-md text-sm">
-                  <p className="font-medium text-foreground">⚠️ Modo Encomenda</p>
+                  <p className="font-medium text-foreground">Modo Encomenda</p>
                   <p className="text-muted-foreground">
-                    As {formData.quantity || '0'} unidades serão registradas como encomenda separadamente. 
-                    O estoque atual ({selectedExistingProduct.quantity} un.) não será alterado.
+                    As {formData.quantity || '0'} unidades serao registradas como encomenda separadamente.
+                    O estoque atual ({selectedExistingProduct.quantity} un.) nao sera alterado.
                   </p>
                 </div>
               )}
@@ -730,7 +664,7 @@ const ProductsPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardContent className="p-4">
-              <h3 className="text-sm font-medium text-muted-foreground">Total Preço de Custo</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Total Preco de Custo</h3>
               <p className="text-2xl font-bold text-primary">
                 R$ {displayRows.reduce((sum, r) => sum + (r.cost_price * r.quantity), 0).toFixed(2)}
               </p>
@@ -738,7 +672,7 @@ const ProductsPage = () => {
           </Card>
           <Card>
             <CardContent className="p-4">
-              <h3 className="text-sm font-medium text-muted-foreground">Projeção de Vendas</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Projecao de Vendas</h3>
               <p className="text-2xl font-bold text-primary">
                 R$ {displayRows.reduce((sum, r) => sum + (r.sale_price * r.quantity), 0).toFixed(2)}
               </p>
@@ -795,11 +729,11 @@ const ProductsPage = () => {
                 <TableHead>Imagem</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Categoria</TableHead>
-                <TableHead>Preço Custo</TableHead>
-                <TableHead>Preço Venda</TableHead>
+                <TableHead>Preco Custo</TableHead>
+                <TableHead>Preco Venda</TableHead>
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Ações</TableHead>
+                <TableHead>Acoes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { productsApi, categoriesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
-import { useTenantFilter } from '@/hooks/useTenantFilter';
 import {
   Dialog,
   DialogContent,
@@ -21,22 +20,17 @@ interface CategoryOption {
 }
 
 const StockProductsPDFReport = () => {
-  const { tenantId, isAdmin } = useTenantFilter();
   const [showDialog, setShowDialog] = useState(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchCategories = async () => {
-    let query = supabase.from('categories').select('id, name').order('name');
-    if (!isAdmin && tenantId) {
-      query = query.eq('tenant_id', tenantId);
-    }
-    const { data } = await query;
+    const data = await categoriesApi.list();
     if (data) {
-      const filtered = data.filter(c => c.name !== 'Tg');
+      const filtered = data.filter((c: any) => c.name !== 'Tg');
       setCategories(filtered);
-      setSelectedCategories(filtered.map(c => c.name));
+      setSelectedCategories(filtered.map((c: any) => c.name));
     }
   };
 
@@ -72,11 +66,6 @@ const StockProductsPDFReport = () => {
 
   const generateStockProductsReport = async () => {
     try {
-      if (!isAdmin && !tenantId) {
-        toast({ title: "Aviso", description: "Não foi possível identificar sua empresa." });
-        return;
-      }
-
       if (selectedCategories.length === 0) {
         toast({ title: "Aviso", description: "Selecione pelo menos uma categoria." });
         return;
@@ -84,25 +73,11 @@ const StockProductsPDFReport = () => {
 
       setLoading(true);
 
-      let stockProductsQuery = supabase
-        .from('products')
-        .select(`*, categories(name)`)
-        .eq('is_order_product', false)
-        .gt('quantity', 0)
-        .order('name');
-
-      if (!isAdmin && tenantId) {
-        stockProductsQuery = stockProductsQuery.eq('tenant_id', tenantId);
-      }
-
-      const stockProductsResult = await stockProductsQuery;
-      if (stockProductsResult.error) throw stockProductsResult.error;
-
-      const stockProducts = stockProductsResult.data || [];
+      const stockProducts = await productsApi.list({ is_order_product: 'false', min_quantity: '1' });
 
       // Filtrar por categorias selecionadas
-      const filteredProducts = stockProducts.filter(product => {
-        const catName = product.categories?.name || 'Sem categoria';
+      const filteredProducts = (stockProducts || []).filter((product: any) => {
+        const catName = product.category_name || 'Sem categoria';
         return selectedCategories.includes(catName);
       });
 
@@ -115,7 +90,7 @@ const StockProductsPDFReport = () => {
       // Agrupar por categoria
       const productsByCategory: { [key: string]: typeof filteredProducts } = {};
       for (const product of filteredProducts) {
-        const categoryName = product.categories?.name || 'Sem categoria';
+        const categoryName = product.category_name || 'Sem categoria';
         if (!productsByCategory[categoryName]) {
           productsByCategory[categoryName] = [];
         }

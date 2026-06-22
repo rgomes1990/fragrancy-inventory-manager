@@ -4,15 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, ShoppingBag, Trash2, Edit, CheckCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ordersApi, orderItemsApi, categoriesApi, productsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Order, OrderItem } from '@/types/database';
 import OrderFormDialog from './OrderFormDialog';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 
 interface OrderWithItems extends Order {
   order_items: OrderItem[];
+  items?: OrderItem[];
 }
 
 const OrdersPage = () => {
@@ -20,7 +20,6 @@ const OrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const { setUserContext } = useAuth();
   const { tenantId, isAdmin } = useTenantFilter();
 
   useEffect(() => {
@@ -31,21 +30,16 @@ const OrdersPage = () => {
 
   const fetchOrders = async () => {
     try {
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (*)
-        `);
-      
-      if (!isAdmin && tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOrders(data || []);
+      const data = await ordersApi.list();
+      // API returns orders; for each order we need items.
+      // Use getById for full data or list order_items separately.
+      // For the list view, fetch all order items and merge.
+      const allItems = await orderItemsApi.list();
+      const ordersWithItems = (data || []).map((order: any) => ({
+        ...order,
+        order_items: (allItems || []).filter((item: any) => item.order_id === order.id),
+      }));
+      setOrders(ordersWithItems);
     } catch (error) {
       console.error('Erro ao buscar encomendas:', error);
       toast({
@@ -68,14 +62,7 @@ const OrdersPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta encomenda?')) return;
 
     try {
-      await setUserContext();
-      
-      const { error } = await supabase
-        .from('orders')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await ordersApi.delete(id);
 
       toast({
         title: "Sucesso",
@@ -96,15 +83,8 @@ const OrdersPage = () => {
     if (!confirm('Confirmar encomenda e criar produtos? Esta ação não pode ser desfeita.')) return;
 
     try {
-      await setUserContext();
-
       // Buscar itens da encomenda
-      const { data: orderItems, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', order.id);
-
-      if (itemsError) throw itemsError;
+      const orderItems = await orderItemsApi.listByOrder(order.id);
 
       if (!orderItems || orderItems.length === 0) {
         toast({
@@ -116,47 +96,26 @@ const OrdersPage = () => {
       }
 
       // Buscar categoria padrão ou criar uma se não existir
-      let { data: defaultCategory } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('name', 'Encomendas')
-        .single();
+      const allCategories = await categoriesApi.list();
+      let defaultCategory = (allCategories || []).find((c: any) => c.name === 'Encomendas');
 
       if (!defaultCategory) {
-        const { data: newCategory, error: categoryError } = await supabase
-          .from('categories')
-          .insert({ name: 'Encomendas' })
-          .select()
-          .single();
-
-        if (categoryError) throw categoryError;
-        defaultCategory = newCategory;
+        defaultCategory = await categoriesApi.create({ name: 'Encomendas' });
       }
 
       // Criar produtos a partir dos itens da encomenda
-      const productsToCreate = orderItems.map(item => ({
-        name: item.product_name,
-        cost_price: item.cost_price,
-        sale_price: item.cost_price * 1.3, // Margem de 30% por padrão
-        quantity: item.quantity,
-        category_id: defaultCategory.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-
-      const { error: productsError } = await supabase
-        .from('products')
-        .insert(productsToCreate);
-
-      if (productsError) throw productsError;
+      for (const item of orderItems) {
+        await productsApi.create({
+          name: item.product_name,
+          cost_price: item.cost_price,
+          sale_price: item.cost_price * 1.3, // Margem de 30% por padrão
+          quantity: item.quantity,
+          category_id: defaultCategory.id,
+        });
+      }
 
       // Atualizar status da encomenda para "Confirmada"
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'Confirmada' })
-        .eq('id', order.id);
-
-      if (updateError) throw updateError;
+      await ordersApi.update(order.id, { status: 'Confirmada' });
 
       toast({
         title: "Sucesso",
@@ -189,8 +148,8 @@ const OrdersPage = () => {
 
   const getOrderItemsDisplay = (orderItems: OrderItem[]) => {
     if (!orderItems || orderItems.length === 0) return 'Nenhum item';
-    
-    return orderItems.map(item => 
+
+    return orderItems.map(item =>
       `${item.product_name} (${item.quantity})`
     ).join(', ');
   };
@@ -199,7 +158,7 @@ const OrdersPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-gray-900 min-w-0">Encomendas</h1>
-        <Button 
+        <Button
           onClick={() => setShowDialog(true)}
           className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto"
         >
@@ -228,7 +187,7 @@ const OrdersPage = () => {
               Valor Total de Todas as Encomendas: R$ {getTotalOrdersValue().toFixed(2)}
             </div>
           </div>
-          
+
           {loading ? (
             <div className="text-center py-8">Carregando encomendas...</div>
           ) : (
@@ -254,7 +213,7 @@ const OrdersPage = () => {
                     </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
-                        order.status === 'Confirmada' 
+                        order.status === 'Confirmada'
                           ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>

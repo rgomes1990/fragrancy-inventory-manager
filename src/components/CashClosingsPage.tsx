@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { cashClosingsApi } from '@/services/apiClient';
 import { calculateCashBalance, CASH_BALANCE_PERIOD_START } from '@/lib/cashBalance';
 import { useToast } from '@/hooks/use-toast';
 import { Wallet, Plus, Loader2 } from 'lucide-react';
@@ -46,13 +46,11 @@ const CashClosingsPage: React.FC = () => {
 
   const fetchClosings = async () => {
     setLoading(true);
-    let q: any = (supabase as any).from('cash_closings').select('*').order('closed_at', { ascending: false });
-    if (!isAdmin && tenantId) q = q.eq('tenant_id', tenantId);
-    const { data, error } = await q;
-    if (error) {
-      toast({ title: 'Erro ao carregar fechamentos', description: error.message, variant: 'destructive' });
-    } else {
+    try {
+      const data = await cashClosingsApi.list();
       setClosings((data || []) as CashClosing[]);
+    } catch (error: any) {
+      toast({ title: 'Erro ao carregar fechamentos', description: error.message || 'Erro desconhecido', variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -84,28 +82,28 @@ const CashClosingsPage: React.FC = () => {
     }
   };
 
-  const confirm = async () => {
+  const confirmClosing = async () => {
     if (!tenantId) return;
     setSaving(true);
-    const now = new Date().toISOString();
-    const { error } = await (supabase as any).from('cash_closings').insert({
-      tenant_id: tenantId,
-      closed_at: now,
-      period_start: periodStart,
-      period_end: now,
-      opening_balance: opening,
-      closing_balance: current,
-      notes: notes || null,
-      created_by: currentUser || null,
-    });
-    setSaving(false);
-    if (error) {
-      toast({ title: 'Erro ao registrar fechamento', description: error.message, variant: 'destructive' });
-      return;
+    try {
+      const now = new Date().toISOString();
+      await cashClosingsApi.create({
+        tenant_id: tenantId,
+        closed_at: now,
+        period_start: periodStart,
+        period_end: now,
+        opening_balance: opening,
+        closing_balance: current,
+        notes: notes || null,
+        created_by: currentUser || null,
+      });
+      toast({ title: 'Fechamento registrado', description: `Saldo final: ${fmt(current)}` });
+      setDialogOpen(false);
+      fetchClosings();
+    } catch (error: any) {
+      toast({ title: 'Erro ao registrar fechamento', description: error.message || 'Erro desconhecido', variant: 'destructive' });
     }
-    toast({ title: 'Fechamento registrado', description: `Saldo final: ${fmt(current)}` });
-    setDialogOpen(false);
-    fetchClosings();
+    setSaving(false);
   };
 
   return (
@@ -215,7 +213,7 @@ const CashClosingsPage: React.FC = () => {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={confirm} disabled={saving || calculating}>
+            <Button onClick={confirmClosing} disabled={saving || calculating}>
               {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Salvando…</> : 'Confirmar fechamento'}
             </Button>
           </DialogFooter>

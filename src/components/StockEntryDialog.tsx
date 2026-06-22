@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PackagePlus } from 'lucide-react';
-import { supabaseWithUser } from '@/integrations/supabase/client';
+import { stockEntriesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Product } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -38,17 +38,13 @@ const StockEntryDialog: React.FC<StockEntryDialogProps> = ({ products, onSuccess
         return;
       }
 
-      const { error } = await supabaseWithUser()
-        .from('stock_entries')
-        .insert([{
-          product_id: productId,
-          quantity: parseInt(quantity),
-          unit_cost: parseFloat(unitCost),
-          notes: notes || null,
-          tenant_id: tenantId,
-        }]);
-
-      if (error) throw error;
+      await stockEntriesApi.create({
+        product_id: productId,
+        quantity: parseInt(quantity),
+        unit_cost: parseFloat(unitCost),
+        notes: notes || null,
+        tenant_id: tenantId,
+      });
 
       toast({ title: "Sucesso", description: "Entrada de estoque registrada! Custo médio recalculado automaticamente." });
       setProductId('');

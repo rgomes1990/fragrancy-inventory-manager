@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2, Edit, MessageCircle, Truck, ClipboardList, Package, CheckCircle2 } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { suppliersApi, supplierOrdersApi, supplierOrderItemsApi, productsApi, stockEntriesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 import {
@@ -46,6 +46,7 @@ interface SupplierOrder {
   order_date: string;
   received_date: string | null;
   tenant_id: string | null;
+  supplier_name?: string;
   items?: SupplierOrderItem[];
   supplier?: Supplier;
 }
@@ -97,23 +98,24 @@ const SuppliersPage = () => {
 
   const fetchAll = async () => {
     try {
-      let sQ = supabase.from('suppliers').select('*').order('name');
-      let oQ = supabase.from('supplier_orders').select('*').order('order_date', { ascending: false });
-      let iQ = supabase.from('supplier_order_items').select('*');
-      let pQ = supabase.from('products').select('id, name, cost_price').order('name');
-      if (!isAdmin && tenantId) {
-        sQ = sQ.eq('tenant_id', tenantId);
-        oQ = oQ.eq('tenant_id', tenantId);
-        pQ = pQ.eq('tenant_id', tenantId);
-      }
-      const [{ data: sD }, { data: oD }, { data: iD }, { data: pD }] = await Promise.all([sQ, oQ, iQ, pQ]);
-      const items = (iD || []) as SupplierOrderItem[];
+      const [sD, oD, pD] = await Promise.all([
+        suppliersApi.list(),
+        supplierOrdersApi.list(),
+        productsApi.list(),
+      ]);
+
       const suppliersData = (sD || []) as Supplier[];
+
+      // For each order, fetch its items and attach supplier info
+      const allItems = await supplierOrderItemsApi.list();
+      const items = (allItems || []) as SupplierOrderItem[];
+
       const ordersWithItems = (oD || []).map((o: any) => ({
         ...o,
         items: items.filter(it => it.order_id === o.id),
         supplier: suppliersData.find(s => s.id === o.supplier_id),
       })) as SupplierOrder[];
+
       setSuppliers(suppliersData);
       setOrders(ordersWithItems);
       setProducts((pD || []) as ProductRow[]);
@@ -152,18 +154,15 @@ const SuppliersPage = () => {
         default_message: supplierForm.default_message || null,
         notes: supplierForm.notes || null,
       };
-      const client = supabaseWithUser();
       if (editingSupplier) {
-        const { error } = await client.from('suppliers').update(payload).eq('id', editingSupplier.id);
-        if (error) throw error;
+        await suppliersApi.update(editingSupplier.id, payload);
         toast({ title: 'Sucesso', description: 'Fornecedor atualizado!' });
       } else {
         if (!isAdmin && !tenantId) {
           toast({ title: 'Erro', description: 'Empresa não identificada.', variant: 'destructive' });
           return;
         }
-        const { error } = await client.from('suppliers').insert([{ ...payload, tenant_id: tenantId }]);
-        if (error) throw error;
+        await suppliersApi.create({ ...payload, tenant_id: tenantId });
         toast({ title: 'Sucesso', description: 'Fornecedor cadastrado!' });
       }
       resetSupplierForm();
@@ -192,8 +191,7 @@ const SuppliersPage = () => {
   const handleDeleteSupplier = async () => {
     if (!supplierToDelete) return;
     try {
-      const { error } = await supabaseWithUser().from('suppliers').delete().eq('id', supplierToDelete.id);
-      if (error) throw error;
+      await suppliersApi.delete(supplierToDelete.id);
       toast({ title: 'Sucesso', description: 'Fornecedor excluído!' });
       setSupplierToDelete(null);
       fetchAll();
@@ -250,25 +248,25 @@ const SuppliersPage = () => {
       return;
     }
     try {
-      const client = supabaseWithUser();
-      const { data: orderData, error: oErr } = await client.from('supplier_orders').insert([{
+      const orderData = await supplierOrdersApi.create({
         supplier_id: orderSupplierId,
         tenant_id: tenantId,
         status: 'aberto',
         total_amount: orderTotal,
         notes: orderNotes || null,
-      }]).select().single();
-      if (oErr) throw oErr;
-      const itemsPayload = validItems.map(it => ({
-        order_id: orderData.id,
-        product_id: it.product_id || null,
-        product_name: it.product_name,
-        quantity: Number(it.quantity),
-        unit_cost: Number(it.unit_cost),
-        subtotal: Number(it.quantity) * Number(it.unit_cost),
-      }));
-      const { error: iErr } = await client.from('supplier_order_items').insert(itemsPayload);
-      if (iErr) throw iErr;
+      });
+
+      for (const it of validItems) {
+        await supplierOrderItemsApi.create({
+          order_id: orderData.id,
+          product_id: it.product_id || null,
+          product_name: it.product_name,
+          quantity: Number(it.quantity),
+          unit_cost: Number(it.unit_cost),
+          subtotal: Number(it.quantity) * Number(it.unit_cost),
+        });
+      }
+
       toast({ title: 'Sucesso', description: 'Pedido registrado!' });
       resetOrderForm();
       fetchAll();
@@ -291,7 +289,6 @@ const SuppliersPage = () => {
 
   const completeOrder = async (o: SupplierOrder) => {
     try {
-      const client = supabaseWithUser();
       // create stock entries for items with product_id
       const stockEntries = (o.items || [])
         .filter(it => it.product_id)
@@ -302,14 +299,14 @@ const SuppliersPage = () => {
           notes: `Pedido fornecedor: ${o.supplier?.name || ''}`,
           tenant_id: tenantId,
         }));
-      if (stockEntries.length > 0) {
-        const { error: seErr } = await client.from('stock_entries').insert(stockEntries);
-        if (seErr) throw seErr;
+      for (const entry of stockEntries) {
+        await stockEntriesApi.create(entry);
       }
-      const { error } = await client.from('supplier_orders').update({
+
+      await supplierOrdersApi.update(o.id, {
         status: 'concluido', received_date: new Date().toISOString(),
-      }).eq('id', o.id);
-      if (error) throw error;
+      });
+
       toast({ title: 'Pedido concluído', description: stockEntries.length > 0 ? 'Entrada de estoque registrada automaticamente.' : 'Status atualizado.' });
       fetchAll();
     } catch (err) {
@@ -321,8 +318,7 @@ const SuppliersPage = () => {
   const handleDeleteOrder = async () => {
     if (!orderToDelete) return;
     try {
-      const { error } = await supabaseWithUser().from('supplier_orders').delete().eq('id', orderToDelete.id);
-      if (error) throw error;
+      await supplierOrdersApi.delete(orderToDelete.id);
       toast({ title: 'Pedido excluído' });
       setOrderToDelete(null);
       fetchAll();
@@ -536,7 +532,7 @@ const SuppliersPage = () => {
                     {orders.map(o => (
                       <TableRow key={o.id}>
                         <TableCell>{new Date(o.order_date).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell className="font-medium">{o.supplier?.name || '—'}</TableCell>
+                        <TableCell className="font-medium">{o.supplier_name || o.supplier?.name || '—'}</TableCell>
                         <TableCell>
                           <div className="text-xs text-muted-foreground max-w-[260px]">
                             {(o.items || []).map(it => `${it.quantity}x ${it.product_name}`).join(', ')}

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Edit, UserCheck, FileText, TrendingUp } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { sellersApi, salesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 import {
@@ -53,11 +53,11 @@ interface SaleRow {
 type PeriodKey = 'current_month' | 'last_month' | 'last_30' | 'current_year' | 'all';
 
 const periodOptions: { value: PeriodKey; label: string }[] = [
-  { value: 'current_month', label: 'Mês atual' },
-  { value: 'last_month', label: 'Mês anterior' },
-  { value: 'last_30', label: 'Últimos 30 dias' },
+  { value: 'current_month', label: 'Mes atual' },
+  { value: 'last_month', label: 'Mes anterior' },
+  { value: 'last_30', label: 'Ultimos 30 dias' },
   { value: 'current_year', label: 'Ano atual' },
-  { value: 'all', label: 'Todo período' },
+  { value: 'all', label: 'Todo periodo' },
 ];
 
 const getRange = (p: PeriodKey): { start: Date | null; end: Date | null } => {
@@ -93,21 +93,21 @@ const SellersPage = () => {
 
   const fetchAll = async () => {
     try {
-      let sq = supabase.from('sellers').select('*').order('name');
-      let salesQ = supabase.from('sales').select('id, seller, total_price, sale_date');
-      if (!isAdmin) {
-        if (!tenantId) { setSellers([]); setSales([]); setLoading(false); return; }
-        sq = sq.eq('tenant_id', tenantId);
-        salesQ = salesQ.eq('tenant_id', tenantId);
+      if (!isAdmin && !tenantId) {
+        setSellers([]);
+        setSales([]);
+        setLoading(false);
+        return;
       }
-      const [{ data: sData, error: sErr }, { data: salesData, error: salesErr }] = await Promise.all([sq, salesQ]);
-      if (sErr) throw sErr;
-      if (salesErr) throw salesErr;
-      setSellers((sData || []) as Seller[]);
+      const [sellersData, salesData] = await Promise.all([
+        sellersApi.list(),
+        salesApi.list(),
+      ]);
+      setSellers((sellersData || []) as Seller[]);
       setSales((salesData || []) as SaleRow[]);
     } catch (error) {
       console.error(error);
-      toast({ title: 'Erro', description: 'Não foi possível carregar os dados.', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Nao foi possivel carregar os dados.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -145,29 +145,26 @@ const SellersPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const client = supabaseWithUser();
       const payload = {
         name: formData.name,
         commission_percentage: Number(formData.commission_percentage) || 0,
       };
       if (editingSeller) {
-        const { error } = await client.from('sellers').update(payload).eq('id', editingSeller.id);
-        if (error) throw error;
+        await sellersApi.update(editingSeller.id, payload);
         toast({ title: 'Sucesso', description: 'Vendedor atualizado!' });
       } else {
         if (!isAdmin && !tenantId) {
-          toast({ title: 'Erro', description: 'Empresa não identificada.', variant: 'destructive' });
+          toast({ title: 'Erro', description: 'Empresa nao identificada.', variant: 'destructive' });
           return;
         }
-        const { error } = await client.from('sellers').insert([{ ...payload, tenant_id: tenantId }]);
-        if (error) throw error;
+        await sellersApi.create({ ...payload, tenant_id: tenantId });
         toast({ title: 'Sucesso', description: 'Vendedor cadastrado!' });
       }
       resetForm();
       fetchAll();
     } catch (error) {
       console.error(error);
-      toast({ title: 'Erro', description: 'Não foi possível salvar.', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Nao foi possivel salvar.', variant: 'destructive' });
     }
   };
 
@@ -180,15 +177,13 @@ const SellersPage = () => {
   const handleDelete = async () => {
     if (!sellerToDelete) return;
     try {
-      const client = supabaseWithUser();
-      const { error } = await client.from('sellers').delete().eq('id', sellerToDelete.id);
-      if (error) throw error;
-      toast({ title: 'Sucesso', description: 'Vendedor excluído!' });
+      await sellersApi.delete(sellerToDelete.id);
+      toast({ title: 'Sucesso', description: 'Vendedor excluido!' });
       setSellerToDelete(null);
       fetchAll();
     } catch (error) {
       console.error(error);
-      toast({ title: 'Erro', description: 'Não foi possível excluir.', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Nao foi possivel excluir.', variant: 'destructive' });
     }
   };
 
@@ -198,7 +193,7 @@ const SellersPage = () => {
       .sort((a, b) => new Date(b.sale_date).getTime() - new Date(a.sale_date).getTime())
       .map(s => `<tr><td style="padding:8px;border-bottom:1px solid #eee;">${new Date(s.sale_date).toLocaleDateString('pt-BR')}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">${fmt(Number(s.total_price))}</td></tr>`)
       .join('');
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Comprovante de Comissão - ${data.seller.name}</title>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Comprovante de Comissao - ${data.seller.name}</title>
       <style>body{font-family:Arial,sans-serif;max-width:720px;margin:24px auto;padding:24px;color:#1f2937;}
       h1{margin:0 0 4px;font-size:22px;} .muted{color:#6b7280;font-size:13px;}
       .box{margin-top:20px;padding:16px;border:1px solid #e5e7eb;border-radius:8px;}
@@ -208,19 +203,19 @@ const SellersPage = () => {
       .total{font-size:18px;font-weight:bold;color:#059669;}
       @media print { .no-print{display:none;} }
       </style></head><body>
-      <h1>Comprovante de Comissão</h1>
+      <h1>Comprovante de Comissao</h1>
       <div class="muted">Emitido em ${new Date().toLocaleString('pt-BR')}</div>
       <div class="box">
         <div class="row"><strong>Vendedor:</strong><span>${data.seller.name}</span></div>
-        <div class="row"><strong>Período:</strong><span>${periodLabel}</span></div>
-        <div class="row"><strong>Comissão:</strong><span>${Number(data.seller.commission_percentage)}%</span></div>
+        <div class="row"><strong>Periodo:</strong><span>${periodLabel}</span></div>
+        <div class="row"><strong>Comissao:</strong><span>${Number(data.seller.commission_percentage)}%</span></div>
         <div class="row"><strong>Quantidade de vendas:</strong><span>${data.sales.length}</span></div>
         <div class="row"><strong>Total vendido:</strong><span>${fmt(data.totalSold)}</span></div>
-        <div class="row"><strong>Comissão a pagar:</strong><span class="total">${fmt(data.commission)}</span></div>
+        <div class="row"><strong>Comissao a pagar:</strong><span class="total">${fmt(data.commission)}</span></div>
       </div>
-      <h3 style="margin-top:24px;">Vendas no período</h3>
+      <h3 style="margin-top:24px;">Vendas no periodo</h3>
       <table><thead><tr><th>Data</th><th style="text-align:right;">Valor</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="2" style="padding:12px;text-align:center;color:#9ca3af;">Sem vendas no período</td></tr>'}</tbody></table>
+      <tbody>${rows || '<tr><td colspan="2" style="padding:12px;text-align:center;color:#9ca3af;">Sem vendas no periodo</td></tr>'}</tbody></table>
       <div style="margin-top:32px;text-align:center;" class="no-print">
         <button onclick="window.print()" style="padding:10px 20px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Imprimir / Salvar PDF</button>
       </div>
@@ -230,17 +225,17 @@ const SellersPage = () => {
   };
 
   if (loading) {
-    return <div className="space-y-6"><h1 className="text-3xl font-bold">Vendedores e Comissões</h1><div className="h-64 bg-muted rounded-lg animate-pulse" /></div>;
+    return <div className="space-y-6"><h1 className="text-3xl font-bold">Vendedores e Comissoes</h1><div className="h-64 bg-muted rounded-lg animate-pulse" /></div>;
   }
 
   return (
     <div className="space-y-8">
-      {/* Comissões */}
+      {/* Comissoes */}
       <div>
         <div className="flex items-start justify-between mb-4 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2"><TrendingUp className="h-7 w-7 text-primary" />Comissões</h1>
-            <p className="text-muted-foreground">Cálculo automático por vendedor</p>
+            <h1 className="text-3xl font-bold flex items-center gap-2"><TrendingUp className="h-7 w-7 text-primary" />Comissoes</h1>
+            <p className="text-muted-foreground">Calculo automatico por vendedor</p>
           </div>
           <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
@@ -251,7 +246,7 @@ const SellersPage = () => {
         </div>
 
         {commissionData.length === 0 ? (
-          <Card><CardContent className="py-8 text-center text-muted-foreground">Cadastre vendedores para visualizar comissões.</CardContent></Card>
+          <Card><CardContent className="py-8 text-center text-muted-foreground">Cadastre vendedores para visualizar comissoes.</CardContent></Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {commissionData.map(({ seller, sales: sSales, totalSold, commission }) => (
@@ -271,7 +266,7 @@ const SellersPage = () => {
                   </div>
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total vendido</span><span className="font-medium">{fmt(totalSold)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Comissão a pagar</span><span className="font-bold text-emerald-600">{fmt(commission)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Comissao a pagar</span><span className="font-bold text-emerald-600">{fmt(commission)}</span></div>
                   </div>
                   {commission > 0 && (
                     <Button variant="outline" className="w-full" onClick={() => generateReceipt({ seller, sales: sSales, totalSold, commission })}>
@@ -301,7 +296,7 @@ const SellersPage = () => {
                   <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="commission">Comissão (%)</Label>
+                  <Label htmlFor="commission">Comissao (%)</Label>
                   <Input id="commission" type="number" step="0.01" min="0" max="100" value={formData.commission_percentage} onChange={(e) => setFormData({ ...formData, commission_percentage: e.target.value })} required />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -323,9 +318,9 @@ const SellersPage = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome</TableHead>
-                    <TableHead>Comissão</TableHead>
+                    <TableHead>Comissao</TableHead>
                     <TableHead>Cadastro</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="text-right">Acoes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -354,7 +349,7 @@ const SellersPage = () => {
       <AlertDialog open={!!sellerToDelete} onOpenChange={() => setSellerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar exclusao</AlertDialogTitle>
             <AlertDialogDescription>Excluir o vendedor "{sellerToDelete?.name}"?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

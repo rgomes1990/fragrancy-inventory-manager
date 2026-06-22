@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Tag, Search } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { categoriesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Category } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -35,24 +35,13 @@ const CategoriesPage = () => {
 
   const fetchCategories = async () => {
     try {
-      let query = supabase
-        .from('categories')
-        .select('*');
-      
-      // Aplicar filtro de tenant para usuários não-admin
-      if (!isAdmin && tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query.order('name', { ascending: true });
-
-      if (error) throw error;
+      const data = await categoriesApi.list();
       setCategories(data || []);
     } catch (error) {
       console.error('Erro ao buscar categorias:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as categorias.",
+        description: "Nao foi possivel carregar as categorias.",
         variant: "destructive",
       });
     } finally {
@@ -75,19 +64,19 @@ const CategoriesPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const categoryData: any = {
         name: formData.name,
       };
 
-      // Adicionar tenant_id para novos registros - com validação
+      // Adicionar tenant_id para novos registros - com validacao
       if (!editingCategory) {
         const tenantIdForCategory = getTenantIdForInsert();
         if (!isAdmin && !tenantIdForCategory) {
           toast({
             title: "Erro",
-            description: "Empresa não identificada. Por favor, faça login novamente.",
+            description: "Empresa nao identificada. Por favor, faca login novamente.",
             variant: "destructive",
           });
           return;
@@ -96,22 +85,13 @@ const CategoriesPage = () => {
       }
 
       if (editingCategory) {
-        const { error } = await supabaseWithUser()
-          .from('categories')
-          .update(categoryData)
-          .eq('id', editingCategory.id);
-
-        if (error) throw error;
+        await categoriesApi.update(editingCategory.id, categoryData);
         toast({
           title: "Sucesso",
           description: "Categoria atualizada com sucesso!",
         });
       } else {
-        const { error } = await supabaseWithUser()
-          .from('categories')
-          .insert([categoryData]);
-
-        if (error) throw error;
+        await categoriesApi.create(categoryData);
         toast({
           title: "Sucesso",
           description: "Categoria cadastrada com sucesso!",
@@ -124,7 +104,7 @@ const CategoriesPage = () => {
       console.error('Erro ao salvar categoria:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a categoria.",
+        description: "Nao foi possivel salvar a categoria.",
         variant: "destructive",
       });
     }
@@ -142,23 +122,18 @@ const CategoriesPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
 
     try {
-      const { error } = await supabaseWithUser()
-        .from('categories')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await categoriesApi.delete(id);
 
       toast({
         title: "Sucesso",
-        description: "Categoria excluída com sucesso!",
+        description: "Categoria excluida com sucesso!",
       });
       fetchCategories();
     } catch (error) {
       console.error('Erro ao excluir categoria:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível excluir a categoria.",
+        description: "Nao foi possivel excluir a categoria.",
         variant: "destructive",
       });
     }
@@ -186,7 +161,7 @@ const CategoriesPage = () => {
               className="pl-9 w-full"
             />
           </div>
-          <Button 
+          <Button
             onClick={() => setShowForm(true)}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto shrink-0"
           >
@@ -245,8 +220,8 @@ const CategoriesPage = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
-                  <TableHead>Data de Criação</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead>Data de Criacao</TableHead>
+                  <TableHead>Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

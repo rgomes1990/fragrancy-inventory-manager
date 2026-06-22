@@ -7,10 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, ShoppingCart, Edit, Trash2, Search, Calculator } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { productOrderRequestsApi, productsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { ProductOrderRequest, Product } from '@/types/database';
-import { useAuth } from '@/contexts/AuthContext';
 import OrderProductsPDFReport from './OrderProductsPDFReport';
 
 const ProductOrderRequestsPage = () => {
@@ -21,8 +20,7 @@ const ProductOrderRequestsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingRequest, setEditingRequest] = useState<ProductOrderRequest | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { setUserContext } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     product_id: '',
     customer_name: '',
@@ -41,29 +39,13 @@ const ProductOrderRequestsPage = () => {
 
   const fetchData = async () => {
     try {
-      const [requestsRes, productsRes] = await Promise.all([
-        supabase
-          .from('product_order_requests')
-          .select(`
-            *,
-            products(
-              id, name, cost_price, sale_price, quantity, category_id, image_url, 
-              created_at, updated_at,
-              categories(id, name, created_at, updated_at)
-            )
-          `)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('products')
-          .select('*')
-          .order('name')
+      const [requestsData, productsData] = await Promise.all([
+        productOrderRequestsApi.list(),
+        productsApi.list(),
       ]);
 
-      if (requestsRes.error) throw requestsRes.error;
-      if (productsRes.error) throw productsRes.error;
-
-      setRequests(requestsRes.data || []);
-      setProducts(productsRes.data || []);
+      setRequests(requestsData || []);
+      setProducts(productsData || []);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
       toast({
@@ -92,9 +74,10 @@ const ProductOrderRequestsPage = () => {
 
     const filtered = requests.filter(request => {
       const searchLower = searchTerm.toLowerCase();
+      const productName = request.product_name || request.products?.name || '';
       return (
         request.customer_name.toLowerCase().includes(searchLower) ||
-        request.products?.name?.toLowerCase().includes(searchLower) ||
+        productName.toLowerCase().includes(searchLower) ||
         request.status.toLowerCase().includes(searchLower) ||
         request.requested_quantity.toString().includes(searchLower)
       );
@@ -105,10 +88,8 @@ const ProductOrderRequestsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      await setUserContext();
-      
       const requestData = {
         product_id: formData.product_id,
         customer_name: formData.customer_name,
@@ -121,13 +102,7 @@ const ProductOrderRequestsPage = () => {
 
       if (editingRequest) {
         // Gerenciar estoque baseado na mudança de status
-        const { data: currentProduct, error: productError } = await supabase
-          .from('products')
-          .select('quantity')
-          .eq('id', formData.product_id)
-          .single();
-
-        if (productError) throw productError;
+        const currentProduct = await productsApi.getById(formData.product_id);
 
         let newQuantity = currentProduct.quantity;
 
@@ -142,31 +117,17 @@ const ProductOrderRequestsPage = () => {
 
         // Atualizar quantidade se houve mudança
         if (newQuantity !== currentProduct.quantity) {
-          const { error: updateProductError } = await supabase
-            .from('products')
-            .update({ quantity: newQuantity })
-            .eq('id', formData.product_id);
-
-          if (updateProductError) throw updateProductError;
+          await productsApi.update(formData.product_id, { quantity: newQuantity });
         }
 
-        const { error } = await supabase
-          .from('product_order_requests')
-          .update(requestData)
-          .eq('id', editingRequest.id);
-
-        if (error) throw error;
+        await productOrderRequestsApi.update(editingRequest.id, requestData);
 
         toast({
           title: "Sucesso",
           description: "Solicitação atualizada com sucesso!",
         });
       } else {
-        const { error } = await supabase
-          .from('product_order_requests')
-          .insert([requestData]);
-
-        if (error) throw error;
+        await productOrderRequestsApi.create(requestData);
 
         toast({
           title: "Sucesso",
@@ -204,14 +165,7 @@ const ProductOrderRequestsPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta solicitação?')) return;
 
     try {
-      await setUserContext();
-      
-      const { error } = await supabase
-        .from('product_order_requests')
-        .delete()
-        .eq('id', request.id);
-
-      if (error) throw error;
+      await productOrderRequestsApi.delete(request.id);
 
       toast({
         title: "Sucesso",
@@ -308,12 +262,12 @@ const ProductOrderRequestsPage = () => {
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="product">Produto</Label>
-                <select 
-                  value={formData.product_id} 
+                <select
+                  value={formData.product_id}
                   onChange={(e) => {
                     const selectedProduct = products.find(p => p.id === e.target.value);
                     setFormData({
-                      ...formData, 
+                      ...formData,
                       product_id: e.target.value,
                       cost_price: selectedProduct?.cost_price?.toString() || '',
                       sale_price: selectedProduct?.sale_price?.toString() || ''
@@ -379,8 +333,8 @@ const ProductOrderRequestsPage = () => {
 
               <div>
                 <Label htmlFor="status">Status</Label>
-                <select 
-                  value={formData.status} 
+                <select
+                  value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value})}
                   className="w-full p-2 border rounded-md"
                 >
@@ -449,7 +403,7 @@ const ProductOrderRequestsPage = () => {
               {filteredRequests.map((request) => (
                 <TableRow key={request.id}>
                   <TableCell className="font-medium">
-                    {request.products?.name || 'Produto não encontrado'}
+                    {request.product_name || request.products?.name || 'Produto não encontrado'}
                   </TableCell>
                   <TableCell>{request.customer_name}</TableCell>
                   <TableCell>{request.requested_quantity}</TableCell>

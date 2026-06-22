@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { ordersApi, orderItemsApi } from '@/services/apiClient';
 import { Order, OrderItem } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
 
@@ -22,23 +22,12 @@ export const useOrderData = (orderId: string | null) => {
     setLoading(true);
     try {
       console.log('Buscando dados da encomenda:', id);
-      
-      // Buscar dados da encomenda
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', id)
-        .single();
 
-      if (orderError) throw orderError;
+      // Buscar dados da encomenda
+      const orderData = await ordersApi.getById(id);
 
       // Buscar itens da encomenda
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', id);
-
-      if (itemsError) throw itemsError;
+      const itemsData = await orderItemsApi.listByOrder(id);
 
       setOrder(orderData);
       setOrderItems(itemsData || []);

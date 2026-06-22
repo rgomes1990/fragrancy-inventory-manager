@@ -5,24 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShoppingCart } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { productOrderRequestsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Product } from '@/types/database';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface ProductOrderRequestDialogProps {
   product: Product;
   onSuccess?: () => void;
 }
 
-const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({ 
-  product, 
-  onSuccess 
+const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
+  product,
+  onSuccess
 }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { setUserContext } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     customer_name: '',
     requested_quantity: '',
@@ -34,10 +32,8 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
-      await setUserContext();
-      
       const requestData = {
         product_id: product.id,
         customer_name: formData.customer_name,
@@ -48,11 +44,7 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
         status: 'Pendente',
       };
 
-      const { error } = await supabase
-        .from('product_order_requests')
-        .insert([requestData]);
-
-      if (error) throw error;
+      await productOrderRequestsApi.create(requestData);
 
       toast({
         title: "Sucesso",
@@ -67,7 +59,7 @@ const ProductOrderRequestDialog: React.FC<ProductOrderRequestDialogProps> = ({
         sale_price: product.sale_price.toString(),
         notes: '',
       });
-      
+
       setOpen(false);
       onSuccess?.();
     } catch (error) {

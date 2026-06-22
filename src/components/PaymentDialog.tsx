@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { salePaymentsApi, salesApi, customersApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Trash2, Pencil, Check, X } from 'lucide-react';
 import SaleSuccessDialog, { SaleSuccessData } from './SaleSuccessDialog';
@@ -39,11 +39,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [successData, setSuccessData] = useState<SaleSuccessData | null>(null);
 
   const loadHistory = async () => {
-    const { data } = await (supabase as any)
-      .from('sale_payments')
-      .select('*')
-      .eq('sale_group_id', saleGroupId)
-      .order('payment_date', { ascending: true });
+    const data = await salePaymentsApi.listByGroup(saleGroupId);
     setHistory(data || []);
   };
 
@@ -52,18 +48,19 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const syncSalesPaymentStatus = async (paidTotal: number) => {
     try {
       const fullyPaid = paidTotal + 0.01 >= total;
-      const client = supabaseWithUser();
-      // Tenta atualizar pelo sale_group_id; se não houver linhas (venda simples), atualiza pelo id.
-      const { data: byGroup } = await (client as any)
-        .from('sales')
-        .update({ payment_received: fullyPaid })
-        .eq('sale_group_id', saleGroupId)
-        .select('id');
-      if (!byGroup || byGroup.length === 0) {
-        await (client as any)
-          .from('sales')
-          .update({ payment_received: fullyPaid })
-          .eq('id', saleGroupId);
+      // Buscar vendas pelo sale_group_id
+      const allSales = await salesApi.list({ sale_group_id: saleGroupId });
+      // Filtrar apenas vendas que realmente pertencem ao grupo (seguranca)
+      const groupSales = (allSales || []).filter(
+        (s: any) => s.sale_group_id === saleGroupId
+      );
+      if (groupSales.length > 0) {
+        for (const sale of groupSales) {
+          await salesApi.update(sale.id, { payment_received: fullyPaid });
+        }
+      } else {
+        // Venda simples - atualiza pelo id
+        await salesApi.update(saleGroupId, { payment_received: fullyPaid });
       }
     } catch (e) {
       console.error('Erro ao sincronizar status da venda:', e);
@@ -84,31 +81,34 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const buildAndShowSuccess = async (paidNow: number, payType: string, newPaidTotal: number) => {
     try {
       // Busca itens da venda (sale_group_id ou id quando venda simples)
-      const { data: salesItems } = await supabase
-        .from('sales')
-        .select('quantity, total_price, customer_id, products(name), kits(name)')
-        .or(`sale_group_id.eq.${saleGroupId},id.eq.${saleGroupId}`);
+      const salesItems = await salesApi.list({ sale_group_id: saleGroupId });
+      let allItems = salesItems || [];
+      if (allItems.length === 0) {
+        // Venda simples - buscar pelo id
+        try {
+          const single = await salesApi.getById(saleGroupId);
+          if (single) allItems = [single];
+        } catch { /* ignore */ }
+      }
 
-      const items = (salesItems || []).map((s: any) => ({
-        name: s.kits?.name || s.products?.name || 'Item',
+      const items = allItems.map((s: any) => ({
+        name: s.kit_name || s.product_name || 'Item',
         quantity: s.quantity,
         subtotal: Number(s.total_price),
-        isKit: !!s.kits,
+        isKit: !!s.kit_name,
       }));
 
-      const customerId = (salesItems?.[0] as any)?.customer_id;
+      const customerId = allItems[0]?.customer_id;
       let whatsapp: string | null = null;
       let cName = customerName || '';
       if (customerId) {
-        const { data: c } = await supabase
-          .from('customers')
-          .select('name, whatsapp')
-          .eq('id', customerId)
-          .maybeSingle();
-        if (c) {
-          whatsapp = (c as any).whatsapp || null;
-          if (!cName) cName = (c as any).name;
-        }
+        try {
+          const c = await customersApi.getById(customerId);
+          if (c) {
+            whatsapp = c.whatsapp || null;
+            if (!cName) cName = c.name;
+          }
+        } catch { /* ignore */ }
       }
 
       const remainingAfter = Math.max(total - newPaidTotal, 0);
@@ -136,16 +136,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     }
     setSaving(true);
     try {
-      const client = supabaseWithUser();
-      const { error } = await (client as any).from('sale_payments').insert([{
+      await salePaymentsApi.create({
         sale_group_id: saleGroupId,
-        tenant_id: tenantId,
         amount: value,
         payment_type: paymentType || null,
         payment_date: paymentDate + 'T12:00:00.000Z',
         notes: notes || null,
-      }]);
-      if (error) throw error;
+      });
       toast({ title: 'Pagamento registrado!', description: formatBRL(value) });
       const newPaid = currentPaid + value;
       await syncSalesPaymentStatus(newPaid);
@@ -165,9 +162,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este recebimento?')) return;
     try {
-      const client = supabaseWithUser();
-      const { error } = await (client as any).from('sale_payments').delete().eq('id', id);
-      if (error) throw error;
+      await salePaymentsApi.delete(id);
       toast({ title: 'Recebimento excluído' });
       const removed = history.find((h: any) => h.id === id);
       const newPaid = Math.max(currentPaid - Number(removed?.amount || 0), 0);
@@ -301,14 +296,12 @@ const HistoryRow: React.FC<HistoryRowProps> = ({ item, onDelete, onUpdated, onSa
     }
     setSaving(true);
     try {
-      const client = supabaseWithUser();
-      const { error } = await (client as any).from('sale_payments').update({
+      await salePaymentsApi.update(item.id, {
         amount: value,
         payment_type: paymentType || null,
         payment_date: paymentDate + 'T12:00:00.000Z',
         notes: notes || null,
-      }).eq('id', item.id);
-      if (error) throw error;
+      });
       toast({ title: 'Recebimento atualizado' });
       setEditing(false);
       await onUpdated();
@@ -360,4 +353,3 @@ const HistoryRow: React.FC<HistoryRowProps> = ({ item, onDelete, onUpdated, onSa
     </div>
   );
 };
-

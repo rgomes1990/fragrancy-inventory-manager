@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
+import { salesBalanceApi, customersApi } from '@/services/apiClient';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 import { DollarSign, Search, Wallet, AlertTriangle } from 'lucide-react';
 import PaymentDialog from './PaymentDialog';
@@ -35,15 +35,12 @@ const ReceivablesPage: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let q = (supabase as any).from('v_sales_balance').select('*').neq('status', 'pago');
-      if (!isAdmin && tenantId) q = q.eq('tenant_id', tenantId);
-      const { data: balanceData, error } = await q.order('sale_date', { ascending: false });
-      if (error) throw error;
+      const balanceData = await salesBalanceApi.list({ status_ne: 'pago' });
 
       const customerIds = Array.from(new Set((balanceData || []).map((r: any) => r.customer_id).filter(Boolean)));
       let customerMap: Record<string, string> = {};
       if (customerIds.length) {
-        const { data: cs } = await supabase.from('customers').select('id, name').in('id', customerIds as string[]);
+        const cs = await customersApi.list();
         (cs || []).forEach((c: any) => { customerMap[c.id] = c.name; });
       }
       setRows((balanceData || []).map((r: any) => ({
@@ -150,7 +147,7 @@ const ReceivablesPage: React.FC = () => {
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">Carregando...</div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">Nenhum pedido em aberto 🎉</div>
+            <div className="text-center py-8 text-muted-foreground">Nenhum pedido em aberto</div>
           ) : (
             <Table>
               <TableHeader>

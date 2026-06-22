@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Eye, Search, AlertTriangle, X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { auditLogApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { AuditLog } from '@/types/database';
 import { Button } from '@/components/ui/button';
@@ -32,15 +32,12 @@ const AuditLogPage = () => {
       const days = parseInt(periodFilter);
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
-      
-      const { data, error } = await supabase
-        .from('audit_log')
-        .select('*')
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1000);
 
-      if (error) throw error;
+      const data = await auditLogApi.list({
+        start_date: startDate.toISOString(),
+        limit: '5000',
+      });
+
       setAuditLogs(data || []);
     } catch (error) {
       console.error('Erro ao buscar logs de auditoria:', error);
@@ -73,12 +70,12 @@ const AuditLogPage = () => {
         // Mostrar apenas alterações em produtos que envolvam quantity
         if (log.table_name !== 'products') return false;
         if (log.operation !== 'UPDATE') return false;
-        
+
         const oldValues = log.old_values as any;
         const newValues = log.new_values as any;
-        
+
         if (!oldValues || !newValues) return false;
-        
+
         // Verificar se houve mudança na quantidade
         return oldValues.quantity !== newValues.quantity;
       });
@@ -93,8 +90,8 @@ const AuditLogPage = () => {
         const newValuesStr = JSON.stringify(log.new_values || {}).toLowerCase();
         const userName = log.user_name.toLowerCase();
         const recordId = log.record_id.toLowerCase();
-        
-        return oldValuesStr.includes(searchLower) || 
+
+        return oldValuesStr.includes(searchLower) ||
                newValuesStr.includes(searchLower) ||
                userName.includes(searchLower) ||
                recordId.includes(searchLower);
@@ -119,7 +116,7 @@ const AuditLogPage = () => {
       UPDATE: 'bg-yellow-100 text-yellow-800',
       DELETE: 'bg-red-100 text-red-800',
     };
-    
+
     return (
       <Badge className={variants[operation as keyof typeof variants] || 'bg-gray-100 text-gray-800'}>
         {operation}
@@ -148,17 +145,17 @@ const AuditLogPage = () => {
   // Função para comparar valores e identificar diferenças
   const getChangedFields = (oldValues: any, newValues: any) => {
     if (!oldValues || !newValues) return { changed: [], added: [], removed: [] };
-    
+
     const changed: string[] = [];
     const added: string[] = [];
     const removed: string[] = [];
-    
+
     const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
-    
+
     allKeys.forEach(key => {
       const oldVal = oldValues[key];
       const newVal = newValues[key];
-      
+
       if (!(key in oldValues)) {
         added.push(key);
       } else if (!(key in newValues)) {
@@ -167,7 +164,7 @@ const AuditLogPage = () => {
         changed.push(key);
       }
     });
-    
+
     return { changed, added, removed };
   };
 
@@ -217,16 +214,16 @@ const AuditLogPage = () => {
 
   const getStockChangeInfo = (log: AuditLog) => {
     if (log.table_name !== 'products' || log.operation !== 'UPDATE') return null;
-    
+
     const oldValues = log.old_values as any;
     const newValues = log.new_values as any;
-    
+
     if (!oldValues || !newValues) return null;
     if (oldValues.quantity === newValues.quantity) return null;
-    
+
     const diff = newValues.quantity - oldValues.quantity;
     const productName = newValues.name || oldValues.name || 'Produto';
-    
+
     return {
       productName,
       oldQty: oldValues.quantity,
@@ -282,7 +279,7 @@ const AuditLogPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label className="text-sm">Operação</Label>
               <Select value={operationFilter} onValueChange={setOperationFilter}>
@@ -297,7 +294,7 @@ const AuditLogPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div>
               <Label className="text-sm">Buscar (nome, ID, valores)</Label>
               <div className="relative">
@@ -310,9 +307,9 @@ const AuditLogPage = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex flex-col justify-end">
-              <Button 
+              <Button
                 variant={showStockChanges ? "default" : "outline"}
                 onClick={() => setShowStockChanges(!showStockChanges)}
                 className={showStockChanges ? "bg-orange-500 hover:bg-orange-600" : ""}
@@ -322,7 +319,7 @@ const AuditLogPage = () => {
               </Button>
             </div>
           </div>
-          
+
           {hasActiveFilters && (
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm text-gray-600">
@@ -385,11 +382,11 @@ const AuditLogPage = () => {
               <TableBody>
                 {filteredLogs.map((log) => {
                   const stockInfo = getStockChangeInfo(log);
-                  
+
                   return (
                     <TableRow key={log.id} className={stockInfo && stockInfo.diff < 0 ? 'bg-red-50' : ''}>
                       <TableCell>
-                        {new Date(log.created_at).toLocaleString('pt-BR')}
+                        {new Date(log.created_at + 'Z').toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                       </TableCell>
                       <TableCell className="font-medium">{log.user_name}</TableCell>
                       <TableCell>{getTableDisplayName(log.table_name)}</TableCell>
@@ -431,7 +428,7 @@ const AuditLogPage = () => {
                                   <strong>Usuário:</strong> {log.user_name}
                                 </div>
                                 <div>
-                                  <strong>Data/Hora:</strong> {new Date(log.created_at).toLocaleString('pt-BR')}
+                                  <strong>Data/Hora:</strong> {new Date(log.created_at + 'Z').toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                                 </div>
                                 <div>
                                   <strong>Operação:</strong> {getOperationBadge(log.operation)}
@@ -440,7 +437,7 @@ const AuditLogPage = () => {
                                   <strong>ID do Registro:</strong> {log.record_id}
                                 </div>
                               </div>
-                              
+
                               {stockInfo && (
                                 <div className={`p-3 rounded ${stockInfo.diff < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
                                   <strong>Alteração de Estoque:</strong>
@@ -448,14 +445,14 @@ const AuditLogPage = () => {
                                     Produto: <strong>{stockInfo.productName}</strong>
                                   </div>
                                   <div>
-                                    Quantidade: {stockInfo.oldQty} → {stockInfo.newQty} 
+                                    Quantidade: {stockInfo.oldQty} → {stockInfo.newQty}
                                     <span className={`ml-2 font-bold ${stockInfo.diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
                                       ({stockInfo.diff > 0 ? '+' : ''}{stockInfo.diff})
                                     </span>
                                   </div>
                                 </div>
                               )}
-                              
+
                               {/* Comparação de Alterações Destacada */}
                               {log.operation === 'UPDATE' && log.old_values && log.new_values && (
                                 <div>
@@ -464,11 +461,11 @@ const AuditLogPage = () => {
                                     const { changed, added, removed } = getChangedFields(log.old_values, log.new_values);
                                     const oldVals = log.old_values as Record<string, any>;
                                     const newVals = log.new_values as Record<string, any>;
-                                    
+
                                     if (changed.length === 0 && added.length === 0 && removed.length === 0) {
                                       return <p className="text-gray-500">Nenhuma alteração detectada.</p>;
                                     }
-                                    
+
                                     return (
                                       <div className="space-y-2">
                                         {changed.map(field => (
@@ -487,7 +484,7 @@ const AuditLogPage = () => {
                                             </div>
                                           </div>
                                         ))}
-                                        
+
                                         {added.map(field => (
                                           <div key={field} className="p-3 rounded-lg border-2 border-green-400 bg-green-50">
                                             <div className="font-medium text-green-800 mb-1">
@@ -498,7 +495,7 @@ const AuditLogPage = () => {
                                             </span>
                                           </div>
                                         ))}
-                                        
+
                                         {removed.map(field => (
                                           <div key={field} className="p-3 rounded-lg border-2 border-red-400 bg-red-50">
                                             <div className="font-medium text-red-800 mb-1">
@@ -556,7 +553,7 @@ const AuditLogPage = () => {
                                   </div>
                                 </div>
                               )}
-                              
+
                               {/* JSON completo para referência */}
                               <details className="mt-4">
                                 <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
@@ -571,7 +568,7 @@ const AuditLogPage = () => {
                                       </pre>
                                     </div>
                                   )}
-                                  
+
                                   {log.operation !== 'DELETE' && log.new_values && (
                                     <div>
                                       <h4 className="font-semibold mb-2 text-sm">Valores Novos:</h4>

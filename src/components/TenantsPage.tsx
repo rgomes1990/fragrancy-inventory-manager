@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { tenantsApi, usersApi } from '@/services/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,7 +51,7 @@ const TenantsPage: React.FC = () => {
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
-  
+
   const [name, setName] = useState('');
 
   useEffect(() => {
@@ -61,33 +61,24 @@ const TenantsPage: React.FC = () => {
   const fetchTenants = async () => {
     try {
       // Buscar tenants e contar usuários
-      const { data: tenantsData, error: tenantsError } = await supabase
-        .from('tenants')
-        .select('*')
-        .order('name');
-
-      if (tenantsError) throw tenantsError;
-
-      // Buscar contagem de usuários por tenant
-      const { data: usersData, error: usersError } = await supabase
-        .from('authorized_users')
-        .select('tenant_id');
-
-      if (usersError) throw usersError;
+      const [tenantsData, usersData] = await Promise.all([
+        tenantsApi.list(),
+        usersApi.list(),
+      ]);
 
       // Contar usuários por tenant
       const userCounts: Record<string, number> = {};
-      usersData?.forEach(user => {
+      (usersData || []).forEach((user: any) => {
         if (user.tenant_id) {
           userCounts[user.tenant_id] = (userCounts[user.tenant_id] || 0) + 1;
         }
       });
 
       // Adicionar contagem aos tenants
-      const tenantsWithCounts = tenantsData?.map(tenant => ({
+      const tenantsWithCounts = (tenantsData || []).map((tenant: any) => ({
         ...tenant,
         user_count: userCounts[tenant.id] || 0
-      })) || [];
+      }));
 
       setTenants(tenantsWithCounts);
     } catch (error) {
@@ -127,22 +118,11 @@ const TenantsPage: React.FC = () => {
     }
 
     try {
-      const client = supabaseWithUser();
-
       if (editingTenant) {
-        const { error } = await client
-          .from('tenants')
-          .update({ name: name.trim() })
-          .eq('id', editingTenant.id);
-
-        if (error) throw error;
+        await tenantsApi.update(editingTenant.id, { name: name.trim() });
         toast.success('Empresa atualizada com sucesso!');
       } else {
-        const { error } = await client
-          .from('tenants')
-          .insert({ name: name.trim() });
-
-        if (error) throw error;
+        await tenantsApi.create({ name: name.trim() });
         toast.success('Empresa criada com sucesso!');
       }
 
@@ -167,14 +147,8 @@ const TenantsPage: React.FC = () => {
     if (!tenantToDelete) return;
 
     try {
-      const client = supabaseWithUser();
-      const { error } = await client
-        .from('tenants')
-        .delete()
-        .eq('id', tenantToDelete.id);
+      await tenantsApi.delete(tenantToDelete.id);
 
-      if (error) throw error;
-      
       toast.success('Empresa excluída com sucesso!');
       fetchTenants();
     } catch (error) {

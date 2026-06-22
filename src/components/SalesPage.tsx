@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { salesApi, productsApi, customersApi, sellersApi, kitsApi, salesBalanceApi, salePaymentsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer, Kit } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -40,11 +40,10 @@ const SalesPage = () => {
   const [filteredTotal, setFilteredTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [successData, setSuccessData] = useState<SaleSuccessData | null>(null);
-  
 
-  
 
-  // Ler parâmetros da URL na inicialização
+
+  // Ler parametros da URL na inicializacao
   useEffect(() => {
     const statusParam = searchParams.get('status');
     const sellerParam = searchParams.get('seller');
@@ -64,7 +63,7 @@ const SalesPage = () => {
       setShowMultiForm(true);
     }
   }, [searchParams]);
-  
+
   const [formData, setFormData] = useState({
     customer_id: '',
     product_id: '',
@@ -77,12 +76,12 @@ const SalesPage = () => {
     payment_type: '',
   });
 
-  const paymentTypes = ['Débito', 'Crédito', 'Pix', 'Link'];
+  const paymentTypes = ['Debito', 'Credito', 'Pix', 'Link'];
 
   const [sellers, setSellers] = useState<{id: string, name: string}[]>([]);
 
   const fetchData = async () => {
-    // Usuário não-admin PRECISA ter tenantId carregado
+    // Usuario nao-admin PRECISA ter tenantId carregado
     if (!isAdmin && !tenantId) {
       setSales([]);
       setProducts([]);
@@ -93,65 +92,17 @@ const SalesPage = () => {
     }
 
     try {
-      // Construir queries com filtro de tenant
-      let salesQuery = supabase
-        .from('sales')
-        .select(`
-          *,
-          customers(id, name, whatsapp, email, created_at, updated_at),
-          products(id, name, cost_price, sale_price, quantity, category_id, created_at, updated_at, categories(id, name, created_at, updated_at)),
-          kits(id, name, sale_price)
-        `);
-      
-      let productsQuery = supabase
-        .from('products')
-        .select(`
-          *,
-          categories(id, name, created_at, updated_at)
-        `);
-      
-      let customersQuery = supabase
-        .from('customers')
-        .select('*');
-
-      let sellersQuery = supabase
-        .from('sellers')
-        .select('id, name');
-
-      let kitsQuery = supabase
-        .from('kits')
-        .select('*, kit_items(*, products(id, name, quantity, cost_price, sale_price))')
-        .eq('active', true);
-
-      // Aplicar filtro de tenant para usuários não-admin
-      if (!isAdmin && tenantId) {
-        salesQuery = salesQuery.eq('tenant_id', tenantId);
-        productsQuery = productsQuery.eq('tenant_id', tenantId);
-        customersQuery = customersQuery.eq('tenant_id', tenantId);
-        sellersQuery = sellersQuery.eq('tenant_id', tenantId);
-        kitsQuery = kitsQuery.eq('tenant_id', tenantId);
-      }
-
-      let balanceQuery = (supabase as any).from('v_sales_balance').select('sale_group_id, tenant_id, total, paid, remaining, status');
-      if (!isAdmin && tenantId) balanceQuery = balanceQuery.eq('tenant_id', tenantId);
-
-      const [salesRes, productsRes, customersRes, sellersRes, kitsRes, balanceRes] = await Promise.all([
-        salesQuery.order('sale_date', { ascending: false }).order('created_at', { ascending: false }),
-        productsQuery.order('name'),
-        customersQuery.order('name'),
-        sellersQuery.order('name'),
-        kitsQuery.order('name'),
-        balanceQuery,
+      const [salesData, productsData, customersData, sellersData, kitsData, balanceData] = await Promise.all([
+        salesApi.list(),
+        productsApi.list(),
+        customersApi.list(),
+        sellersApi.list(),
+        kitsApi.list(),
+        salesBalanceApi.list(),
       ]);
 
-      if (salesRes.error) throw salesRes.error;
-      if (productsRes.error) throw productsRes.error;
-      if (customersRes.error) throw customersRes.error;
-      if (sellersRes.error) throw sellersRes.error;
-      if (kitsRes.error) throw kitsRes.error;
-
       const bmap: Record<string, any> = {};
-      (balanceRes?.data || []).forEach((b: any) => {
+      (balanceData || []).forEach((b: any) => {
         bmap[b.sale_group_id] = {
           total: Number(b.total),
           paid: Number(b.paid),
@@ -161,16 +112,16 @@ const SalesPage = () => {
       });
       setBalanceMap(bmap);
 
-      setSales(salesRes.data || []);
-      setProducts(productsRes.data || []);
-      setCustomers(customersRes.data || []);
-      setSellers(sellersRes.data || []);
-      setKits((kitsRes.data || []) as any);
+      setSales(salesData || []);
+      setProducts(productsData || []);
+      setCustomers(customersData || []);
+      setSellers(sellersData || []);
+      setKits((kitsData || []) as any);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os dados.",
+        description: "Nao foi possivel carregar os dados.",
         variant: "destructive",
       });
     } finally {
@@ -179,7 +130,7 @@ const SalesPage = () => {
   };
 
   useEffect(() => {
-    // Só buscar dados quando tenantId estiver definido (ou for admin)
+    // So buscar dados quando tenantId estiver definido (ou for admin)
     if (isAdmin || tenantId) {
       fetchData();
     }
@@ -215,7 +166,7 @@ const SalesPage = () => {
         const saleDate = new Date(sale.sale_date);
         const start = startDate ? new Date(startDate) : null;
         const end = endDate ? new Date(endDate) : null;
-        
+
         if (start && end) {
           return saleDate >= start && saleDate <= end;
         } else if (start) {
@@ -226,7 +177,7 @@ const SalesPage = () => {
         return true;
       });
     } else if (selectedMonth) {
-      // Apenas filtrar por mês se não houver range de datas
+      // Apenas filtrar por mes se nao houver range de datas
       filtered = filtered.filter(sale => {
         const saleDate = new Date(sale.sale_date);
         const saleMonth = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
@@ -265,9 +216,9 @@ const SalesPage = () => {
       filtered = filtered.filter(sale => {
         const searchLower = searchTerm.toLowerCase();
         return (
-          sale.customers?.name?.toLowerCase().includes(searchLower) ||
-          sale.products?.name?.toLowerCase().includes(searchLower) ||
-          (sale as any).kits?.name?.toLowerCase().includes(searchLower) ||
+          (sale as any).customer_name?.toLowerCase().includes(searchLower) ||
+          (sale as any).product_name?.toLowerCase().includes(searchLower) ||
+          (sale as any).kit_name?.toLowerCase().includes(searchLower) ||
           sale.quantity.toString().includes(searchLower) ||
           sale.unit_price.toString().includes(searchLower) ||
           sale.total_price.toString().includes(searchLower) ||
@@ -275,6 +226,20 @@ const SalesPage = () => {
         );
       });
     }
+
+    // Ordenar por data decrescente (mais recentes primeiro)
+    filtered.sort((a, b) => {
+      const dateA = a.sale_date || '';
+      const dateB = b.sale_date || '';
+      if (dateB > dateA) return 1;
+      if (dateB < dateA) return -1;
+      // Desempate por created_at
+      const createdA = (a as any).created_at || '';
+      const createdB = (b as any).created_at || '';
+      if (createdB > createdA) return 1;
+      if (createdB < createdA) return -1;
+      return 0;
+    });
 
     setFilteredSales(filtered);
 
@@ -294,8 +259,8 @@ const SalesPage = () => {
       total = filtered.reduce((sum, sale) => sum + Number(sale.total_price), 0);
     }
     setFilteredTotal(total);
-    
-    // Manter o cálculo mensal para compatibilidade
+
+    // Manter o calculo mensal para compatibilidade
     if (selectedMonth) {
       setMonthlyTotal(total);
     } else {
@@ -323,7 +288,7 @@ const SalesPage = () => {
   }) => {
     const tenantIdToUse = getTenantIdForInsert();
     if (!isAdmin && !tenantIdToUse) {
-      toast({ title: "Erro", description: "Empresa não identificada. Por favor, faça login novamente.", variant: "destructive" });
+      toast({ title: "Erro", description: "Empresa nao identificada. Por favor, faca login novamente.", variant: "destructive" });
       return;
     }
     try {
@@ -334,11 +299,11 @@ const SalesPage = () => {
           productDecrement[item.product_id] = (productDecrement[item.product_id] || 0) + item.quantity;
         } else if (item.item_type === 'kit' && item.kit_id) {
           const kit = kits.find(k => k.id === item.kit_id);
-          if (!kit || !kit.kit_items) {
-            toast({ title: "Erro", description: "Kit não encontrado.", variant: "destructive" });
+          if (!kit || !(kit as any).kit_items) {
+            toast({ title: "Erro", description: "Kit nao encontrado.", variant: "destructive" });
             return;
           }
-          for (const ki of kit.kit_items) {
+          for (const ki of (kit as any).kit_items) {
             productDecrement[ki.product_id] = (productDecrement[ki.product_id] || 0) + (ki.quantity * item.quantity);
           }
         }
@@ -348,7 +313,7 @@ const SalesPage = () => {
       for (const [pid, qty] of Object.entries(productDecrement)) {
         const p = products.find(x => x.id === pid);
         if (!p) {
-          toast({ title: "Erro", description: "Produto não encontrado.", variant: "destructive" });
+          toast({ title: "Erro", description: "Produto nao encontrado.", variant: "destructive" });
           return;
         }
         if (qty > p.quantity) {
@@ -357,7 +322,6 @@ const SalesPage = () => {
         }
       }
 
-      const supabaseClient = supabaseWithUser();
       const groupId = saleData.items.length > 1 ? crypto.randomUUID() : null;
 
       // Aplica desconto rateado entre itens (proporcional ao subtotal)
@@ -394,40 +358,40 @@ const SalesPage = () => {
           sale_group_id: groupId,
         };
 
-        const { data: inserted, error: saleError } = await supabaseClient.from('sales').insert([saleRecord]).select('id').single();
-        if (saleError) throw saleError;
+        const inserted = await salesApi.create(saleRecord);
         if (!firstSaleId && inserted) firstSaleId = (inserted as any).id;
       }
 
       // Registrar cada forma de pagamento em sale_payments
-      // Crediário NÃO entra em sale_payments (fica como saldo "A Receber")
+      // Crediario NAO entra em sale_payments (fica como saldo "A Receber")
       const paymentGroupId = groupId || firstSaleId;
-      const paymentsList = (saleData.payments || []).filter(p => p.type !== 'Crediário' && p.amount > 0);
+      const paymentsList = (saleData.payments || []).filter(p => p.type !== 'Crediario' && p.amount > 0);
 
       if (paymentGroupId && paymentsList.length > 0) {
-        const rows = paymentsList.map(p => ({
-          sale_group_id: paymentGroupId,
-          tenant_id: tenantIdToUse,
-          amount: p.amount,
-          payment_type: p.type,
-          payment_date: saleData.sale_date + 'T12:00:00.000Z',
-          notes: 'Recebimento no ato da venda',
-        }));
-        await (supabaseClient as any).from('sale_payments').insert(rows);
+        for (const p of paymentsList) {
+          await salePaymentsApi.create({
+            sale_group_id: paymentGroupId,
+            tenant_id: tenantIdToUse,
+            amount: p.amount,
+            payment_type: p.type,
+            payment_date: saleData.sale_date + 'T12:00:00.000Z',
+            notes: 'Recebimento no ato da venda',
+          });
+        }
       } else if (paymentGroupId && !saleData.payments && saleData.payment_received) {
         // Compat com chamadas legadas
         const initialPaid = saleData.partial_payment_amount && saleData.partial_payment_amount > 0
           ? saleData.partial_payment_amount
           : totalAllItems;
         if (initialPaid > 0) {
-          await (supabaseClient as any).from('sale_payments').insert([{
+          await salePaymentsApi.create({
             sale_group_id: paymentGroupId,
             tenant_id: tenantIdToUse,
             amount: initialPaid,
             payment_type: saleData.payment_type || null,
             payment_date: saleData.sale_date + 'T12:00:00.000Z',
             notes: 'Recebimento no ato da venda',
-          }]);
+          });
         }
       }
 
@@ -435,11 +399,7 @@ const SalesPage = () => {
       for (const [pid, qty] of Object.entries(productDecrement)) {
         const p = products.find(x => x.id === pid);
         if (!p) continue;
-        const { error: updateError } = await supabaseClient
-          .from('products')
-          .update({ quantity: p.quantity - qty })
-          .eq('id', pid);
-        if (updateError) throw updateError;
+        await productsApi.update(pid, { quantity: p.quantity - qty });
       }
 
 
@@ -453,7 +413,7 @@ const SalesPage = () => {
       const summaryItems = saleData.items.map(it => {
         if (it.item_type === 'kit') {
           const k = kits.find(x => x.id === it.kit_id);
-          return { name: k?.name || 'Kit', quantity: it.quantity, subtotal: it.subtotal, isKit: true };
+          return { name: (k as any)?.name || 'Kit', quantity: it.quantity, subtotal: it.subtotal, isKit: true };
         }
         const p = products.find(x => x.id === it.product_id);
         return { name: p?.name || 'Produto', quantity: it.quantity, subtotal: it.subtotal, isKit: false };
@@ -476,7 +436,7 @@ const SalesPage = () => {
       console.error('Erro ao salvar venda:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a venda.",
+        description: "Nao foi possivel salvar a venda.",
         variant: "destructive",
       });
     }
@@ -484,16 +444,13 @@ const SalesPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      // Obter cliente com header do usuário atual
-      const supabaseClient = supabaseWithUser();
-      
       const product = products.find(p => p.id === formData.product_id);
       if (!product) {
         toast({
           title: "Erro",
-          description: "Produto não encontrado.",
+          description: "Produto nao encontrado.",
           variant: "destructive",
         });
         return;
@@ -501,7 +458,7 @@ const SalesPage = () => {
 
       const quantity = parseInt(formData.quantity);
       const unit_price = parseFloat(formData.unit_price || product.sale_price.toString());
-      
+
       if (editingSale) {
         const oldQuantity = editingSale.quantity;
         if (quantity > (product.quantity + oldQuantity)) {
@@ -526,8 +483,8 @@ const SalesPage = () => {
       const total_price = unit_price * quantity;
 
       const partialAmount = formData.partial_payment_amount ? parseFloat(formData.partial_payment_amount) : null;
-      
-      const saleData: any = {
+
+      const saleDataPayload: any = {
         customer_id: formData.customer_id,
         product_id: formData.product_id,
         quantity,
@@ -540,31 +497,26 @@ const SalesPage = () => {
         payment_type: formData.payment_type || null,
       };
 
-      // Adicionar tenant_id para novos registros - com validação
+      // Adicionar tenant_id para novos registros - com validacao
       if (!editingSale) {
         const tenantIdForSale = getTenantIdForInsert();
         if (!isAdmin && !tenantIdForSale) {
           toast({
             title: "Erro",
-            description: "Empresa não identificada. Por favor, faça login novamente.",
+            description: "Empresa nao identificada. Por favor, faca login novamente.",
             variant: "destructive",
           });
           return;
         }
-        saleData.tenant_id = tenantIdForSale;
+        saleDataPayload.tenant_id = tenantIdForSale;
       }
 
       if (editingSale) {
-        const { error: saleError } = await supabaseClient
-          .from('sales')
-          .update(saleData)
-          .eq('id', editingSale.id);
-
-        if (saleError) throw saleError;
+        await salesApi.update(editingSale.id, saleDataPayload);
 
         const newQuantity = product.quantity + editingSale.quantity - quantity;
-        
-        console.log(`[EDIÇÃO VENDA] Atualizando estoque do produto ${product.name}:`, {
+
+        console.log(`[EDICAO VENDA] Atualizando estoque do produto ${product.name}:`, {
           estoqueAtual: product.quantity,
           quantidadeAnterior: editingSale.quantity,
           novaQuantidade: quantity,
@@ -572,25 +524,12 @@ const SalesPage = () => {
           productId: formData.product_id
         });
 
-        const { error: updateError } = await supabaseClient
-          .from('products')
-          .update({ quantity: newQuantity })
-          .eq('id', formData.product_id);
+        await productsApi.update(formData.product_id, { quantity: newQuantity });
 
-        if (updateError) {
-          console.error('[EDIÇÃO VENDA] Erro ao atualizar estoque:', updateError);
-          throw updateError;
-        }
-
-        console.log(`[EDIÇÃO VENDA] Estoque atualizado com sucesso para ${product.name}`);
+        console.log(`[EDICAO VENDA] Estoque atualizado com sucesso para ${product.name}`);
 
         if (unit_price !== product.sale_price) {
-          const { error: priceUpdateError } = await supabaseClient
-            .from('products')
-            .update({ sale_price: unit_price })
-            .eq('id', formData.product_id);
-
-          if (priceUpdateError) throw priceUpdateError;
+          await productsApi.update(formData.product_id, { sale_price: unit_price });
         }
 
         toast({
@@ -598,27 +537,21 @@ const SalesPage = () => {
           description: "Venda atualizada com sucesso!",
         });
       } else {
-        const { data: insertedSale, error: saleError } = await supabaseClient
-          .from('sales')
-          .insert([saleData])
-          .select('id')
-          .single();
-
-        if (saleError) throw saleError;
+        const insertedSale = await salesApi.create(saleDataPayload);
 
         // Registrar pagamento inicial (venda simples)
         const initialPaid = partialAmount && partialAmount > 0
           ? partialAmount
           : (formData.payment_received ? total_price : 0);
         if (initialPaid > 0 && insertedSale) {
-          await (supabaseClient as any).from('sale_payments').insert([{
+          await salePaymentsApi.create({
             sale_group_id: (insertedSale as any).id,
-            tenant_id: saleData.tenant_id,
+            tenant_id: saleDataPayload.tenant_id,
             amount: initialPaid,
             payment_type: formData.payment_type || null,
             payment_date: formData.sale_date + 'T12:00:00.000Z',
             notes: 'Recebimento no ato da venda',
-          }]);
+          });
         }
 
         const newQuantity = product.quantity - quantity;
@@ -635,15 +568,7 @@ const SalesPage = () => {
           updateData.sale_price = unit_price;
         }
 
-        const { error: updateError } = await supabaseClient
-          .from('products')
-          .update(updateData)
-          .eq('id', formData.product_id);
-
-        if (updateError) {
-          console.error('[VENDA SIMPLES] Erro ao atualizar estoque:', updateError);
-          throw updateError;
-        }
+        await productsApi.update(formData.product_id, updateData);
 
         console.log(`[VENDA SIMPLES] Estoque atualizado com sucesso para ${product.name}`);
 
@@ -659,7 +584,7 @@ const SalesPage = () => {
       console.error('Erro ao salvar venda:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar a venda.",
+        description: "Nao foi possivel salvar a venda.",
         variant: "destructive",
       });
     }
@@ -685,19 +610,16 @@ const SalesPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
 
     try {
-      const supabaseClient = supabaseWithUser();
-      
       const saleKitId = (sale as any).kit_id as string | null;
       if (saleKitId) {
         // Devolver estoque de cada componente do kit
         const kit = kits.find(k => k.id === saleKitId);
-        if (kit?.kit_items) {
-          for (const ki of kit.kit_items) {
+        if (kit && (kit as any).kit_items) {
+          for (const ki of (kit as any).kit_items) {
             const p = products.find(x => x.id === ki.product_id);
             if (p) {
               const novo = p.quantity + (ki.quantity * sale.quantity);
-              const { error: upErr } = await supabaseClient.from('products').update({ quantity: novo }).eq('id', p.id);
-              if (upErr) throw upErr;
+              await productsApi.update(p.id, { quantity: novo });
             }
           }
         }
@@ -705,31 +627,22 @@ const SalesPage = () => {
         const product = products.find(p => p.id === sale.product_id);
         if (product) {
           const novoEstoque = product.quantity + sale.quantity;
-          const { error: updateError } = await supabaseClient
-            .from('products')
-            .update({ quantity: novoEstoque })
-            .eq('id', sale.product_id);
-          if (updateError) throw updateError;
+          await productsApi.update(sale.product_id, { quantity: novoEstoque });
         }
       }
 
-      const { error } = await supabaseClient
-        .from('sales')
-        .delete()
-        .eq('id', sale.id);
-
-      if (error) throw error;
+      await salesApi.delete(sale.id);
 
       toast({
         title: "Sucesso",
-        description: "Venda excluída com sucesso!",
+        description: "Venda excluida com sucesso!",
       });
       fetchData();
     } catch (error) {
       console.error('Erro ao excluir venda:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível excluir a venda.",
+        description: "Nao foi possivel excluir a venda.",
         variant: "destructive",
       });
     }
@@ -774,10 +687,10 @@ const SalesPage = () => {
     return options;
   };
 
-  // Filtrar dados válidos de forma mais rigorosa
+  // Filtrar dados validos de forma mais rigorosa
   const validCustomers = customers.filter(c => c?.id && c?.name);
   const validProducts = products.filter(p => p?.id && p?.name);
-  // Filtrar produtos com estoque maior que 0 e que NÃO sejam produtos de encomenda para os selects
+  // Filtrar produtos com estoque maior que 0 e que NAO sejam produtos de encomenda para os selects
   const availableProducts = validProducts.filter(p => p.quantity > 0 && !p.is_order_product);
 
   if (loading) {
@@ -804,7 +717,7 @@ const SalesPage = () => {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-gray-900 min-w-0">Vendas</h1>
-        <Button 
+        <Button
           onClick={() => setShowMultiForm(true)}
           className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto"
         >
@@ -844,7 +757,7 @@ const SalesPage = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="product">Produto</Label>
                 <SearchableSelect
@@ -857,7 +770,7 @@ const SalesPage = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="quantity">Quantidade</Label>
                 <Input
@@ -871,7 +784,7 @@ const SalesPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="unit_price">Preço Unitário</Label>
+                <Label htmlFor="unit_price">Preco Unitario</Label>
                 <Input
                   id="unit_price"
                   type="number"
@@ -895,8 +808,8 @@ const SalesPage = () => {
 
               <div>
                 <Label htmlFor="seller">Vendedor</Label>
-                <select 
-                  value={formData.seller} 
+                <select
+                  value={formData.seller}
                   onChange={(e) => setFormData({...formData, seller: e.target.value})}
                   className="w-full p-2 border rounded-md"
                   required
@@ -912,8 +825,8 @@ const SalesPage = () => {
 
               <div>
                 <Label htmlFor="payment_type">Tipo de Pagamento</Label>
-                <select 
-                  value={formData.payment_type} 
+                <select
+                  value={formData.payment_type}
                   onChange={(e) => setFormData({...formData, payment_type: e.target.value})}
                   className="w-full p-2 border rounded-md"
                 >
@@ -925,7 +838,7 @@ const SalesPage = () => {
                   ))}
                 </select>
               </div>
-              
+
               {selectedProduct && formData.quantity && formData.unit_price && (
                 <div className="lg:col-span-4 p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium mb-2">Resumo da Venda</h4>
@@ -935,7 +848,7 @@ const SalesPage = () => {
                       <p className="font-medium">{selectedProduct.name}</p>
                     </div>
                     <div>
-                      <span className="text-gray-600">Preço Unitário:</span>
+                      <span className="text-gray-600">Preco Unitario:</span>
                       <p className="font-medium">R$ {parseFloat(formData.unit_price || '0').toFixed(2)}</p>
                     </div>
                     <div>
@@ -965,7 +878,7 @@ const SalesPage = () => {
                     Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
                   </Label>
                 </div>
-                
+
                 {formData.payment_received && (
                   <div>
                     <Label htmlFor="partial_payment">Valor pago parcialmente (deixe em branco para pagamento total)</Label>
@@ -982,8 +895,8 @@ const SalesPage = () => {
               </div>
 
               <div className="lg:col-span-4 flex space-x-2">
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="bg-gradient-to-r from-purple-600 to-pink-600"
                   disabled={!formData.customer_id || !formData.product_id || !formData.quantity || !formData.unit_price || !formData.seller}
                 >
@@ -1015,8 +928,8 @@ const SalesPage = () => {
                   className="pl-9 w-full"
                 />
               </div>
-              <select 
-                value={selectedSeller} 
+              <select
+                value={selectedSeller}
                 onChange={(e) => setSelectedSeller(e.target.value)}
                 className="p-2 border rounded-md w-full"
               >
@@ -1027,8 +940,8 @@ const SalesPage = () => {
                   </option>
                 ))}
               </select>
-              <select 
-                value={selectedStatus} 
+              <select
+                value={selectedStatus}
                 onChange={(e) => {
                   setSelectedStatus(e.target.value);
                   if (searchParams.has('status')) {
@@ -1044,14 +957,14 @@ const SalesPage = () => {
                 <option value="parcial">Parcial</option>
                 <option value="a-receber">A Receber (todos)</option>
               </select>
-              <select 
-                value={selectedPaymentType} 
+              <select
+                value={selectedPaymentType}
                 onChange={(e) => setSelectedPaymentType(e.target.value)}
                 className="p-2 border rounded-md w-full"
               >
                 <option value="">Todos tipos</option>
-                <option value="Débito">Débito</option>
-                <option value="Crédito">Crédito</option>
+                <option value="Debito">Debito</option>
+                <option value="Credito">Credito</option>
                 <option value="Pix">Pix</option>
                 <option value="Link">Link</option>
               </select>
@@ -1064,10 +977,10 @@ const SalesPage = () => {
                     setStartDate(e.target.value);
                     if (e.target.value) setSelectedMonth('');
                   }}
-                  placeholder="Data início"
+                  placeholder="Data inicio"
                   className="w-full"
                 />
-                <span className="text-gray-500 shrink-0">até</span>
+                <span className="text-gray-500 shrink-0">ate</span>
                 <Input
                   type="date"
                   value={endDate}
@@ -1080,8 +993,8 @@ const SalesPage = () => {
                 />
               </div>
               {!startDate && !endDate && (
-                <select 
-                  value={selectedMonth} 
+                <select
+                  value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="p-2 border rounded-md w-full"
                 >
@@ -1114,11 +1027,11 @@ const SalesPage = () => {
                 <TableHead>Cliente</TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead>Quantidade</TableHead>
-                <TableHead>Valor Unitário</TableHead>
+                <TableHead>Valor Unitario</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Ações</TableHead>
+                <TableHead>Acoes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1148,12 +1061,12 @@ const SalesPage = () => {
                         {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="font-medium">
-                        {sale.customers?.name || 'Cliente não encontrado'}
+                        {(sale as any).customer_name || 'Cliente nao encontrado'}
                       </TableCell>
                       <TableCell>
-                        {(sale as any).kits?.name
-                          ? <span>🎁 {(sale as any).kits.name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
-                          : (sale.products?.name || 'Produto não encontrado')}
+                        {(sale as any).kit_name
+                          ? <span>🎁 {(sale as any).kit_name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
+                          : ((sale as any).product_name || 'Produto nao encontrado')}
                       </TableCell>
                       <TableCell>{sale.quantity}</TableCell>
                       <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
@@ -1178,7 +1091,7 @@ const SalesPage = () => {
                             </div>
                           </div>
                         ) : isGrouped ? (
-                          <span className="text-xs text-muted-foreground">↳ mesmo grupo</span>
+                          <span className="text-xs text-muted-foreground">mesmo grupo</span>
                         ) : (
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                             status === 'pendente' || status === 'parcial'
@@ -1216,24 +1129,33 @@ const SalesPage = () => {
                   );
                 };
 
-                const rows: React.ReactNode[] = [];
+                // Montar lista de entradas (grupos e individuais) com data para ordenação
+                const entries: { date: string; render: () => React.ReactNode[] }[] = [];
 
-                // Renderizar vendas agrupadas
                 groupedSales.forEach((groupSales) => {
                   const groupTotal = groupSales.reduce((sum, s) => sum + Number(s.total_price), 0);
                   const groupKey = (groupSales[0] as any)?.sale_group_id || groupSales[0]?.id;
                   const groupPaid = groupKey ? Number(balanceMap[groupKey]?.paid || 0) : 0;
-                  groupSales.forEach((sale, idx) => {
-                    rows.push(renderSaleRow(sale, true, idx === 0, groupTotal, groupPaid, groupSales.length));
+                  const date = groupSales[0]?.sale_date || '';
+                  entries.push({
+                    date,
+                    render: () => groupSales.map((sale, idx) =>
+                      renderSaleRow(sale, true, idx === 0, groupTotal, groupPaid, groupSales.length)
+                    ),
                   });
                 });
 
-                // Renderizar vendas individuais
                 ungroupedSales.forEach((sale) => {
-                  rows.push(renderSaleRow(sale));
+                  entries.push({
+                    date: sale.sale_date || '',
+                    render: () => [renderSaleRow(sale)],
+                  });
                 });
 
-                return rows;
+                // Ordenar por data decrescente (mais recentes primeiro)
+                entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+                return entries.flatMap((entry) => entry.render());
               })()}
             </TableBody>
           </Table>

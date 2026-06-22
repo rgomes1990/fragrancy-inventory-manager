@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2 } from 'lucide-react';
-import { supabaseWithUser } from '@/integrations/supabase/client';
+import { kitsApi, kitItemsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Kit, Product } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -72,28 +72,29 @@ const KitFormDialog: React.FC<KitFormDialogProps> = ({ open, onOpenChange, kit, 
 
     try {
       setSaving(true);
-      const client = supabaseWithUser();
       let kitId = kit?.id;
 
       if (kit) {
-        const { error } = await client.from('kits').update({
+        await kitsApi.update(kit.id, {
           name, description: description || null, sale_price: parseFloat(salePrice),
-        }).eq('id', kit.id);
-        if (error) throw error;
-        await client.from('kit_items').delete().eq('kit_id', kit.id);
+        });
+        // Delete existing kit items
+        const existingItems = await kitItemsApi.listByKit(kit.id);
+        for (const item of existingItems || []) {
+          await kitItemsApi.delete(item.id);
+        }
       } else {
-        const { data, error } = await client.from('kits').insert([{
+        const data = await kitsApi.create({
           name, description: description || null, sale_price: parseFloat(salePrice),
           tenant_id: tenantId, active: true,
-        }]).select('id').single();
-        if (error) throw error;
-        kitId = data!.id;
+        });
+        kitId = data.id;
       }
 
-      const { error: itemsError } = await client.from('kit_items').insert(
-        validItems.map(i => ({ kit_id: kitId!, product_id: i.product_id, quantity: i.quantity }))
-      );
-      if (itemsError) throw itemsError;
+      // Insert new kit items
+      for (const i of validItems) {
+        await kitItemsApi.create({ kit_id: kitId!, product_id: i.product_id, quantity: i.quantity });
+      }
 
       toast({ title: 'Sucesso', description: kit ? 'Kit atualizado!' : 'Kit criado!' });
       onOpenChange(false);

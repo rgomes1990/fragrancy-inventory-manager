@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { expensesApi } from '@/services/apiClient';
+import { calculateCashBalance } from '@/lib/cashBalance';
 import { format } from 'date-fns';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
 
@@ -56,73 +57,21 @@ const ExpensesPage = () => {
   ];
 
   useEffect(() => {
-    // Só buscar dados quando tenantId estiver definido (ou for admin)
+    // So buscar dados quando tenantId estiver definido (ou for admin)
     if (isAdmin || tenantId) {
       fetchExpenses();
     }
   }, [tenantId, isAdmin]);
 
-  // Buscar os mesmos dados do Dashboard para o Caixa da Empresa
+  // Buscar caixa da empresa usando a mesma logica do Dashboard
   useEffect(() => {
-    const fetchCompanyCash = async () => {
-      // Buscar vendas pagas a partir de 29/08/2025
-      let salesQuery = supabase
-        .from('sales')
-        .select('total_price, sale_date, payment_received, partial_payment_amount')
-        .gte('sale_date', '2025-08-29');
-      
-      if (!isAdmin && tenantId) {
-        salesQuery = salesQuery.eq('tenant_id', tenantId);
-      }
-      
-      const { data: salesFromDateData } = await salesQuery;
-      
-      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
-        const partialAmount = Number((sale as any).partial_payment_amount) || 0;
-        const totalPrice = Number(sale.total_price) || 0;
-        
-        if (sale.payment_received && (partialAmount === 0 || partialAmount >= totalPrice)) {
-          return sum + totalPrice;
-        }
-        return sum;
-      }, 0) || 0;
-
-      // Buscar despesas e entradas de caixa
-      let expensesQuery = supabase
-        .from('expenses')
-        .select('amount, category');
-      
-      if (!isAdmin && tenantId) {
-        expensesQuery = expensesQuery.eq('tenant_id', tenantId);
-      }
-      
-      const { data: expensesData } = await expensesQuery;
-      
-      const totalExpensesOut = expensesData?.reduce((sum, expense) => {
-        if (expense.category !== 'Entrada de Caixa') {
-          return sum + Number(expense.amount);
-        }
-        return sum;
-      }, 0) || 0;
-      
-      const totalCashInAmount = expensesData?.reduce((sum, expense) => {
-        if (expense.category === 'Entrada de Caixa') {
-          return sum + Number(expense.amount);
-        }
-        return sum;
-      }, 0) || 0;
-
-      return revenueFromDate - totalExpensesOut + totalCashInAmount;
-    };
-
-    // Só buscar quando tenantId estiver definido (ou for admin)
     if (isAdmin || tenantId) {
-      fetchCompanyCash().then(setCompanyCash);
+      calculateCashBalance(tenantId, isAdmin).then(setCompanyCash).catch(() => setCompanyCash(0));
     }
   }, [expenses, tenantId, isAdmin]);
 
   const fetchExpenses = async () => {
-    // Usuário não-admin PRECISA ter tenantId carregado
+    // Usuario nao-admin PRECISA ter tenantId carregado
     if (!isAdmin && !tenantId) {
       setExpenses([]);
       setLoading(false);
@@ -130,18 +79,7 @@ const ExpensesPage = () => {
     }
 
     try {
-      let query = supabase
-        .from('expenses')
-        .select('*');
-      
-      // Aplicar filtro de tenant para usuários não-admin
-      if (!isAdmin && tenantId) {
-        query = query.eq('tenant_id', tenantId);
-      }
-
-      const { data, error } = await query.order('expense_date', { ascending: false });
-
-      if (error) throw error;
+      const data = await expensesApi.list();
       setExpenses(data || []);
     } catch (error) {
       console.error('Erro ao buscar despesas:', error);
@@ -157,11 +95,11 @@ const ExpensesPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.description || !formData.amount || !formData.category) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
+        description: "Preencha todos os campos obrigatorios",
         variant: "destructive",
       });
       return;
@@ -176,13 +114,13 @@ const ExpensesPage = () => {
         observacao: formData.observacao
       };
 
-      // Adicionar tenant_id para novos registros - com validação
+      // Adicionar tenant_id para novos registros - com validacao
       if (!editingExpense) {
         const tenantIdForExpense = getTenantIdForInsert();
         if (!isAdmin && !tenantIdForExpense) {
           toast({
             title: "Erro",
-            description: "Empresa não identificada. Por favor, faça login novamente.",
+            description: "Empresa nao identificada. Por favor, faca login novamente.",
             variant: "destructive",
           });
           return;
@@ -191,22 +129,13 @@ const ExpensesPage = () => {
       }
 
       if (editingExpense) {
-        const { error } = await supabaseWithUser()
-          .from('expenses')
-          .update(expenseData)
-          .eq('id', editingExpense.id);
-
-        if (error) throw error;
+        await expensesApi.update(editingExpense.id, expenseData);
         toast({
           title: "Sucesso",
           description: "Despesa atualizada com sucesso",
         });
       } else {
-        const { error } = await supabaseWithUser()
-          .from('expenses')
-          .insert([expenseData]);
-
-        if (error) throw error;
+        await expensesApi.create(expenseData);
         toast({
           title: "Sucesso",
           description: "Despesa criada com sucesso",
@@ -247,16 +176,11 @@ const ExpensesPage = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabaseWithUser()
-        .from('expenses')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await expensesApi.delete(id);
 
       toast({
         title: "Sucesso",
-        description: "Despesa excluída com sucesso",
+        description: "Despesa excluida com sucesso",
       });
       fetchExpenses();
     } catch (error) {
@@ -271,11 +195,11 @@ const ExpensesPage = () => {
 
   const handleCashInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!cashInFormData.amount || !cashInFormData.description) {
       toast({
         title: "Erro",
-        description: "Preencha todos os campos obrigatórios",
+        description: "Preencha todos os campos obrigatorios",
         variant: "destructive",
       });
       return;
@@ -286,7 +210,7 @@ const ExpensesPage = () => {
       if (!isAdmin && !tenantIdForCashIn) {
         toast({
           title: "Erro",
-          description: "Empresa não identificada. Por favor, faça login novamente.",
+          description: "Empresa nao identificada. Por favor, faca login novamente.",
           variant: "destructive",
         });
         return;
@@ -301,15 +225,11 @@ const ExpensesPage = () => {
         tenant_id: tenantIdForCashIn
       };
 
-      const { error } = await supabaseWithUser()
-        .from('expenses')
-        .insert([cashInData]);
+      await expensesApi.create(cashInData);
 
-      if (error) throw error;
-      
       toast({
         title: "Sucesso",
-        description: "Entrada de caixa lançada com sucesso",
+        description: "Entrada de caixa lancada com sucesso",
       });
 
       setCashInDialogOpen(false);
@@ -321,10 +241,10 @@ const ExpensesPage = () => {
       });
       fetchExpenses();
     } catch (error) {
-      console.error('Erro ao lançar entrada de caixa:', error);
+      console.error('Erro ao lancar entrada de caixa:', error);
       toast({
         title: "Erro",
-        description: "Erro ao lançar entrada de caixa",
+        description: "Erro ao lancar entrada de caixa",
         variant: "destructive",
       });
     }
@@ -336,11 +256,11 @@ const ExpensesPage = () => {
     }
     return sum - expense.amount;
   }, 0);
-  
+
   const totalCashIn = expenses
     .filter(e => e.category === 'Entrada de Caixa')
     .reduce((sum, e) => sum + e.amount, 0);
-  
+
   const totalCashOut = expenses
     .filter(e => e.category !== 'Entrada de Caixa')
     .reduce((sum, e) => sum + e.amount, 0);
@@ -376,7 +296,7 @@ const ExpensesPage = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Lançar Entrada de Caixa</DialogTitle>
+                <DialogTitle>Lancar Entrada de Caixa</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCashInSubmit} className="space-y-4">
                 <div>
@@ -392,7 +312,7 @@ const ExpensesPage = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cashInDescription">Descrição *</Label>
+                  <Label htmlFor="cashInDescription">Descricao *</Label>
                   <Input
                     id="cashInDescription"
                     placeholder="Ex: Sobrou de viagem"
@@ -411,16 +331,16 @@ const ExpensesPage = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cashInObservacao">Observação</Label>
+                  <Label htmlFor="cashInObservacao">Observacao</Label>
                   <Textarea
                     id="cashInObservacao"
-                    placeholder="Observações adicionais"
+                    placeholder="Observacoes adicionais"
                     value={cashInFormData.observacao}
                     onChange={(e) => setCashInFormData({ ...cashInFormData, observacao: e.target.value })}
                   />
                 </div>
                 <Button type="submit" className="w-full">
-                  Lançar Entrada
+                  Lancar Entrada
                 </Button>
               </form>
             </DialogContent>
@@ -449,12 +369,12 @@ const ExpensesPage = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="description">Descrição *</Label>
+                <Label htmlFor="description">Descricao *</Label>
                 <Input
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Descrição da despesa"
+                  placeholder="Descricao da despesa"
                   required
                 />
               </div>
@@ -495,12 +415,12 @@ const ExpensesPage = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="observacao">Observação</Label>
+                <Label htmlFor="observacao">Observacao</Label>
                 <Textarea
                   id="observacao"
                   value={formData.observacao}
                   onChange={(e) => setFormData({...formData, observacao: e.target.value})}
-                  placeholder="Observações adicionais (opcional)"
+                  placeholder="Observacoes adicionais (opcional)"
                   rows={3}
                 />
               </div>
@@ -543,7 +463,7 @@ const ExpensesPage = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Saídas</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Saidas</CardTitle>
             <DollarSign className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
@@ -593,12 +513,12 @@ const ExpensesPage = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Descrição</TableHead>
+                  <TableHead>Descricao</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Data</TableHead>
-                  <TableHead>Observação</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>Observacao</TableHead>
+                  <TableHead className="text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -634,9 +554,9 @@ const ExpensesPage = () => {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                              <AlertDialogTitle>Confirmar exclusao</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
+                                Tem certeza que deseja excluir esta despesa? Esta acao nao pode ser desfeita.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

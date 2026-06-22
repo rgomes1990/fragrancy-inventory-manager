@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# Redirecionar todas as requisicoes para index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Bloquear acesso direto a arquivos internos
+<FilesMatch "\.(php)$">
+    <If "%{REQUEST_URI} !~ m#^/api/(index\.php)?#">
+        Require all denied
+    </If>
+</FilesMatch>

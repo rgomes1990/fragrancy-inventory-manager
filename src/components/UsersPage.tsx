@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { usersApi, tenantsApi } from '@/services/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,7 +66,7 @@ const UsersPage: React.FC = () => {
   const [editingUser, setEditingUser] = useState<AuthorizedUser | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AuthorizedUser | null>(null);
-  
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -79,33 +79,24 @@ const UsersPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [usersRes, tenantsRes] = await Promise.all([
-        supabase
-          .from('authorized_users')
-          .select('id, username, created_at, tenant_id, is_admin')
-          .order('username'),
-        supabase
-          .from('tenants')
-          .select('id, name')
-          .order('name')
+      const [usersData, tenantsData] = await Promise.all([
+        usersApi.list(),
+        tenantsApi.list(),
       ]);
-
-      if (usersRes.error) throw usersRes.error;
-      if (tenantsRes.error) throw tenantsRes.error;
 
       // Mapear nomes dos tenants
       const tenantMap: Record<string, string> = {};
-      tenantsRes.data?.forEach(t => {
+      (tenantsData || []).forEach((t: any) => {
         tenantMap[t.id] = t.name;
       });
 
-      const usersWithTenantNames = usersRes.data?.map(user => ({
+      const usersWithTenantNames = (usersData || []).map((user: any) => ({
         ...user,
         tenant_name: user.tenant_id ? tenantMap[user.tenant_id] : undefined
-      })) || [];
+      }));
 
       setUsers(usersWithTenantNames);
-      setTenants(tenantsRes.data || []);
+      setTenants(tenantsData || []);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
       toast.error('Erro ao carregar dados');
@@ -161,11 +152,9 @@ const UsersPage: React.FC = () => {
     }
 
     try {
-      const client = supabaseWithUser();
-
       if (editingUser) {
-        const updateData: { 
-          username: string; 
+        const updateData: {
+          username: string;
           password_hash?: string;
           tenant_id: string | null;
           is_admin: boolean;
@@ -179,24 +168,15 @@ const UsersPage: React.FC = () => {
           updateData.password_hash = password.trim();
         }
 
-        const { error } = await client
-          .from('authorized_users')
-          .update(updateData)
-          .eq('id', editingUser.id);
-
-        if (error) throw error;
+        await usersApi.update(editingUser.id, updateData);
         toast.success('Usuário atualizado com sucesso!');
       } else {
-        const { error } = await client
-          .from('authorized_users')
-          .insert({
-            username: username.trim(),
-            password_hash: password.trim(),
-            tenant_id: selectedTenantId || null,
-            is_admin: userIsAdmin
-          });
-
-        if (error) throw error;
+        await usersApi.create({
+          username: username.trim(),
+          password_hash: password.trim(),
+          tenant_id: selectedTenantId || null,
+          is_admin: userIsAdmin
+        });
         toast.success('Usuário criado com sucesso!');
       }
 
@@ -226,14 +206,8 @@ const UsersPage: React.FC = () => {
     if (!userToDelete) return;
 
     try {
-      const client = supabaseWithUser();
-      const { error } = await client
-        .from('authorized_users')
-        .delete()
-        .eq('id', userToDelete.id);
+      await usersApi.delete(userToDelete.id);
 
-      if (error) throw error;
-      
       toast.success('Usuário excluído com sucesso!');
       fetchData();
     } catch (error) {

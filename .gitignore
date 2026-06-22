@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Sensitive config files
+api/config/database.php
+api/config/jwt.php
+.env
+

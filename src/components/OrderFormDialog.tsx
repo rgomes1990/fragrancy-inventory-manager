@@ -6,11 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ordersApi, orderItemsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Order } from '@/types/database';
 import { useOrderData } from '@/hooks/useOrderData';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderFormDialogProps {
   isOpen: boolean;
@@ -31,25 +30,8 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<FormOrderItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const { currentUser } = useAuth();
 
   const { order, orderItems, loading: loadingOrderData } = useOrderData(editingOrder?.id || null);
-
-  // Definir usuário no contexto antes de operações no banco
-  const setUserContext = async () => {
-    if (currentUser) {
-      try {
-        await supabase.rpc('set_config', {
-          setting_name: 'app.current_user',
-          setting_value: currentUser,
-          is_local: false
-        });
-        console.log('Contexto do usuário definido para:', currentUser);
-      } catch (error) {
-        console.error('Erro ao definir contexto do usuário:', error);
-      }
-    }
-  };
 
   // Resetar formulário quando o dialog é aberto/fechado
   useEffect(() => {
@@ -67,7 +49,7 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
       console.log('Carregando dados para edição:', { order, orderItems });
       setCustomerName(order.customer_name);
       setNotes(order.notes || '');
-      
+
       if (orderItems.length > 0) {
         setItems(orderItems.map(item => ({
           product_name: item.product_name,
@@ -94,12 +76,12 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
   const updateItem = (index: number, field: keyof FormOrderItem, value: string | number) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Recalcular subtotal se quantidade ou preço mudaram
     if (field === 'quantity' || field === 'cost_price') {
       newItems[index].subtotal = newItems[index].quantity * newItems[index].cost_price;
     }
-    
+
     setItems(newItems);
   };
 
@@ -112,46 +94,32 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
     setLoading(true);
 
     try {
-      await setUserContext();
-      
       const totalAmount = calculateTotal();
 
       if (editingOrder) {
         // Atualizar encomenda existente
-        const { error: orderError } = await supabase
-          .from('orders')
-          .update({
-            customer_name: customerName,
-            notes: notes,
-            total_amount: totalAmount,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingOrder.id);
-
-        if (orderError) throw orderError;
+        await ordersApi.update(editingOrder.id, {
+          customer_name: customerName,
+          notes: notes,
+          total_amount: totalAmount,
+        });
 
         // Remover itens antigos
-        const { error: deleteError } = await supabase
-          .from('order_items')
-          .delete()
-          .eq('order_id', editingOrder.id);
-
-        if (deleteError) throw deleteError;
+        const existingItems = await orderItemsApi.listByOrder(editingOrder.id);
+        for (const item of existingItems || []) {
+          await orderItemsApi.delete(item.id);
+        }
 
         // Adicionar novos itens
-        const orderItemsToInsert = items.map(item => ({
-          order_id: editingOrder.id,
-          product_name: item.product_name,
-          cost_price: item.cost_price,
-          quantity: item.quantity,
-          subtotal: item.subtotal,
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItemsToInsert);
-
-        if (itemsError) throw itemsError;
+        for (const item of items) {
+          await orderItemsApi.create({
+            order_id: editingOrder.id,
+            product_name: item.product_name,
+            cost_price: item.cost_price,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+          });
+        }
 
         toast({
           title: "Sucesso",
@@ -159,31 +127,21 @@ const OrderFormDialog = ({ isOpen, onClose, onOrderSaved, editingOrder }: OrderF
         });
       } else {
         // Criar nova encomenda
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            customer_name: customerName,
-            notes: notes,
-            total_amount: totalAmount,
-          })
-          .select()
-          .single();
+        const orderData = await ordersApi.create({
+          customer_name: customerName,
+          notes: notes,
+          total_amount: totalAmount,
+        });
 
-        if (orderError) throw orderError;
-
-        const orderItemsToInsert = items.map(item => ({
-          order_id: orderData.id,
-          product_name: item.product_name,
-          cost_price: item.cost_price,
-          quantity: item.quantity,
-          subtotal: item.subtotal,
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItemsToInsert);
-
-        if (itemsError) throw itemsError;
+        for (const item of items) {
+          await orderItemsApi.create({
+            order_id: orderData.id,
+            product_name: item.product_name,
+            cost_price: item.cost_price,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+          });
+        }
 
         toast({
           title: "Sucesso",

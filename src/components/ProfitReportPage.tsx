@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
+import { salesApi, expensesApi, productsApi } from '@/services/apiClient';
+import { calculateCashBalance } from '@/lib/cashBalance';
 import { TrendingUp, DollarSign, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -31,58 +32,35 @@ const ProfitReportPage = () => {
 
   const fetchData = async () => {
     try {
-      // Buscar TODAS as vendas para o card Receita Total
-      const { data: allSalesData, error: allSalesError } = await supabase
-        .from('sales')
-        .select('total_price, sale_date');
+      // Buscar todas as vendas, despesas e produtos em paralelo
+      const [allSalesData, allExpensesData, allProductsData] = await Promise.all([
+        salesApi.list(),
+        expensesApi.list(),
+        productsApi.list(),
+      ]);
 
-      if (allSalesError) throw allSalesError;
-
-      const totalRevenue = allSalesData?.reduce((sum, sale) => {
+      const totalRevenue = (allSalesData || []).reduce((sum: number, sale: any) => {
         return sum + Number(sale.total_price);
-      }, 0) || 0;
-
-      // Buscar vendas a partir de 29/08/2025 para o cálculo do Caixa da Empresa
-      const { data: salesFromDateData, error: salesFromDateError } = await supabase
-        .from('sales')
-        .select('total_price, sale_date')
-        .gte('sale_date', '2025-08-29');
-
-      if (salesFromDateError) throw salesFromDateError;
-
-      const revenueFromDate = salesFromDateData?.reduce((sum, sale) => {
-        return sum + Number(sale.total_price);
-      }, 0) || 0;
-
-      // Buscar todas as despesas lançadas
-      const { data: allExpensesData, error: expensesError } = await supabase
-        .from('expenses')
-        .select('amount');
-
-      if (expensesError) throw expensesError;
-
-      const totalExpenses = allExpensesData?.reduce((sum, expense) => {
-        return sum + Number(expense.amount);
-      }, 0) || 0;
+      }, 0);
 
       // Buscar soma dos custos dos produtos (exceto produtos de encomenda)
-      const { data: allProductsData, error: productsError } = await supabase
-        .from('products')
-        .select('cost_price, is_order_product');
-
-      if (productsError) throw productsError;
-
-      const totalCostSum = allProductsData?.reduce((sum, product) => {
-        // Excluir produtos de encomenda (is_order_product = true)
+      const totalCostSum = (allProductsData || []).reduce((sum: number, product: any) => {
         if (!product.is_order_product) {
           return sum + Number(product.cost_price);
         }
         return sum;
-      }, 0) || 0;
+      }, 0);
 
-      // Calcular caixa da empresa (receita a partir de 29/08 - todas as despesas)
-      const companyCash = revenueFromDate - totalExpenses;
-      
+      const totalExpenses = (allExpensesData || []).reduce((sum: number, expense: any) => {
+        if (expense.category !== 'Entrada de Caixa') {
+          return sum + Number(expense.amount);
+        }
+        return sum;
+      }, 0);
+
+      // Calcular caixa da empresa usando a mesma logica do Dashboard
+      const companyCash = await calculateCashBalance(null, false);
+
       // Dividir por 2 para cada pessoa
       const daniloShare = companyCash / 2;
       const anaPaulaShare = companyCash / 2;

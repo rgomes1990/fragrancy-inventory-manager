@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Users, Search, ShoppingCart } from 'lucide-react';
-import { supabase, supabaseWithUser } from '@/integrations/supabase/client';
+import { customersApi, salesApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -48,9 +48,9 @@ const CustomersPage = () => {
       setFilteredCustomers(customers);
       return;
     }
-    
+
     const searchLower = searchTerm.toLowerCase();
-    const filtered = customers.filter(customer => 
+    const filtered = customers.filter(customer =>
       customer.name.toLowerCase().includes(searchLower) ||
       customer.whatsapp?.toLowerCase().includes(searchLower) ||
       customer.email?.toLowerCase().includes(searchLower)
@@ -60,40 +60,22 @@ const CustomersPage = () => {
 
   const fetchCustomers = async () => {
     try {
-      // Construir queries com filtro de tenant
-      let customersQuery = supabase
-        .from('customers')
-        .select('*');
-      
-      let salesQuery = supabase
-        .from('sales')
-        .select('customer_id');
-
-      // Aplicar filtro de tenant para usuários não-admin
-      if (!isAdmin && tenantId) {
-        customersQuery = customersQuery.eq('tenant_id', tenantId);
-        salesQuery = salesQuery.eq('tenant_id', tenantId);
-      }
-
       // Buscar clientes e vendas em paralelo
-      const [customersRes, salesRes] = await Promise.all([
-        customersQuery.order('created_at', { ascending: false }),
-        salesQuery
+      const [customersData, salesData] = await Promise.all([
+        customersApi.list(),
+        salesApi.list(),
       ]);
-
-      if (customersRes.error) throw customersRes.error;
-      if (salesRes.error) throw salesRes.error;
 
       // Contar vendas por cliente
       const salesCountByCustomer: Record<string, number> = {};
-      salesRes.data?.forEach(sale => {
+      salesData?.forEach((sale: any) => {
         if (sale.customer_id) {
           salesCountByCustomer[sale.customer_id] = (salesCountByCustomer[sale.customer_id] || 0) + 1;
         }
       });
 
       // Adicionar contagem de vendas aos clientes
-      const customersWithSales: CustomerWithSales[] = (customersRes.data || []).map(customer => ({
+      const customersWithSales: CustomerWithSales[] = (customersData || []).map((customer: any) => ({
         ...customer,
         salesCount: salesCountByCustomer[customer.id] || 0
       }));
@@ -102,9 +84,7 @@ const CustomersPage = () => {
       customersWithSales.sort((a, b) => {
         if (a.salesCount > 0 && b.salesCount === 0) return -1;
         if (a.salesCount === 0 && b.salesCount > 0) return 1;
-        // Se ambos têm ou não têm vendas, ordenar por quantidade de vendas (maior primeiro)
         if (a.salesCount !== b.salesCount) return b.salesCount - a.salesCount;
-        // Se igual, ordenar por data de cadastro
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
@@ -113,7 +93,7 @@ const CustomersPage = () => {
       console.error('Erro ao buscar clientes:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os clientes.",
+        description: "Nao foi possivel carregar os clientes.",
         variant: "destructive",
       });
     } finally {
@@ -129,7 +109,7 @@ const CustomersPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       const birthday =
         formData.birthday_day && formData.birthday_month
@@ -142,13 +122,13 @@ const CustomersPage = () => {
         birthday,
       };
 
-      // Adicionar tenant_id para novos registros - com validação
+      // Adicionar tenant_id para novos registros - com validacao
       if (!editingCustomer) {
         const tenantIdForCustomer = getTenantIdForInsert();
         if (!isAdmin && !tenantIdForCustomer) {
           toast({
             title: "Erro",
-            description: "Empresa não identificada. Por favor, faça login novamente.",
+            description: "Empresa nao identificada. Por favor, faca login novamente.",
             variant: "destructive",
           });
           return;
@@ -157,22 +137,13 @@ const CustomersPage = () => {
       }
 
       if (editingCustomer) {
-        const { error } = await supabaseWithUser()
-          .from('customers')
-          .update(customerData)
-          .eq('id', editingCustomer.id);
-
-        if (error) throw error;
+        await customersApi.update(editingCustomer.id, customerData);
         toast({
           title: "Sucesso",
           description: "Cliente atualizado com sucesso!",
         });
       } else {
-        const { error } = await supabaseWithUser()
-          .from('customers')
-          .insert([customerData]);
-
-        if (error) throw error;
+        await customersApi.create(customerData);
         toast({
           title: "Sucesso",
           description: "Cliente cadastrado com sucesso!",
@@ -185,7 +156,7 @@ const CustomersPage = () => {
       console.error('Erro ao salvar cliente:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível salvar o cliente.",
+        description: "Nao foi possivel salvar o cliente.",
         variant: "destructive",
       });
     }
@@ -209,23 +180,18 @@ const CustomersPage = () => {
     if (!confirm('Tem certeza que deseja excluir este cliente?')) return;
 
     try {
-      const { error } = await supabaseWithUser()
-        .from('customers')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await customersApi.delete(id);
 
       toast({
         title: "Sucesso",
-        description: "Cliente excluído com sucesso!",
+        description: "Cliente excluido com sucesso!",
       });
       fetchCustomers();
     } catch (error) {
       console.error('Erro ao excluir cliente:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível excluir o cliente.",
+        description: "Nao foi possivel excluir o cliente.",
         variant: "destructive",
       });
     }
@@ -247,7 +213,7 @@ const CustomersPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold text-gray-900 min-w-0">Clientes</h1>
-        <Button 
+        <Button
           onClick={() => setShowForm(true)}
           className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto"
         >
@@ -294,7 +260,7 @@ const CustomersPage = () => {
                 />
               </div>
               <div className="md:col-span-2">
-                <Label>Aniversário (opcional)</Label>
+                <Label>Aniversario (opcional)</Label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
@@ -309,7 +275,7 @@ const CustomersPage = () => {
                     type="number"
                     min={1}
                     max={12}
-                    placeholder="Mês"
+                    placeholder="Mes"
                     value={formData.birthday_month}
                     onChange={(e) => setFormData({ ...formData, birthday_month: e.target.value })}
                     className="w-24"
@@ -359,7 +325,7 @@ const CustomersPage = () => {
                   <TableHead>WhatsApp</TableHead>
                   <TableHead>E-mail</TableHead>
                   <TableHead>Data de Cadastro</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead>Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -372,7 +338,7 @@ const CustomersPage = () => {
                 ) : (
                   filteredCustomers.map((customer) => (
                     <TableRow key={customer.id}>
-                      <TableCell 
+                      <TableCell
                         className={`font-medium ${customer.salesCount > 0 ? 'text-primary cursor-pointer hover:underline' : ''}`}
                         onClick={() => handleCustomerClick(customer)}
                       >

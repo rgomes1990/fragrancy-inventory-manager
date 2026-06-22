@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
+import { dashboardApi, productsApi, salesApi, customersApi, expensesApi, salesBalanceApi, salePaymentsApi } from '@/services/apiClient';
 import { Package, Users, ShoppingCart, DollarSign, TrendingUp, Trophy, Crown, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -63,7 +63,7 @@ const Dashboard = () => {
     totalPartialPayments: 0,
     totalToReceive: 0,
   });
-  
+
   const [recentSales, setRecentSales] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
@@ -78,130 +78,80 @@ const Dashboard = () => {
     }
   }, [stockFilter, tenantId, isAdmin]);
 
-  // Helper function to apply tenant filter
-  const applyTenantFilter = (query: any) => {
-    if (!isAdmin && tenantId) {
-      return query.eq('tenant_id', tenantId);
-    }
-    return query;
-  };
-
   const fetchDashboardData = async () => {
     try {
-      let productsQuery = supabase.from('products').select('id, cost_price, sale_price, quantity');
-      if (stockFilter === 'in-stock') {
-        productsQuery = productsQuery.gt('quantity', 0);
-      } else if (stockFilter === 'out-of-stock') {
-        productsQuery = productsQuery.eq('quantity', 0);
-      }
-      productsQuery = applyTenantFilter(productsQuery);
-
-      let customersQuery = supabase.from('customers').select('id', { count: 'exact' });
-      customersQuery = applyTenantFilter(customersQuery);
-
-      let salesQuery = supabase.from('sales').select('total_price', { count: 'exact' });
-      salesQuery = applyTenantFilter(salesQuery);
-
-      let expensesQuery = supabase.from('expenses').select('amount');
-      expensesQuery = applyTenantFilter(expensesQuery);
-
-      const [productsRes, customersRes, salesRes, allExpensesRes] = await Promise.all([
-        productsQuery,
-        customersQuery,
-        salesQuery,
-        expensesQuery
+      // Fetch all data via API
+      const [allProducts, allSales, customersData, allExpenses, balanceData, salePaymentsData] = await Promise.all([
+        productsApi.list(),
+        salesApi.list(),
+        customersApi.list(),
+        expensesApi.list(),
+        salesBalanceApi.list(),
+        salePaymentsApi.list(),
       ]);
 
-      // Buscar TODAS as vendas para o card Receita Total (com filtro de tenant)
-      let allSalesQuery = supabase
-        .from('sales')
-        .select('total_price');
-      allSalesQuery = applyTenantFilter(allSalesQuery);
-      const { data: allSalesData } = await allSalesQuery;
-      
-      const totalRevenue = allSalesData?.reduce((sum, sale) => sum + Number(sale.total_price), 0) || 0;
+      // Filter products based on stockFilter
+      let productsData = allProducts || [];
+      if (stockFilter === 'in-stock') {
+        productsData = productsData.filter((p: any) => Number(p.quantity) > 0);
+      } else if (stockFilter === 'out-of-stock') {
+        productsData = productsData.filter((p: any) => Number(p.quantity) === 0);
+      }
 
-      // Caixa: lógica legada (vendas com payment_received=true a partir de 29/08/2025
-      // + partial_payment_amount registrados na própria venda) — mantém histórico estável.
-      // A partir de 13/06/2026 também somamos pagamentos registrados via "A Receber"
-      // (sale_payments) que ainda não foram refletidos no payment_received da venda,
-      // para que novos recebimentos parciais entrem no caixa sem reprocessar o histórico.
+      const salesData = allSales || [];
+      const expensesArr = allExpenses || [];
+
+      const totalRevenue = salesData.reduce((sum: number, sale: any) => sum + Number(sale.total_price), 0);
+
+      // Caixa: logica legada (vendas com payment_received=true a partir de 29/08/2025)
       const CAIXA_LEGACY_START = '2025-08-29';
       const SALE_PAYMENTS_CUTOFF = '2026-06-13';
 
-      let legacySalesQuery = supabase
-        .from('sales')
-        .select('total_price, payment_received, partial_payment_amount, sale_date')
-        .gte('sale_date', CAIXA_LEGACY_START);
-      legacySalesQuery = applyTenantFilter(legacySalesQuery);
-      const { data: legacySales } = await legacySalesQuery;
-      const legacyRevenue = (legacySales || []).reduce((sum: number, row: any) => {
+      const legacySales = salesData.filter((s: any) => new Date(s.sale_date) >= new Date(CAIXA_LEGACY_START));
+      const legacyRevenue = legacySales.reduce((sum: number, row: any) => {
         if (row.payment_received) return sum + Number(row.total_price || 0);
         return sum + Number(row.partial_payment_amount || 0);
       }, 0);
 
-      let newPaymentsQuery = (supabase as any)
-        .from('sale_payments')
-        .select('amount, tenant_id, created_at, sale_group_id')
-        .gte('created_at', SALE_PAYMENTS_CUTOFF);
-      if (!isAdmin && tenantId) newPaymentsQuery = newPaymentsQuery.eq('tenant_id', tenantId);
-      const { data: newPaymentsData } = await newPaymentsQuery;
+      const newPayments = (salePaymentsData || []).filter((p: any) => new Date(p.created_at) >= new Date(SALE_PAYMENTS_CUTOFF));
 
-      // Exclui pagamentos cuja venda já está marcada como payment_received=true
-      // (já contabilizada via legacyRevenue) para evitar duplicidade.
-      const groupIds = Array.from(new Set((newPaymentsData || []).map((p: any) => p.sale_group_id).filter(Boolean)));
+      // Exclui pagamentos cuja venda ja esta marcada como payment_received=true
+      const groupIds = Array.from(new Set(newPayments.map((p: any) => p.sale_group_id).filter(Boolean)));
       const paidGroupIds = new Set<string>();
-      if (groupIds.length > 0) {
-        const { data: paidSales } = await supabase
-          .from('sales')
-          .select('id, sale_group_id, payment_received')
-          .or(`sale_group_id.in.(${groupIds.join(',')}),id.in.(${groupIds.join(',')})`)
-          .eq('payment_received', true);
-        (paidSales || []).forEach((s: any) => {
+      salesData.forEach((s: any) => {
+        if (s.payment_received) {
           if (s.sale_group_id) paidGroupIds.add(s.sale_group_id);
           if (s.id) paidGroupIds.add(s.id);
-        });
-      }
+        }
+      });
 
-      const newPaymentsRevenue = (newPaymentsData || []).reduce((sum: number, p: any) => {
+      const newPaymentsRevenue = newPayments.reduce((sum: number, p: any) => {
         if (paidGroupIds.has(p.sale_group_id)) return sum;
         return sum + Number(p.amount || 0);
       }, 0);
 
       const revenueFromDate = legacyRevenue + newPaymentsRevenue;
 
-      // Separar despesas (saídas) e entradas de caixa
-      let expensesDataQuery = supabase
-        .from('expenses')
-        .select('amount, category');
-      expensesDataQuery = applyTenantFilter(expensesDataQuery);
-      const { data: expensesData } = await expensesDataQuery;
-      
-      const totalExpenses = expensesData?.reduce((sum, expense) => {
+      // Separar despesas (saidas) e entradas de caixa
+      const totalExpenses = expensesArr.reduce((sum: number, expense: any) => {
         if (expense.category !== 'Entrada de Caixa') {
           return sum + Number(expense.amount);
         }
         return sum;
-      }, 0) || 0;
-      
-      const totalCashIn = expensesData?.reduce((sum, expense) => {
+      }, 0);
+
+      const totalCashIn = expensesArr.reduce((sum: number, expense: any) => {
         if (expense.category === 'Entrada de Caixa') {
           return sum + Number(expense.amount);
         }
         return sum;
-      }, 0) || 0;
+      }, 0);
 
-      // Total a Receber: usar a view v_sales_balance (saldo real, em tempo real)
-      let balanceQuery = (supabase as any)
-        .from('v_sales_balance')
-        .select('remaining, status, tenant_id')
-        .neq('status', 'pago');
-      if (!isAdmin && tenantId) balanceQuery = balanceQuery.eq('tenant_id', tenantId);
-      const { data: balanceRows } = await balanceQuery;
-
+      // Total a Receber: usar salesBalance
       let totalPendingPayments = 0;
       let totalPartialPayments = 0;
-      (balanceRows || []).forEach((r: any) => {
+      (balanceData || []).forEach((r: any) => {
+        if (r.status === 'pago') return;
         const rem = Number(r.remaining) || 0;
         if (r.status === 'parcial') totalPartialPayments += rem;
         else totalPendingPayments += rem;
@@ -209,89 +159,75 @@ const Dashboard = () => {
 
       const totalToReceive = totalPendingPayments + totalPartialPayments;
 
-
-      let costSaleSumQuery = supabase.from('products').select('cost_price, sale_price, quantity, is_order_product');
+      // Cost/Sale sums (use same filter as products)
+      let costSaleProducts = allProducts || [];
       if (stockFilter === 'in-stock') {
-        costSaleSumQuery = costSaleSumQuery.gt('quantity', 0);
+        costSaleProducts = costSaleProducts.filter((p: any) => Number(p.quantity) > 0);
       } else if (stockFilter === 'out-of-stock') {
-        costSaleSumQuery = costSaleSumQuery.eq('quantity', 0);
+        costSaleProducts = costSaleProducts.filter((p: any) => Number(p.quantity) === 0);
       }
-      costSaleSumQuery = applyTenantFilter(costSaleSumQuery);
 
-      const { data: allProductsData } = await costSaleSumQuery;
-      
-      const totalCostSum = allProductsData?.reduce((sum, product) => {
-        // Excluir produtos de encomenda (is_order_product = true)
-        // Multiplicar preço de custo pela quantidade em estoque
-        // Para produtos sem estoque, considerar quantidade = 1
+      const totalCostSum = costSaleProducts.reduce((sum: number, product: any) => {
         if (!product.is_order_product) {
           const qty = Number(product.quantity);
           const effectiveQty = qty > 0 ? qty : 1;
           return sum + (Number(product.cost_price) * effectiveQty);
         }
         return sum;
-      }, 0) || 0;
-      
-      const totalSaleSum = allProductsData?.reduce((sum, product) => {
-        // Excluir produtos de encomenda (is_order_product = true)
-        // Multiplicar preço de venda pela quantidade em estoque
-        // Para produtos sem estoque, considerar quantidade = 1
+      }, 0);
+
+      const totalSaleSum = costSaleProducts.reduce((sum: number, product: any) => {
         if (!product.is_order_product) {
           const qty = Number(product.quantity);
           const effectiveQty = qty > 0 ? qty : 1;
           return sum + (Number(product.sale_price) * effectiveQty);
         }
         return sum;
-      }, 0) || 0;
+      }, 0);
 
-      let recentSalesQuery = supabase
-        .from('sales')
-        .select(`
-          *,
-          customers(name),
-          products(name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(15);
-      recentSalesQuery = applyTenantFilter(recentSalesQuery);
-      const { data: recentSalesData } = await recentSalesQuery;
+      // Recent sales (use flat fields from API)
+      const recentSalesData = salesData
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 15);
 
-      let topProductsQuery = supabase
-        .from('sales')
-        .select(`
-          products(name),
-          quantity,
-          total_price
-        `)
-        .not('products', 'is', null);
-      topProductsQuery = applyTenantFilter(topProductsQuery);
-      const { data: topProductsData } = await topProductsQuery;
+      // Top products
+      const productSales: Record<string, TopProduct> = {};
+      salesData.forEach((sale: any) => {
+        const productName = sale.product_name || 'Produto desconhecido';
+        if (!sale.product_id) return;
+        if (!productSales[productName]) {
+          productSales[productName] = {
+            product_name: productName,
+            total_quantity: 0,
+            total_revenue: 0
+          };
+        }
+        productSales[productName].total_quantity += sale.quantity;
+        productSales[productName].total_revenue += Number(sale.total_price);
+      });
 
-      let topCustomersQuery = supabase
-        .from('sales')
-        .select(`
-          customers(name),
-          quantity,
-          total_price
-        `)
-        .not('customers', 'is', null);
-      topCustomersQuery = applyTenantFilter(topCustomersQuery);
-      const { data: topCustomersData } = await topCustomersQuery;
+      // Top customers
+      const customerPurchases: Record<string, TopCustomer> = {};
+      salesData.forEach((sale: any) => {
+        const customerName = sale.customer_name || 'Cliente desconhecido';
+        if (!sale.customer_id) return;
+        if (!customerPurchases[customerName]) {
+          customerPurchases[customerName] = {
+            customer_name: customerName,
+            total_purchases: 0,
+            total_spent: 0
+          };
+        }
+        customerPurchases[customerName].total_purchases += sale.quantity;
+        customerPurchases[customerName].total_spent += Number(sale.total_price);
+      });
 
-      // Buscar vendas por vendedor diretamente da tabela sales
-      let salesBySellerQuery = supabase
-        .from('sales')
-        .select('seller, total_price');
-      salesBySellerQuery = applyTenantFilter(salesBySellerQuery);
-      const { data: salesBySellerData } = await salesBySellerQuery;
-
-      // Agregar vendas por vendedor dinamicamente
+      // Sales by seller
       const sellerStats: Record<string, { sales: number; revenue: number }> = {};
-      
-      salesBySellerData?.forEach((sale) => {
-        const sellerName = sale.seller || 'Não informado';
+      salesData.forEach((sale: any) => {
+        const sellerName = sale.seller || 'Nao informado';
         const revenue = Number(sale.total_price) || 0;
-        
+
         if (!sellerStats[sellerName]) {
           sellerStats[sellerName] = { sales: 0, revenue: 0 };
         }
@@ -299,38 +235,9 @@ const Dashboard = () => {
         sellerStats[sellerName].revenue += revenue;
       });
 
-      // Converter para array
       const sellersStatsArray: SellerSales[] = Object.entries(sellerStats)
         .map(([name, data]) => ({ name, sales: data.sales, revenue: data.revenue }))
         .sort((a, b) => b.revenue - a.revenue);
-
-      const productSales = topProductsData?.reduce((acc, sale) => {
-        const productName = sale.products?.name || 'Produto desconhecido';
-        if (!acc[productName]) {
-          acc[productName] = {
-            product_name: productName,
-            total_quantity: 0,
-            total_revenue: 0
-          };
-        }
-        acc[productName].total_quantity += sale.quantity;
-        acc[productName].total_revenue += Number(sale.total_price);
-        return acc;
-      }, {} as Record<string, TopProduct>) || {};
-
-      const customerPurchases = topCustomersData?.reduce((acc, sale) => {
-        const customerName = sale.customers?.name || 'Cliente desconhecido';
-        if (!acc[customerName]) {
-          acc[customerName] = {
-            customer_name: customerName,
-            total_purchases: 0,
-            total_spent: 0
-          };
-        }
-        acc[customerName].total_purchases += sale.quantity;
-        acc[customerName].total_spent += Number(sale.total_price);
-        return acc;
-      }, {} as Record<string, TopCustomer>) || {};
 
       const top5Products = Object.values(productSales)
         .sort((a, b) => b.total_quantity - a.total_quantity)
@@ -340,36 +247,26 @@ const Dashboard = () => {
         .sort((a, b) => b.total_spent - a.total_spent)
         .slice(0, 15);
 
-      // Calcular vendas mensais para o gráfico (últimos 12 meses)
-      let allSalesForChartQuery = supabase
-        .from('sales')
-        .select('sale_date, total_price');
-      allSalesForChartQuery = applyTenantFilter(allSalesForChartQuery);
-      const { data: allSalesForChart } = await allSalesForChartQuery;
-
+      // Calcular vendas mensais para o grafico (ultimos 12 meses)
       const monthlySalesData: Record<string, { vendas: number; receita: number }> = {};
-      
-      // Inicializar os últimos 12 meses
+
       const now = new Date();
       for (let i = 11; i >= 0; i--) {
         const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
         monthlySalesData[monthKey] = { vendas: 0, receita: 0 };
       }
 
-      // Agregar vendas por mês
-      allSalesForChart?.forEach((sale) => {
+      salesData.forEach((sale: any) => {
         const saleDate = new Date(sale.sale_date);
         const monthKey = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
-        
+
         if (monthlySalesData[monthKey]) {
           monthlySalesData[monthKey].vendas += 1;
           monthlySalesData[monthKey].receita += Number(sale.total_price);
         }
       });
 
-      // Converter para array para o gráfico
       const chartData = Object.entries(monthlySalesData)
         .map(([month, data]) => {
           const [year, monthNum] = month.split('-');
@@ -382,28 +279,25 @@ const Dashboard = () => {
           };
         })
         .sort((a, b) => {
-          // Ordenar cronologicamente
           const monthOrder = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
           const aMonth = a.month.split(' ')[0];
           const bMonth = b.month.split(' ')[0];
           const aYear = a.month.split(' ')[1];
           const bYear = b.month.split(' ')[1];
-          
+
           if (aYear !== bYear) {
             return Number(aYear) - Number(bYear);
           }
           return monthOrder.indexOf(aMonth) - monthOrder.indexOf(bMonth);
         });
 
-      const productsData = productsRes.data || [];
-      
       // Somar a quantidade total de produtos em estoque
-      const totalProductQuantity = productsData.reduce((sum, product) => sum + (Number(product.quantity) || 0), 0);
+      const totalProductQuantity = productsData.reduce((sum: number, product: any) => sum + (Number(product.quantity) || 0), 0);
 
       setStats({
         totalProducts: totalProductQuantity,
-        totalCustomers: customersRes.count || 0,
-        totalSales: salesRes.count || 0,
+        totalCustomers: (customersData || []).length,
+        totalSales: salesData.length,
         totalRevenue,
         revenueFromDate,
         totalCostSum,
@@ -443,7 +337,7 @@ const Dashboard = () => {
   const getFilteredStatsCards = () => {
     const baseCards = [
       {
-        title: stockFilter === 'all' ? 'Total de Produtos' : 
+        title: stockFilter === 'all' ? 'Total de Produtos' :
                stockFilter === 'in-stock' ? 'Produtos com Estoque' : 'Produtos sem Estoque',
         value: stats.totalProducts,
         icon: Package,
@@ -472,14 +366,14 @@ const Dashboard = () => {
         bgColor: 'bg-yellow-50',
       },
       {
-        title: 'Soma Preços de Custo',
+        title: 'Soma Precos de Custo',
         value: `R$ ${stats.totalCostSum.toFixed(2)}`,
         icon: TrendingUp,
         color: 'from-red-500 to-red-600',
         bgColor: 'bg-red-50',
       },
       {
-        title: 'Projeção de Vendas',
+        title: 'Projecao de Vendas',
         value: `R$ ${stats.totalSaleSum.toFixed(2)}`,
         icon: Package,
         color: 'from-indigo-500 to-indigo-600',
@@ -553,21 +447,21 @@ const Dashboard = () => {
             </SelectContent>
           </Select>
           <div className="text-sm text-gray-500">
-            Última atualização: {new Date().toLocaleString('pt-BR')}
+            Ultima atualizacao: {new Date().toLocaleString('pt-BR')}
           </div>
         </div>
       </div>
 
-      {/* Cards de estatísticas */}
+      {/* Cards de estatisticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {getFilteredStatsCards().map((card, index) => {
           const Icon = card.icon;
           const isClickable = (card as any).clickable;
           const clickType = (card as any).clickType;
-          
+
           return (
-            <Card 
-              key={index} 
+            <Card
+              key={index}
               className={`${card.bgColor} border-0 shadow-md hover:shadow-lg transition-shadow duration-300 ${isClickable ? 'cursor-pointer hover:ring-2 hover:ring-offset-2 hover:ring-primary' : ''}`}
               onClick={isClickable ? () => handleCardClick(clickType) : undefined}
             >
@@ -590,7 +484,7 @@ const Dashboard = () => {
         })}
       </div>
 
-      {/* Cards de vendas por vendedor (dinâmico) */}
+      {/* Cards de vendas por vendedor (dinamico) */}
       {sellersSales.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sellersSales.map((seller, index) => {
@@ -602,9 +496,9 @@ const Dashboard = () => {
               { bg: 'bg-orange-50', ring: 'ring-orange-400', text: 'text-orange-500' },
             ];
             const color = colors[index % colors.length];
-            
+
             return (
-              <Card 
+              <Card
                 key={seller.name}
                 className={`${color.bg} border-0 shadow-md cursor-pointer hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:${color.ring} transition-all duration-300`}
                 onClick={() => handleCardClick(`seller-${seller.name}`)}
@@ -727,8 +621,8 @@ const Dashboard = () => {
                 {recentSales.map((sale) => (
                   <div key={sale.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
                     <div>
-                      <p className="font-medium text-sm">{sale.products?.name}</p>
-                      <p className="text-xs text-gray-500">{sale.customers?.name}</p>
+                      <p className="font-medium text-sm">{sale.product_name || sale.kit_name || '-'}</p>
+                      <p className="text-xs text-gray-500">{sale.customer_name || '-'}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-sm">R$ {Number(sale.total_price).toFixed(2)}</p>
@@ -746,34 +640,34 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Gráfico de Evolução de Vendas */}
+      {/* Grafico de Evolucao de Vendas */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <TrendingUp className="w-5 h-5 text-blue-500" />
-            <span>Evolução de Vendas Mensais</span>
+            <span>Evolucao de Vendas Mensais</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={monthlySales}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="month" 
+              <XAxis
+                dataKey="month"
                 style={{ fontSize: '12px' }}
               />
-              <YAxis 
+              <YAxis
                 yAxisId="left"
                 style={{ fontSize: '12px' }}
                 label={{ value: 'Quantidade', angle: -90, position: 'insideLeft' }}
               />
-              <YAxis 
+              <YAxis
                 yAxisId="right"
                 orientation="right"
                 style={{ fontSize: '12px' }}
                 label={{ value: 'Receita (R$)', angle: 90, position: 'insideRight' }}
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number, name: string) => {
                   if (name === 'receita') {
                     return [`R$ ${value.toFixed(2)}`, 'Receita'];
@@ -782,17 +676,17 @@ const Dashboard = () => {
                 }}
               />
               <Legend />
-              <Bar 
+              <Bar
                 yAxisId="left"
-                dataKey="vendas" 
-                fill="#8b5cf6" 
+                dataKey="vendas"
+                fill="#8b5cf6"
                 name="Vendas"
                 radius={[4, 4, 0, 0]}
               />
-              <Bar 
+              <Bar
                 yAxisId="right"
-                dataKey="receita" 
-                fill="#10b981" 
+                dataKey="receita"
+                fill="#10b981"
                 name="Receita"
                 radius={[4, 4, 0, 0]}
               />

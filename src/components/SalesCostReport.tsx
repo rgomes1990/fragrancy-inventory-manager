@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar, FileText, TrendingUp, DollarSign, Package } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { salesApi } from '@/services/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
 
@@ -39,37 +39,17 @@ const SalesCostReport = () => {
 
   const fetchSalesCostData = async () => {
     if (!tenantId) return;
-    
+
     setLoading(true);
     try {
-      let query = supabase
-        .from('sales')
-        .select(`
-          id,
-          sale_date,
-          quantity,
-          unit_price,
-          total_price,
-          seller,
-          products(name, cost_price),
-          customers(name)
-        `)
-        .eq('tenant_id', tenantId)
-        .order('sale_date', { ascending: false });
+      const params: Record<string, string | undefined> = {};
+      if (startDate) params.date_from = startDate;
+      if (endDate) params.date_to = endDate + 'T23:59:59';
 
-      if (startDate) {
-        query = query.gte('sale_date', startDate);
-      }
-      if (endDate) {
-        query = query.lte('sale_date', endDate + 'T23:59:59');
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const data = await salesApi.list(params);
 
       const processedData: SaleCostData[] = (data || []).map((sale: any) => {
-        const costPrice = sale.products?.cost_price || 0;
+        const costPrice = sale.cost_price || 0;
         const totalCost = costPrice * sale.quantity;
         const totalSale = Number(sale.total_price);
         const profit = totalSale - totalCost;
@@ -78,7 +58,7 @@ const SalesCostReport = () => {
         return {
           id: sale.id,
           sale_date: sale.sale_date,
-          product_name: sale.products?.name || 'Produto não encontrado',
+          product_name: sale.product_name || 'Produto não encontrado',
           quantity: sale.quantity,
           unit_price: sale.unit_price,
           cost_price: costPrice,
@@ -86,7 +66,7 @@ const SalesCostReport = () => {
           total_cost: totalCost,
           profit: profit,
           profit_margin: profitMargin,
-          customer_name: sale.customers?.name || 'Sem cliente',
+          customer_name: sale.customer_name || 'Sem cliente',
           seller: sale.seller || 'Não informado'
         };
       });
@@ -120,16 +100,16 @@ const SalesCostReport = () => {
   const generatePDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    
+
     // Header
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('Relatório de Custos de Vendas', pageWidth / 2, 20, { align: 'center' });
-    
+
     // Period
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    const periodText = startDate && endDate 
+    const periodText = startDate && endDate
       ? `Período: ${new Date(startDate).toLocaleDateString('pt-BR')} a ${new Date(endDate).toLocaleDateString('pt-BR')}`
       : 'Período: Todas as vendas';
     doc.text(periodText, pageWidth / 2, 28, { align: 'center' });
@@ -160,7 +140,7 @@ const SalesCostReport = () => {
     let yPos = 74;
     doc.setFillColor(59, 130, 246);
     doc.rect(14, yPos, pageWidth - 28, 8, 'F');
-    
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
@@ -196,7 +176,7 @@ const SalesCostReport = () => {
       doc.text(`R$ ${sale.unit_price.toFixed(2)}`, 114, yPos + 4.5);
       doc.text(`R$ ${sale.total_cost.toFixed(2)}`, 136, yPos + 4.5);
       doc.text(`R$ ${sale.total_sale.toFixed(2)}`, 158, yPos + 4.5);
-      
+
       const profitColor = sale.profit >= 0 ? [34, 197, 94] : [239, 68, 68];
       doc.setTextColor(profitColor[0], profitColor[1], profitColor[2]);
       doc.text(`R$ ${sale.profit.toFixed(2)}`, 180, yPos + 4.5);
