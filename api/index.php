@@ -53,9 +53,11 @@ $controllers = [
     'users'                  => 'users.php',
     'tenants'                => 'tenants.php',
     'audit-log'              => 'audit_log.php',
+    'sale-items'             => 'sale_items.php',
     'sales-balance'          => 'sales_balance.php',
     'product-order-requests' => 'product_order_requests.php',
     'dashboard'              => 'dashboard.php',
+    'upload'                 => 'upload.php',
 ];
 
 if (!isset($controllers[$resource])) {

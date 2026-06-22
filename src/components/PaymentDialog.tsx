@@ -43,25 +43,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setHistory(data || []);
   };
 
-  // Sincroniza sales.payment_received com o saldo atual do grupo.
-  // Marca todas as linhas como pagas quando o total já foi quitado, e desmarca caso contrário.
+  // Sincroniza sales.payment_received com o saldo atual da venda.
   const syncSalesPaymentStatus = async (paidTotal: number) => {
     try {
       const fullyPaid = paidTotal + 0.01 >= total;
-      // Buscar vendas pelo sale_group_id
-      const allSales = await salesApi.list({ sale_group_id: saleGroupId });
-      // Filtrar apenas vendas que realmente pertencem ao grupo (seguranca)
-      const groupSales = (allSales || []).filter(
-        (s: any) => s.sale_group_id === saleGroupId
-      );
-      if (groupSales.length > 0) {
-        for (const sale of groupSales) {
-          await salesApi.update(sale.id, { payment_received: fullyPaid });
-        }
-      } else {
-        // Venda simples - atualiza pelo id
-        await salesApi.update(saleGroupId, { payment_received: fullyPaid });
-      }
+      await salesApi.update(saleGroupId, { payment_received: fullyPaid });
     } catch (e) {
       console.error('Erro ao sincronizar status da venda:', e);
     }
@@ -80,25 +66,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   const buildAndShowSuccess = async (paidNow: number, payType: string, newPaidTotal: number) => {
     try {
-      // Busca itens da venda (sale_group_id ou id quando venda simples)
-      const salesItems = await salesApi.list({ sale_group_id: saleGroupId });
-      let allItems = salesItems || [];
-      if (allItems.length === 0) {
-        // Venda simples - buscar pelo id
-        try {
-          const single = await salesApi.getById(saleGroupId);
-          if (single) allItems = [single];
-        } catch { /* ignore */ }
-      }
+      // Busca a venda com seus itens
+      const sale = await salesApi.getById(saleGroupId);
+      const saleItems = sale?.items || [];
 
-      const items = allItems.map((s: any) => ({
+      const items = saleItems.map((s: any) => ({
         name: s.kit_name || s.product_name || 'Item',
         quantity: s.quantity,
         subtotal: Number(s.total_price),
         isKit: !!s.kit_name,
       }));
 
-      const customerId = allItems[0]?.customer_id;
+      const customerId = sale?.customer_id;
       let whatsapp: string | null = null;
       let cName = customerName || '';
       if (customerId) {
@@ -137,7 +116,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setSaving(true);
     try {
       await salePaymentsApi.create({
-        sale_group_id: saleGroupId,
+        sale_id: saleGroupId,
         amount: value,
         payment_type: paymentType || null,
         payment_date: paymentDate + 'T12:00:00.000Z',

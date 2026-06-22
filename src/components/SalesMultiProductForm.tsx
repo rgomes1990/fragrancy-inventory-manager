@@ -24,24 +24,36 @@ export interface PaymentEntry {
 
 interface Seller { id: string; name: string; }
 
+export interface SaleFormData {
+  customer_id: string;
+  items: SaleItem[];
+  sale_date: string;
+  seller: string;
+  payments: PaymentEntry[];
+  discount_amount: number;
+  payment_received: boolean;
+  partial_payment_amount: number | null;
+  payment_type: string | null;
+}
+
+export interface EditingSaleData {
+  id: string;
+  sale_number?: number;
+  customer_id: string;
+  sale_date: string;
+  seller: string;
+  total_price: number;
+  items: Array<{ product_id: string | null; kit_id: string | null; product_name?: string; kit_name?: string; quantity: number; unit_price: number; total_price: number }>;
+}
+
 interface Props {
   customers: Customer[];
   products: Product[];
   kits?: Kit[];
   sellers: Seller[];
   initialKitId?: string | null;
-  onSubmit: (saleData: {
-    customer_id: string;
-    items: SaleItem[];
-    sale_date: string;
-    seller: string;
-    payments: PaymentEntry[];
-    discount_amount: number;
-    // Compat com lógica antiga (derivados):
-    payment_received: boolean;
-    partial_payment_amount: number | null;
-    payment_type: string | null;
-  }) => Promise<void>;
+  editingSale?: EditingSaleData | null;
+  onSubmit: (saleData: SaleFormData) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -60,13 +72,35 @@ const kitAvailability = (kit: Kit): number => {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initialKitId, onSubmit, onCancel }: Props) => {
-  const [customerID, setCustomerID] = useState('');
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
-  const [seller, setSeller] = useState('');
-  const [items, setItems] = useState<SaleItem[]>([
-    { item_type: 'product', product_id: '', kit_id: null, quantity: 1, unit_price: 0, subtotal: 0 }
-  ]);
+const getLoggedUserName = (): string => {
+  try {
+    const data = localStorage.getItem('userData');
+    if (!data) return '';
+    const parsed = JSON.parse(data);
+    return parsed.username || '';
+  } catch { return ''; }
+};
+
+const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initialKitId, editingSale, onSubmit, onCancel }: Props) => {
+  const loggedUser = normalize(getLoggedUserName());
+  // Tentar encontrar o vendedor que corresponde ao usuario logado (ignora acentos)
+  const defaultSeller = editingSale?.seller || sellers.find(s => loggedUser.includes(normalize(s.name).split(' ')[0]))?.name || '';
+
+  const [customerID, setCustomerID] = useState(editingSale?.customer_id || '');
+  const [saleDate, setSaleDate] = useState(editingSale?.sale_date ? new Date(editingSale.sale_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+  const [seller, setSeller] = useState(defaultSeller);
+  const [items, setItems] = useState<SaleItem[]>(
+    editingSale?.items?.length ? editingSale.items.map(i => ({
+      item_type: i.kit_id ? 'kit' as const : 'product' as const,
+      product_id: i.product_id,
+      kit_id: i.kit_id,
+      quantity: i.quantity,
+      unit_price: Number(i.unit_price),
+      subtotal: Number(i.total_price),
+    })) : [{ item_type: 'product', product_id: '', kit_id: null, quantity: 1, unit_price: 0, subtotal: 0 }]
+  );
 
   // Desconto
   const [discountMode, setDiscountMode] = useState<'value' | 'percent'>('value');
@@ -157,10 +191,6 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
     arr[i] = { ...arr[i], ...patch };
     setPayments(arr);
   };
-  const fillRemaining = (i: number) => {
-    const rest = Math.max(total - paidSum - crediarioSum + (Number(payments[i].amount) || 0), 0);
-    updatePayment(i, { amount: rest });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,25 +229,13 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
 
   const isFormValid = () => customerID && seller && items.some(it => it.quantity > 0 && it.unit_price > 0 && (it.product_id || it.kit_id));
 
-  const productOptions = products.filter(p => p?.id && p?.name && p.quantity > 0 && !p.is_order_product)
+  const editingProductIds = new Set((editingSale?.items || []).map(i => i.product_id).filter(Boolean));
+  const productOptions = products.filter(p => p?.id && p?.name && !p.is_order_product && (p.quantity > 0 || editingProductIds.has(p.id)))
     .map(p => ({ value: p.id, label: `${p.name} (Estoque: ${p.quantity})` }));
   const kitOptions = kits.map(k => ({ value: k.id, label: `${k.name} (Disp: ${kitAvailability(k)})` }));
 
   return (
-    <Card className="border-border/60 shadow-[var(--shadow-card)] rounded-2xl overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-accent/50 to-transparent border-b border-border/60">
-        <CardTitle className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md"
-                style={{ background: 'var(--gradient-primary)' }}>
-            <ShoppingCart className="w-5 h-5" />
-          </span>
-          <div className="leading-tight">
-            <div className="text-xl font-serif">PDV / Caixa</div>
-            <div className="text-xs text-muted-foreground font-normal">Registrar nova venda</div>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-6">
+    <div>
         <form onSubmit={handleSubmit} className="space-y-7">
           {/* Dados gerais */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -370,12 +388,25 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
           <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-border/60 bg-muted/30">
               <h3 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">Formas de pagamento</h3>
-              <Button type="button" onClick={addPayment} size="sm" variant="ghost"
-                className="text-primary hover:text-primary hover:bg-accent rounded-lg h-8">
-                <Plus className="w-4 h-4 mr-1" /> Adicionar pagamento
-              </Button>
+              {remaining > 0.01 && (
+                <Button type="button" onClick={addPayment} size="sm" variant="ghost"
+                  className="text-primary hover:text-primary hover:bg-accent rounded-lg h-8">
+                  <Plus className="w-4 h-4 mr-1" /> Dividir pagamento
+                </Button>
+              )}
             </div>
             <div className="p-4 space-y-3">
+              {/* Resumo do valor */}
+              <div className="flex items-center justify-between text-sm bg-muted/40 rounded-lg px-3 py-2">
+                <span>Total da venda: <strong>{fmt(total)}</strong></span>
+                {paidSum + crediarioSum > 0 && paidSum + crediarioSum < total - 0.01 && (
+                  <span className="text-amber-600 font-medium">Falta: {fmt(remaining)}</span>
+                )}
+                {paidSum + crediarioSum >= total - 0.01 && total > 0 && (
+                  <span className="text-green-600 font-medium">Pagamento completo</span>
+                )}
+              </div>
+
               {payments.map((p, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-5">
@@ -394,17 +425,27 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
                       className="rounded-lg" placeholder="0,00" />
                   </div>
                   <div className="col-span-2 flex gap-1">
-                    <Button type="button" variant="outline" size="sm" onClick={() => fillRemaining(i)}
-                      className="h-10 text-xs flex-1" title="Preencher com o saldo">=Falta</Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removePayment(i)}
-                      className="h-10 text-destructive hover:bg-destructive/10">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {payments.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removePayment(i)}
+                        className="h-10 text-destructive hover:bg-destructive/10 flex-1">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
+
+              {/* Auto-preencher primeiro pagamento com o total quando usuario digitar itens */}
+              {payments.length === 1 && payments[0].amount === 0 && total > 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => updatePayment(0, { amount: total })}
+                  className="w-full text-sm">
+                  <DollarSign className="w-4 h-4 mr-1" /> Preencher com o valor total ({fmt(total)})
+                </Button>
+              )}
+
               <p className="text-xs text-muted-foreground">
                 Crediário não entra no caixa: a venda vai para <strong>A Receber</strong>.
+                {payments.length > 1 && ' Use "Dividir pagamento" para pagar com formas diferentes.'}
               </p>
             </div>
           </div>
@@ -456,12 +497,11 @@ const SalesMultiProductForm = ({ customers, products, kits = [], sellers, initia
             <Button type="submit" disabled={!isFormValid()}
               className="rounded-lg text-white shadow-md hover:shadow-lg transition-shadow"
               style={{ background: 'var(--gradient-primary)' }}>
-              Registrar Venda
+              {editingSale ? 'Salvar Alteracoes' : 'Registrar Venda'}
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 

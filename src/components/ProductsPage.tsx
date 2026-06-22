@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Package, Edit, Trash2, Search, Image as ImageIcon, ArrowDownToLine } from 'lucide-react';
-import { productsApi, categoriesApi, productOrderRequestsApi, stockEntriesApi, salesApi } from '@/services/apiClient';
+import { productsApi, categoriesApi, productOrderRequestsApi, stockEntriesApi, salesApi, uploadFile } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Product, Category, ProductOrderRequest } from '@/types/database';
 import { useTenantFilter } from '@/hooks/useTenantFilter';
@@ -43,6 +43,9 @@ const ProductsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -226,6 +229,17 @@ const ProductsPage = () => {
     e.preventDefault();
 
     try {
+      // Upload da imagem se uma nova foi selecionada
+      let imageUrl = formData.image_url || null;
+      if (imageFile) {
+        try {
+          imageUrl = await uploadFile(imageFile);
+        } catch (err: any) {
+          toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+          return;
+        }
+      }
+
       // CASE 1: Editing an existing product (direct update)
       if (editingProduct) {
         const productData: any = {
@@ -234,7 +248,7 @@ const ProductsPage = () => {
           sale_price: parseFloat(formData.sale_price),
           quantity: parseInt(formData.quantity),
           category_id: formData.category_id || null,
-          image_url: formData.image_url || null,
+          image_url: imageUrl,
           is_order_product: formData.is_order_product || false,
         };
 
@@ -267,8 +281,8 @@ const ProductsPage = () => {
         if (formData.category_id && formData.category_id !== (selectedExistingProduct.category_id || '')) {
           updateFields.category_id = formData.category_id || null;
         }
-        if (formData.image_url && formData.image_url !== (selectedExistingProduct.image_url || '')) {
-          updateFields.image_url = formData.image_url || null;
+        if (imageUrl && imageUrl !== (selectedExistingProduct.image_url || '')) {
+          updateFields.image_url = imageUrl;
         }
         if (Object.keys(updateFields).length > 0) {
           await productsApi.update(selectedExistingProduct.id, updateFields);
@@ -313,7 +327,7 @@ const ProductsPage = () => {
           sale_price: parseFloat(formData.sale_price),
           quantity: parseInt(formData.quantity),
           category_id: formData.category_id || null,
-          image_url: formData.image_url || null,
+          image_url: imageUrl,
           is_order_product: formData.is_order_product || false,
           tenant_id: tenantIdForProduct,
         };
@@ -333,6 +347,8 @@ const ProductsPage = () => {
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
     setSelectedExistingProduct(null);
+    setImageFile(null);
+    setImagePreview(null);
     setFormData({
       name: product.name,
       cost_price: product.cost_price.toString(),
@@ -386,6 +402,8 @@ const ProductsPage = () => {
 
   const resetForm = () => {
     setFormData({ name: '', cost_price: '', sale_price: '', quantity: '', category_id: '', image_url: '', is_order_product: false });
+    setImageFile(null);
+    setImagePreview(null);
     setEditingProduct(null);
     setSelectedExistingProduct(null);
     setShowForm(false);
@@ -611,19 +629,45 @@ const ProductsPage = () => {
               </div>
 
               <div>
-                <Label htmlFor="image_url">URL da Imagem do Produto</Label>
-                <Input
-                  id="image_url"
-                  type="url"
-                  placeholder="https://exemplo.com/imagem.jpg"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                <Label>Foto do Produto</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
                 />
-                {formData.image_url && (
-                  <div className="mt-2">
-                    <img src={formData.image_url} alt="Preview" className="w-20 h-20 object-cover rounded border cursor-pointer" onClick={() => setSelectedImage(formData.image_url)} />
+                <div className="flex items-center gap-3 mt-1">
+                  {(imagePreview || formData.image_url) ? (
+                    <img
+                      src={imagePreview || formData.image_url}
+                      alt="Preview"
+                      className="w-20 h-20 object-cover rounded-lg border cursor-pointer"
+                      onClick={() => setSelectedImage(imagePreview || formData.image_url)}
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-1">
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                      {imagePreview || formData.image_url ? 'Trocar foto' : 'Escolher foto'}
+                    </Button>
+                    {(imagePreview || formData.image_url) && (
+                      <Button type="button" variant="ghost" size="sm" className="text-destructive text-xs h-7"
+                        onClick={() => { setImageFile(null); setImagePreview(null); setFormData({ ...formData, image_url: '' }); }}>
+                        Remover
+                      </Button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="md:col-span-2">

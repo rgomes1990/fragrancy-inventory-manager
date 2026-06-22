@@ -9,7 +9,8 @@ import { DollarSign, Search, Wallet, AlertTriangle } from 'lucide-react';
 import PaymentDialog from './PaymentDialog';
 
 interface Row {
-  sale_group_id: string;
+  sale_id: string;
+  sale_group_id?: string; // backward compat
   tenant_id: string | null;
   customer_id: string | null;
   customer_name?: string;
@@ -167,7 +168,7 @@ const ReceivablesPage: React.FC = () => {
                   const overdue = isOverdue(r);
                   const days = daysSince(r.sale_date);
                   return (
-                    <TableRow key={r.sale_group_id} className={overdue ? 'bg-rose-50/40' : ''}>
+                    <TableRow key={r.sale_id || r.sale_group_id} className={overdue ? 'bg-rose-50/40' : ''}>
                       <TableCell className="font-medium">
                         {r.customer_name}
                         {overdue && (
@@ -204,7 +205,7 @@ const ReceivablesPage: React.FC = () => {
         <PaymentDialog
           open={!!selected}
           onClose={() => setSelected(null)}
-          saleGroupId={selected.sale_group_id}
+          saleGroupId={selected.sale_id || selected.sale_group_id!}
           tenantId={selected.tenant_id}
           total={selected.total}
           paid={selected.paid}

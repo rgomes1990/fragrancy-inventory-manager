@@ -39,7 +39,7 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
                 {getPageTitle(currentPage)}
               </h2>
             </div>
-            <LogoutButton />
+            <UserInfo />
           </header>
 
           {/* Main Content */}
@@ -54,9 +54,12 @@ const Layout = ({ children, currentPage, onPageChange }: LayoutProps) => {
   );
 };
 
-const LogoutButton = () => {
-  const { logout } = useAuth();
+const UserInfo = () => {
+  const { logout, userData } = useAuth();
   const navigate = useNavigate();
+  const username = userData?.username || '';
+  // Formatar nome: "rogerio-perfumes" -> "Rogerio"
+  const displayName = username.split('-')[0].replace(/^\w/, (c: string) => c.toUpperCase());
 
   const handleLogout = async () => {
     try {
@@ -68,15 +71,23 @@ const LogoutButton = () => {
   };
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleLogout}
-      className="flex items-center gap-2"
-    >
-      <LogOut className="w-4 h-4" />
-      Sair
-    </Button>
+    <div className="flex items-center gap-3">
+      <div className="hidden sm:flex items-center gap-2">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+          {displayName.charAt(0)}
+        </div>
+        <span className="text-sm font-medium text-foreground">{displayName}</span>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleLogout}
+        className="flex items-center gap-2"
+      >
+        <LogOut className="w-4 h-4" />
+        Sair
+      </Button>
+    </div>
   );
 };
 

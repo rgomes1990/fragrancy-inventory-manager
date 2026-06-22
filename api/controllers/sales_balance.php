@@ -19,8 +19,8 @@ function handleRequest(array $user, ?string $id): void {
     }
 
     if ($id) {
-        $where = $where ? "$where AND sale_group_id = :sgid" : "WHERE sale_group_id = :sgid";
-        $params[':sgid'] = $id;
+        $where = $where ? "$where AND sale_id = :sid" : "WHERE sale_id = :sid";
+        $params[':sid'] = $id;
     }
 
     $sql = "SELECT * FROM v_sales_balance $where ORDER BY sale_date DESC";

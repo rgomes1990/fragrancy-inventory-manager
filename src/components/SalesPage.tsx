@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
 import { salesApi, productsApi, customersApi, sellersApi, kitsApi, salesBalanceApi, salePaymentsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
@@ -103,7 +104,7 @@ const SalesPage = () => {
 
       const bmap: Record<string, any> = {};
       (balanceData || []).forEach((b: any) => {
-        bmap[b.sale_group_id] = {
+        bmap[b.sale_id || b.sale_group_id] = {
           total: Number(b.total),
           paid: Number(b.paid),
           remaining: Number(b.remaining),
@@ -141,7 +142,7 @@ const SalesPage = () => {
   }, [sales, balanceMap, searchTerm, selectedMonth, selectedSeller, selectedStatus, selectedCustomerId, selectedPaymentType, startDate, endDate]);
 
   const getSaleBalance = (sale: Sale) => {
-    const groupKey = (sale as any).sale_group_id || sale.id;
+    const groupKey = sale.id;
     return balanceMap[groupKey];
   };
 
@@ -215,13 +216,13 @@ const SalesPage = () => {
     if (searchTerm) {
       filtered = filtered.filter(sale => {
         const searchLower = searchTerm.toLowerCase();
+        const items = (sale as any).items || [];
+        const itemNames = items.map((i: any) => (i.product_name || i.kit_name || '').toLowerCase()).join(' ');
         return (
           (sale as any).customer_name?.toLowerCase().includes(searchLower) ||
-          (sale as any).product_name?.toLowerCase().includes(searchLower) ||
-          (sale as any).kit_name?.toLowerCase().includes(searchLower) ||
-          sale.quantity.toString().includes(searchLower) ||
-          sale.unit_price.toString().includes(searchLower) ||
-          sale.total_price.toString().includes(searchLower) ||
+          itemNames.includes(searchLower) ||
+          String(sale.total_price).includes(searchLower) ||
+          String((sale as any).sale_number || '').includes(searchLower) ||
           new Date(sale.sale_date).toLocaleDateString('pt-BR').includes(searchTerm)
         );
       });
@@ -249,7 +250,7 @@ const SalesPage = () => {
       // Para "a receber", soma o que falta receber, deduplicando por grupo
       const seen = new Set<string>();
       filtered.forEach(sale => {
-        const groupKey = (sale as any).sale_group_id || sale.id;
+        const groupKey = sale.id;
         if (seen.has(groupKey)) return;
         seen.add(groupKey);
         const bal = balanceMap[groupKey];
@@ -322,8 +323,6 @@ const SalesPage = () => {
         }
       }
 
-      const groupId = saleData.items.length > 1 ? crypto.randomUUID() : null;
-
       // Aplica desconto rateado entre itens (proporcional ao subtotal)
       const discount = Number(saleData.discount_amount) || 0;
       const subtotalAll = saleData.items.reduce((s, it) => s + it.subtotal, 0);
@@ -336,41 +335,36 @@ const SalesPage = () => {
       });
       const totalAllItems = itemsWithDiscount.reduce((sum, item) => sum + item.subtotal, 0);
 
-      let firstSaleId: string | null = null;
-      for (const item of itemsWithDiscount) {
-        const itemPartialPayment = saleData.partial_payment_amount
-          ? (item.subtotal / Math.max(totalAllItems, 0.01)) * saleData.partial_payment_amount
-          : null;
-
-        const saleRecord: any = {
-          customer_id: saleData.customer_id,
+      // Criar UMA venda (cabecalho) com todos os itens
+      const saleRecord: any = {
+        customer_id: saleData.customer_id,
+        total_price: totalAllItems,
+        sale_date: saleData.sale_date + 'T00:00:00.000Z',
+        seller: saleData.seller,
+        payment_received: saleData.payment_received,
+        partial_payment_amount: saleData.partial_payment_amount,
+        payment_type: saleData.payment_type,
+        tenant_id: tenantIdToUse,
+        items: itemsWithDiscount.map(item => ({
           product_id: item.item_type === 'product' ? item.product_id : null,
           kit_id: item.item_type === 'kit' ? item.kit_id : null,
           quantity: item.quantity,
           unit_price: item.unit_price,
           total_price: item.subtotal,
-          sale_date: saleData.sale_date + 'T00:00:00.000Z',
-          seller: saleData.seller,
-          payment_received: saleData.payment_received,
-          partial_payment_amount: itemPartialPayment,
-          payment_type: saleData.payment_type,
-          tenant_id: tenantIdToUse,
-          sale_group_id: groupId,
-        };
+        })),
+      };
 
-        const inserted = await salesApi.create(saleRecord);
-        if (!firstSaleId && inserted) firstSaleId = (inserted as any).id;
-      }
+      const inserted = await salesApi.create(saleRecord);
+      const saleId = (inserted as any)?.id;
 
       // Registrar cada forma de pagamento em sale_payments
       // Crediario NAO entra em sale_payments (fica como saldo "A Receber")
-      const paymentGroupId = groupId || firstSaleId;
       const paymentsList = (saleData.payments || []).filter(p => p.type !== 'Crediario' && p.amount > 0);
 
-      if (paymentGroupId && paymentsList.length > 0) {
+      if (saleId && paymentsList.length > 0) {
         for (const p of paymentsList) {
           await salePaymentsApi.create({
-            sale_group_id: paymentGroupId,
+            sale_id: saleId,
             tenant_id: tenantIdToUse,
             amount: p.amount,
             payment_type: p.type,
@@ -378,14 +372,13 @@ const SalesPage = () => {
             notes: 'Recebimento no ato da venda',
           });
         }
-      } else if (paymentGroupId && !saleData.payments && saleData.payment_received) {
-        // Compat com chamadas legadas
+      } else if (saleId && !saleData.payments && saleData.payment_received) {
         const initialPaid = saleData.partial_payment_amount && saleData.partial_payment_amount > 0
           ? saleData.partial_payment_amount
           : totalAllItems;
         if (initialPaid > 0) {
           await salePaymentsApi.create({
-            sale_group_id: paymentGroupId,
+            sale_id: saleId,
             tenant_id: tenantIdToUse,
             amount: initialPaid,
             payment_type: saleData.payment_type || null,
@@ -492,10 +485,14 @@ const SalesPage = () => {
         total_price,
         sale_date: formData.sale_date + 'T00:00:00.000Z',
         seller: formData.seller,
-        payment_received: formData.payment_received,
-        partial_payment_amount: partialAmount,
-        payment_type: formData.payment_type || null,
       };
+
+      // Campos de pagamento apenas na criacao (baixa de pagamento so pelo menu A Receber)
+      if (!editingSale) {
+        saleDataPayload.payment_received = formData.payment_received;
+        saleDataPayload.partial_payment_amount = partialAmount;
+        saleDataPayload.payment_type = formData.payment_type || null;
+      }
 
       // Adicionar tenant_id para novos registros - com validacao
       if (!editingSale) {
@@ -545,7 +542,7 @@ const SalesPage = () => {
           : (formData.payment_received ? total_price : 0);
         if (initialPaid > 0 && insertedSale) {
           await salePaymentsApi.create({
-            sale_group_id: (insertedSale as any).id,
+            sale_id: (insertedSale as any).id,
             tenant_id: saleDataPayload.tenant_id,
             amount: initialPaid,
             payment_type: formData.payment_type || null,
@@ -592,42 +589,116 @@ const SalesPage = () => {
 
   const handleEdit = (sale: Sale) => {
     setEditingSale(sale);
-    setFormData({
-      customer_id: sale.customer_id,
-      product_id: sale.product_id,
-      quantity: sale.quantity.toString(),
-      unit_price: sale.unit_price.toString(),
-      sale_date: new Date(sale.sale_date).toISOString().split('T')[0],
-      seller: sale.seller || '',
-      payment_received: sale.payment_received ?? true,
-      partial_payment_amount: sale.partial_payment_amount ? sale.partial_payment_amount.toString() : '',
-      payment_type: (sale as any).payment_type || '',
-    });
-    setShowForm(true);
+    setShowMultiForm(false); // fechar form de criacao se aberto
+  };
+
+  const handleEditSubmit = async (saleData: any) => {
+    if (!editingSale) return;
+    try {
+      // Devolver estoque dos itens antigos
+      const oldItems = (editingSale as any).items || [];
+      for (const item of oldItems) {
+        if (item.product_id) {
+          const p = products.find(x => x.id === item.product_id);
+          if (p) await productsApi.update(item.product_id, { quantity: p.quantity + item.quantity });
+        } else if (item.kit_id) {
+          const kit = kits.find(k => k.id === item.kit_id);
+          if (kit && (kit as any).kit_items) {
+            for (const ki of (kit as any).kit_items) {
+              const p = products.find(x => x.id === ki.product_id);
+              if (p) await productsApi.update(ki.product_id, { quantity: p.quantity + (ki.quantity * item.quantity) });
+            }
+          }
+        }
+      }
+
+      // Atualizar cabecalho da venda
+      const totalPrice = saleData.items.reduce((s: number, i: any) => s + i.subtotal, 0) - (saleData.discount_amount || 0);
+      await salesApi.update(editingSale.id, {
+        customer_id: saleData.customer_id,
+        sale_date: saleData.sale_date + 'T00:00:00.000Z',
+        seller: saleData.seller,
+        total_price: Math.max(totalPrice, 0),
+      });
+
+      // Deletar itens antigos e criar novos
+      const db = await salesApi.getById(editingSale.id);
+      // Backend deleta sale_items via CASCADE quando recriamos
+      // Vamos usar endpoint direto - deletar itens antigos
+      for (const oldItem of (db?.items || [])) {
+        try {
+          await fetch(`/api/sale-items/${oldItem.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` } });
+        } catch { /* ignore */ }
+      }
+
+      // Criar novos itens
+      for (const item of saleData.items) {
+        await fetch('/api/sale-items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
+          body: JSON.stringify({
+            sale_id: editingSale.id,
+            product_id: item.product_id || null,
+            kit_id: item.kit_id || null,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.subtotal,
+          }),
+        });
+      }
+
+      // Decrementar estoque dos novos itens
+      const productDecrement: Record<string, number> = {};
+      for (const item of saleData.items) {
+        if (item.item_type === 'product' && item.product_id) {
+          productDecrement[item.product_id] = (productDecrement[item.product_id] || 0) + item.quantity;
+        } else if (item.item_type === 'kit' && item.kit_id) {
+          const kit = kits.find(k => k.id === item.kit_id);
+          if (kit && (kit as any).kit_items) {
+            for (const ki of (kit as any).kit_items) {
+              productDecrement[ki.product_id] = (productDecrement[ki.product_id] || 0) + (ki.quantity * item.quantity);
+            }
+          }
+        }
+      }
+      // Refetch products para ter estoque atualizado apos devolucao
+      const freshProducts = await productsApi.list();
+      for (const [pid, qty] of Object.entries(productDecrement)) {
+        const p = freshProducts.find((x: any) => x.id === pid);
+        if (p) await productsApi.update(pid, { quantity: p.quantity - qty });
+      }
+
+      toast({ title: "Venda atualizada com sucesso!" });
+      setEditingSale(null);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: "Erro", description: err.message || "Falha ao atualizar.", variant: "destructive" });
+    }
   };
 
   const handleDelete = async (sale: Sale) => {
     if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
 
     try {
-      const saleKitId = (sale as any).kit_id as string | null;
-      if (saleKitId) {
-        // Devolver estoque de cada componente do kit
-        const kit = kits.find(k => k.id === saleKitId);
-        if (kit && (kit as any).kit_items) {
-          for (const ki of (kit as any).kit_items) {
-            const p = products.find(x => x.id === ki.product_id);
-            if (p) {
-              const novo = p.quantity + (ki.quantity * sale.quantity);
-              await productsApi.update(p.id, { quantity: novo });
+      // Devolver estoque de cada item da venda
+      const items = (sale as any).items || [];
+      for (const item of items) {
+        if (item.kit_id) {
+          const kit = kits.find(k => k.id === item.kit_id);
+          if (kit && (kit as any).kit_items) {
+            for (const ki of (kit as any).kit_items) {
+              const p = products.find(x => x.id === ki.product_id);
+              if (p) {
+                await productsApi.update(ki.product_id, { quantity: p.quantity + (ki.quantity * item.quantity) });
+              }
             }
           }
-        }
-      } else {
-        const product = products.find(p => p.id === sale.product_id);
-        if (product) {
-          const novoEstoque = product.quantity + sale.quantity;
-          await productsApi.update(sale.product_id, { quantity: novoEstoque });
+        } else if (item.product_id) {
+          const p = products.find(x => x.id === item.product_id);
+          if (p) {
+            await productsApi.update(item.product_id, { quantity: p.quantity + item.quantity });
+          }
         }
       }
 
@@ -726,190 +797,51 @@ const SalesPage = () => {
         </Button>
       </div>
 
-      {showMultiForm && (
-        <SalesMultiProductForm
-          customers={validCustomers}
-          products={availableProducts}
-          kits={kits}
-          initialKitId={initialKitId}
-          onSubmit={handleMultiProductSubmit}
-          onCancel={() => { setShowMultiForm(false); setInitialKitId(null); }}
-          sellers={sellers}
-        />
-      )}
+      {/* Modal de nova venda */}
+      <Dialog open={showMultiForm} onOpenChange={(open) => { if (!open) { setShowMultiForm(false); setInitialKitId(null); } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Venda</DialogTitle>
+          </DialogHeader>
+          <SalesMultiProductForm
+            customers={validCustomers}
+            products={availableProducts}
+            kits={kits}
+            initialKitId={initialKitId}
+            onSubmit={handleMultiProductSubmit}
+            onCancel={() => { setShowMultiForm(false); setInitialKitId(null); }}
+            sellers={sellers}
+          />
+        </DialogContent>
+      </Dialog>
 
-      {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {editingSale ? 'Editar Venda' : 'Nova Venda Simples'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="customer">Cliente</Label>
-                <SearchableSelect
-                  options={validCustomers.map(c => ({ value: c.id, label: c.name }))}
-                  value={formData.customer_id}
-                  onChange={(val) => setFormData({...formData, customer_id: val})}
-                  placeholder="Selecione o cliente"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="product">Produto</Label>
-                <SearchableSelect
-                  options={validProducts
-                    .filter(p => p.quantity > 0 || (editingSale && p.id === editingSale.product_id))
-                    .map(p => ({ value: p.id, label: `${p.name} (Estoque: ${p.quantity})` }))}
-                  value={formData.product_id}
-                  onChange={(val) => setFormData({...formData, product_id: val})}
-                  placeholder="Selecione o produto"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="quantity">Quantidade</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="unit_price">Preco Unitario</Label>
-                <Input
-                  id="unit_price"
-                  type="number"
-                  step="0.01"
-                  value={formData.unit_price}
-                  onChange={(e) => setFormData({...formData, unit_price: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="sale_date">Data da Venda</Label>
-                <Input
-                  id="sale_date"
-                  type="date"
-                  value={formData.sale_date}
-                  onChange={(e) => setFormData({...formData, sale_date: e.target.value})}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="seller">Vendedor</Label>
-                <select
-                  value={formData.seller}
-                  onChange={(e) => setFormData({...formData, seller: e.target.value})}
-                  className="w-full p-2 border rounded-md"
-                  required
-                >
-                  <option value="">Selecione o vendedor</option>
-                  {sellers.map((seller) => (
-                    <option key={seller.id} value={seller.name}>
-                      {seller.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <Label htmlFor="payment_type">Tipo de Pagamento</Label>
-                <select
-                  value={formData.payment_type}
-                  onChange={(e) => setFormData({...formData, payment_type: e.target.value})}
-                  className="w-full p-2 border rounded-md"
-                >
-                  <option value="">Selecione o tipo</option>
-                  {paymentTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedProduct && formData.quantity && formData.unit_price && (
-                <div className="lg:col-span-4 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium mb-2">Resumo da Venda</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Produto:</span>
-                      <p className="font-medium">{selectedProduct.name}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Preco Unitario:</span>
-                      <p className="font-medium">R$ {parseFloat(formData.unit_price || '0').toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Quantidade:</span>
-                      <p className="font-medium">{formData.quantity}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Total:</span>
-                      <p className="font-bold text-lg">
-                        R$ {(parseFloat(formData.unit_price || '0') * parseInt(formData.quantity || '0')).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="lg:col-span-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <input
-                    id="payment_received"
-                    type="checkbox"
-                    checked={formData.payment_received}
-                    onChange={(e) => setFormData({...formData, payment_received: e.target.checked})}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <Label htmlFor="payment_received" className="text-sm font-medium cursor-pointer">
-                    Recebimento confirmado (desmarque se apenas quiser dar baixa no estoque)
-                  </Label>
-                </div>
-
-                {formData.payment_received && (
-                  <div>
-                    <Label htmlFor="partial_payment">Valor pago parcialmente (deixe em branco para pagamento total)</Label>
-                    <Input
-                      id="partial_payment"
-                      type="number"
-                      step="0.01"
-                      value={formData.partial_payment_amount}
-                      onChange={(e) => setFormData({...formData, partial_payment_amount: e.target.value})}
-                      placeholder="Valor pago"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="lg:col-span-4 flex space-x-2">
-                <Button
-                  type="submit"
-                  className="bg-gradient-to-r from-purple-600 to-pink-600"
-                  disabled={!formData.customer_id || !formData.product_id || !formData.quantity || !formData.unit_price || !formData.seller}
-                >
-                  {editingSale ? 'Atualizar Venda' : 'Registrar Venda'}
-                </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+      {/* Modal de edicao de venda */}
+      <Dialog open={!!editingSale} onOpenChange={(open) => { if (!open) setEditingSale(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Venda #{(editingSale as any)?.sale_number || ''}</DialogTitle>
+          </DialogHeader>
+          {editingSale && (
+            <SalesMultiProductForm
+              customers={validCustomers}
+              products={availableProducts}
+              kits={kits}
+              sellers={sellers}
+              editingSale={{
+                id: editingSale.id,
+                sale_number: (editingSale as any).sale_number,
+                customer_id: editingSale.customer_id,
+                sale_date: editingSale.sale_date,
+                seller: editingSale.seller || '',
+                total_price: Number(editingSale.total_price),
+                items: (editingSale as any).items || [],
+              }}
+              onSubmit={handleEditSubmit}
+              onCancel={() => setEditingSale(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
@@ -1023,11 +955,10 @@ const SalesPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>N°</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Cliente</TableHead>
-                <TableHead>Produto</TableHead>
-                <TableHead>Quantidade</TableHead>
-                <TableHead>Valor Unitario</TableHead>
+                <TableHead>Itens</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead>Status</TableHead>
@@ -1035,128 +966,78 @@ const SalesPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(() => {
-                // Agrupar vendas pelo sale_group_id
-                const groupedSales: Map<string, Sale[]> = new Map();
-                const ungroupedSales: Sale[] = [];
+              {filteredSales.map((sale) => {
+                const status = getDisplayStatus(sale);
+                const items = (sale as any).items || [];
+                const bal = getSaleBalance(sale);
 
-                filteredSales.forEach((sale) => {
-                  const groupId = (sale as any).sale_group_id;
-                  if (groupId) {
-                    if (!groupedSales.has(groupId)) {
-                      groupedSales.set(groupId, []);
-                    }
-                    groupedSales.get(groupId)!.push(sale);
-                  } else {
-                    ungroupedSales.push(sale);
-                  }
-                });
-
-                const renderSaleRow = (sale: Sale, isGrouped: boolean = false, isFirst: boolean = false, groupTotal?: number, groupPaid?: number, groupSize?: number) => {
-                  const status = getDisplayStatus(sale);
-
-                  return (
-                    <TableRow key={sale.id} className={isGrouped ? 'bg-muted/30' : ''}>
-                      <TableCell>
-                        {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {(sale as any).customer_name || 'Cliente nao encontrado'}
-                      </TableCell>
-                      <TableCell>
-                        {(sale as any).kit_name
-                          ? <span>🎁 {(sale as any).kit_name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
-                          : ((sale as any).product_name || 'Produto nao encontrado')}
-                      </TableCell>
-                      <TableCell>{sale.quantity}</TableCell>
-                      <TableCell>R$ {sale.unit_price.toFixed(2)}</TableCell>
-                      <TableCell className="font-bold">R$ {sale.total_price.toFixed(2)}</TableCell>
-                      <TableCell>{sale.seller || '-'}</TableCell>
-                      <TableCell>
-                        {isGrouped && isFirst && groupTotal !== undefined ? (
-                          <div className="space-y-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                              status === 'pendente' || status === 'parcial'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}>
-                              {status === 'pendente'
-                                ? `Pendente (Total: R$ ${groupTotal.toFixed(2)})`
-                                : status === 'parcial'
-                                ? `Pendente - Pago: R$ ${(groupPaid || 0).toFixed(2)} | Falta: R$ ${(groupTotal - (groupPaid || 0)).toFixed(2)}`
-                                : `Recebido (Total: R$ ${groupTotal.toFixed(2)})`}
-                            </span>
-                            <div className="text-xs text-muted-foreground">
-                              Venda com {groupSize} itens
+                return (
+                  <TableRow key={sale.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {(sale as any).sale_number ? `#${(sale as any).sale_number}` : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {new Date(sale.sale_date).toLocaleDateString('pt-BR')}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {(sale as any).customer_name || 'Cliente nao encontrado'}
+                    </TableCell>
+                    <TableCell>
+                      {items.length > 0 ? (
+                        <div className="space-y-1">
+                          {items.map((item: any, idx: number) => (
+                            <div key={idx} className="text-sm">
+                              {item.kit_name
+                                ? <span>🎁 {item.kit_name} <span className="text-xs text-muted-foreground">(Kit)</span></span>
+                                : (item.product_name || 'Produto')}
+                              <span className="text-muted-foreground"> x{item.quantity} - R$ {Number(item.total_price).toFixed(2)}</span>
                             </div>
-                          </div>
-                        ) : isGrouped ? (
-                          <span className="text-xs text-muted-foreground">mesmo grupo</span>
-                        ) : (
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            status === 'pendente' || status === 'parcial'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {status === 'pendente'
-                              ? 'Pendente'
-                              : status === 'parcial'
-                              ? `Pendente parcial`
-                              : 'Recebido'}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(sale)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(sale)}
-                            className="text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          ))}
+                          {items.length > 1 && (
+                            <div className="text-xs text-muted-foreground font-medium">{items.length} itens</div>
+                          )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                };
-
-                // Montar lista de entradas (grupos e individuais) com data para ordenação
-                const entries: { date: string; render: () => React.ReactNode[] }[] = [];
-
-                groupedSales.forEach((groupSales) => {
-                  const groupTotal = groupSales.reduce((sum, s) => sum + Number(s.total_price), 0);
-                  const groupKey = (groupSales[0] as any)?.sale_group_id || groupSales[0]?.id;
-                  const groupPaid = groupKey ? Number(balanceMap[groupKey]?.paid || 0) : 0;
-                  const date = groupSales[0]?.sale_date || '';
-                  entries.push({
-                    date,
-                    render: () => groupSales.map((sale, idx) =>
-                      renderSaleRow(sale, true, idx === 0, groupTotal, groupPaid, groupSales.length)
-                    ),
-                  });
-                });
-
-                ungroupedSales.forEach((sale) => {
-                  entries.push({
-                    date: sale.sale_date || '',
-                    render: () => [renderSaleRow(sale)],
-                  });
-                });
-
-                // Ordenar por data decrescente (mais recentes primeiro)
-                entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                return entries.flatMap((entry) => entry.render());
-              })()}
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-bold">R$ {Number(sale.total_price).toFixed(2)}</TableCell>
+                    <TableCell>{sale.seller || '-'}</TableCell>
+                    <TableCell>
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        status === 'pendente' || status === 'parcial'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {status === 'pendente'
+                          ? 'Pendente'
+                          : status === 'parcial'
+                          ? `Parcial (R$ ${(bal?.paid || 0).toFixed(2)})`
+                          : 'Recebido'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(sale)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(sale)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>

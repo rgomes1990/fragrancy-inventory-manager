@@ -9,10 +9,15 @@ function handleRequest(array $user, ?string $id): void {
 
     if ($method === 'GET' && !$id) {
         $options = ['orderBy' => 'payment_date DESC'];
-        // Filtrar por sale_group_id se fornecido
+        // Filtrar por sale_id se fornecido
+        if (isset($_GET['sale_id'])) {
+            $options['where'] = 'sale_id = :sid';
+            $options['params'] = [':sid' => $_GET['sale_id']];
+        }
+        // Backward compat: aceitar sale_group_id como alias
         if (isset($_GET['sale_group_id'])) {
-            $options['where'] = 'sale_group_id = :sgid';
-            $options['params'] = [':sgid' => $_GET['sale_group_id']];
+            $options['where'] = 'sale_id = :sid';
+            $options['params'] = [':sid' => $_GET['sale_group_id']];
         }
         jsonResponse($crud->list($options));
     }

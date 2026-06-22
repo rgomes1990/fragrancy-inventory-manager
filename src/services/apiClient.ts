@@ -134,8 +134,8 @@ export const customersApi = createCrudApi<any>('customers');
 export const salesApi = createCrudApi<any>('sales');
 export const salePaymentsApi = {
   ...createCrudApi<any>('sale-payments'),
-  listByGroup: (saleGroupId: string) =>
-    request<any[]>('sale-payments', { params: { sale_group_id: saleGroupId } }),
+  listByGroup: (saleId: string) =>
+    request<any[]>('sale-payments', { params: { sale_id: saleId } }),
 };
 export const ordersApi = createCrudApi<any>('orders');
 export const orderItemsApi = {
@@ -183,6 +183,27 @@ export const salesBalanceApi = {
 export const dashboardApi = {
   get: () => request<any>('dashboard'),
 };
+
+// Upload de arquivo
+export async function uploadFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/upload`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || 'Erro no upload');
+  }
+
+  const data = await response.json();
+  return data.url;
+}
 
 // Export a generic request for custom queries
 export { request as apiRequest };
