@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search } from 'lucide-react';
+import { Plus, ShoppingCart, Trash2, Edit, Calendar, Search, Lock, Wallet } from 'lucide-react';
+import { useCashRegister } from '@/hooks/useCashRegister';
 import { salesApi, productsApi, customersApi, sellersApi, kitsApi, salesBalanceApi, salePaymentsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import { Sale, Product, Customer, Kit } from '@/types/database';
@@ -17,8 +18,10 @@ import SearchableSelect from './SearchableSelect';
 import SaleSuccessDialog, { SaleSuccessData } from './SaleSuccessDialog';
 
 const SalesPage = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
+  const { isOpen: isCashRegisterOpen, loading: cashRegisterLoading } = useCashRegister();
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [balanceMap, setBalanceMap] = useState<Record<string, { total: number; paid: number; remaining: number; status: string }>>({});
@@ -764,7 +767,7 @@ const SalesPage = () => {
   // Filtrar produtos com estoque maior que 0 e que NAO sejam produtos de encomenda para os selects
   const availableProducts = validProducts.filter(p => p.quantity > 0 && !p.is_order_product);
 
-  if (loading) {
+  if (loading || cashRegisterLoading) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-gray-900">Vendas</h1>
@@ -779,6 +782,26 @@ const SalesPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Banner de caixa fechado */}
+      {!isCashRegisterOpen && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-center gap-4 flex-wrap">
+          <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+            <Lock className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-800">O caixa está fechado</p>
+            <p className="text-sm text-amber-700">Abra o caixa para registrar novas vendas.</p>
+          </div>
+          <Button
+            variant="outline"
+            className="border-amber-300 text-amber-800 hover:bg-amber-100 gap-2"
+            onClick={() => navigate('/cash-closings')}
+          >
+            <Wallet className="w-4 h-4" /> Abrir Caixa
+          </Button>
+        </div>
+      )}
+
       <SaleSuccessDialog
         open={!!successData}
         onClose={() => setSuccessData(null)}
@@ -790,7 +813,8 @@ const SalesPage = () => {
         <h1 className="text-3xl font-bold text-gray-900 min-w-0">Vendas</h1>
         <Button
           onClick={() => setShowMultiForm(true)}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto"
+          disabled={!isCashRegisterOpen}
+          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto disabled:opacity-50"
         >
           <Plus className="w-4 h-4 mr-2" />
           Cadastrar Venda

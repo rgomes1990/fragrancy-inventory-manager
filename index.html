@@ -7,13 +7,7 @@
     <meta name="description" content="Sistema de gerenciamento de inventário de fragrâncias" />
     <meta name="author" content="Lovable" />
     
-    <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#8B5CF6" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Fragrancy" />
-    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
 
     <meta property="og:title" content="Fragrancy Inventory Manager" />
     <meta property="og:description" content="Sistema de gerenciamento de inventário de fragrâncias" />
@@ -27,6 +21,19 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      // Limpar service workers e caches antigos (legado PWA/Lovable)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          registrations.forEach(function(reg) { reg.unregister(); });
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          names.forEach(function(name) { caches.delete(name); });
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

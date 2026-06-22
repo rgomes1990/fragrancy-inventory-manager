@@ -160,7 +160,13 @@ export const supplierOrderItemsApi = {
 export const stockEntriesApi = createCrudApi<any>('stock-entries');
 export const expensesApi = createCrudApi<any>('expenses');
 export const reinvestmentsApi = createCrudApi<any>('reinvestments');
-export const cashClosingsApi = createCrudApi<any>('cash-closings');
+export const cashClosingsApi = {
+  ...createCrudApi<any>('cash-closings'),
+  getOpenRegister: () =>
+    request<any[]>('cash-closings', { params: { status: 'open' } }),
+  getSessionSummary: (openedAt: string) =>
+    request<any>('cash-closings/session-summary', { params: { opened_at: openedAt } }),
+};
 export const productOrderRequestsApi = createCrudApi<any>('product-order-requests');
 
 export const usersApi = createCrudApi<any>('users');

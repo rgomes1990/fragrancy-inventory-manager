@@ -1,9 +1,13 @@
 # =====================================================
-# .htaccess para a raiz do public_html na Hostinger
-# Copie este arquivo para public_html/.htaccess
+# .htaccess para o app React (perfumes1/)
 # =====================================================
 
 RewriteEngine On
+
+# Desativar LiteSpeed Cache herdado do dominio pai
+<IfModule LiteSpeed>
+    CacheLookup off
+</IfModule>
 
 # Forcar HTTPS
 RewriteCond %{HTTPS} off
@@ -20,27 +24,31 @@ RewriteCond %{REQUEST_FILENAME} !-d
 # Todas as outras rotas vao para index.html (React Router)
 RewriteRule ^(.*)$ index.html [QSA,L]
 
-# Prevenir cache de respostas da API
+# Prevenir cache do index.html (SPA entry point) e respostas da API
+# O index.html NUNCA deve ser cacheado — ele referencia JS/CSS com hashes unicos
 <IfModule mod_headers.c>
-    <FilesMatch "index\.php$">
+    <FilesMatch "index\.(html|php)$">
         Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
         Header set Pragma "no-cache"
         Header set Expires "0"
+        Header unset ETag
     </FilesMatch>
 </IfModule>
 
-# Compressao GZIP
-<IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
-</IfModule>
-
-# Cache de assets estaticos
+# Sobrescrever ExpiresDefault herdado do pai — index.html nao deve ter cache
 <IfModule mod_expires.c>
     ExpiresActive On
+    ExpiresDefault "access plus 0 seconds"
+    ExpiresByType text/html "access plus 0 seconds"
     ExpiresByType text/css "access plus 1 year"
     ExpiresByType application/javascript "access plus 1 year"
     ExpiresByType image/png "access plus 1 year"
     ExpiresByType image/jpeg "access plus 1 year"
     ExpiresByType image/svg+xml "access plus 1 year"
     ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Compressao GZIP
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
 </IfModule>
