@@ -13,11 +13,32 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import {
+  drawPageBackground,
+  drawHeader,
+  drawAllFooters,
+  drawCategoryHeader,
+  drawTableHeaderRow,
+  drawAlternatingRow,
+  drawImageFrame,
+  newPageIfNeeded,
+  loadImageAsBase64,
+  COLORS,
+} from '@/utils/pdfHelpers';
 
 interface CategoryOption {
   id: string;
   name: string;
 }
+
+const SUBTITLE = 'Catalogo de Estoque';
+
+const TABLE_COLUMNS = [
+  { label: 'FOTO', x: 20 },
+  { label: 'PRODUTO', x: 45 },
+  { label: 'QTD', x: 148 },
+  { label: 'PRECO', x: 165 },
+];
 
 const StockProductsPDFReport = () => {
   const [showDialog, setShowDialog] = useState(false);
@@ -48,22 +69,6 @@ const StockProductsPDFReport = () => {
   const selectAll = () => setSelectedCategories(categories.map(c => c.name));
   const selectNone = () => setSelectedCategories([]);
 
-  const loadImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Erro ao carregar imagem:', error);
-      return null;
-    }
-  };
-
   const generateStockProductsReport = async () => {
     try {
       if (selectedCategories.length === 0) {
@@ -75,10 +80,11 @@ const StockProductsPDFReport = () => {
 
       const stockProducts = await productsApi.list({ is_order_product: 'false', min_quantity: '1' });
 
-      // Filtrar por categorias selecionadas
       const filteredProducts = (stockProducts || []).filter((product: any) => {
         const catName = product.category_name || 'Sem categoria';
-        return selectedCategories.includes(catName);
+        return selectedCategories.includes(catName)
+          && !product.is_order_product
+          && Number(product.quantity) > 0;
       });
 
       if (filteredProducts.length === 0) {
@@ -111,75 +117,71 @@ const StockProductsPDFReport = () => {
       });
 
       const doc = new jsPDF();
-      doc.setFontSize(18);
-      doc.text('Catálogo de Produtos em Estoque', 20, 20);
-      doc.setFontSize(10);
-      doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 20, 30);
+      const ROW_HEIGHT = 20;
 
-      let yPosition = 50;
+      // Primeira pagina
+      drawPageBackground(doc);
+      drawHeader(doc, SUBTITLE);
+
+      let y = 38;
 
       for (const categoryName of sortedCategories) {
         const categoryProducts = productsByCategory[categoryName];
 
-        if (yPosition > 240) { doc.addPage(); yPosition = 20; }
+        // Espaco para header da categoria + header da tabela + pelo menos 1 linha
+        y = newPageIfNeeded(doc, y, 40, SUBTITLE);
 
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(categoryName, 20, yPosition);
-        yPosition += 8;
-        doc.setDrawColor(100, 100, 100);
-        doc.line(20, yPosition, 190, yPosition);
-        yPosition += 8;
+        y = drawCategoryHeader(doc, categoryName, y);
+        y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
 
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Foto', 20, yPosition);
-        doc.text('Produto', 50, yPosition);
-        doc.text('Qtd', 140, yPosition);
-        doc.text('Preço', 160, yPosition);
-        yPosition += 5;
-        doc.setDrawColor(200, 200, 200);
-        doc.line(20, yPosition, 190, yPosition);
-        yPosition += 8;
-        doc.setFont('helvetica', 'normal');
-
+        let rowIndex = 0;
         for (const product of categoryProducts) {
-          if (yPosition > 250) {
-            doc.addPage();
-            yPosition = 20;
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`${categoryName} (continuação)`, 20, yPosition);
-            yPosition += 10;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
+          y = newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE);
+
+          if (y < 40) {
+            // Nova pagina — redesenhar header da categoria e tabela
+            y = drawCategoryHeader(doc, `${categoryName} (continuacao)`, y);
+            y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
+            rowIndex = 0;
           }
 
+          drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT);
+
+          // Imagem
+          let imageBase64: string | null = null;
           if (product.image_url) {
-            try {
-              const imageBase64 = await loadImageAsBase64(product.image_url);
-              if (imageBase64) {
-                doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, 15, 15);
-              }
-            } catch (error) {
-              console.error('Erro ao adicionar imagem:', error);
-            }
+            imageBase64 = await loadImageAsBase64(product.image_url);
           }
+          drawImageFrame(doc, imageBase64, 20, y - 3, 14);
 
-          doc.text(product.name.substring(0, 30), 50, yPosition);
-          doc.text((product.quantity || 0).toString(), 140, yPosition);
-          doc.text(`R$ ${(product.sale_price || 0).toFixed(2)}`, 160, yPosition);
-          yPosition += 20;
+          // Texto do produto
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(...COLORS.charcoal);
+          doc.text(product.name.substring(0, 35), 45, y + 5);
+
+          // Quantidade
+          doc.setFont('helvetica', 'bold');
+          doc.text((product.quantity || 0).toString(), 150, y + 5);
+
+          // Preco
+          doc.setFont('helvetica', 'normal');
+          doc.text(`R$ ${(product.sale_price || 0).toFixed(2)}`, 165, y + 5);
+
+          y += ROW_HEIGHT;
+          rowIndex++;
         }
-        yPosition += 5;
+
+        y += 8;
       }
 
+      drawAllFooters(doc);
       doc.save(`catalogo-estoque-${new Date().toISOString().split('T')[0]}.pdf`);
-      toast({ title: "Sucesso", description: "Catálogo PDF gerado com sucesso!" });
+      toast({ title: "Sucesso", description: "Catalogo PDF gerado com sucesso!" });
       setShowDialog(false);
     } catch (error) {
-      console.error('Erro ao gerar catálogo:', error);
-      toast({ title: "Erro", description: "Não foi possível gerar o catálogo PDF.", variant: "destructive" });
+      console.error('Erro ao gerar catalogo:', error);
+      toast({ title: "Erro", description: "Nao foi possivel gerar o catalogo PDF.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -189,7 +191,7 @@ const StockProductsPDFReport = () => {
     <>
       <Button onClick={handleOpen} className="bg-green-600 hover:bg-green-700 text-white">
         <FileText className="w-4 h-4 mr-2" />
-        Catálogo PDF Estoque
+        Catalogo PDF Estoque
       </Button>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -220,7 +222,7 @@ const StockProductsPDFReport = () => {
               disabled={loading || selectedCategories.length === 0}
               className="bg-green-600 hover:bg-green-700 text-white"
             >
-              {loading ? 'Gerando...' : 'Gerar Catálogo'}
+              {loading ? 'Gerando...' : 'Gerar Catalogo'}
             </Button>
           </DialogFooter>
         </DialogContent>

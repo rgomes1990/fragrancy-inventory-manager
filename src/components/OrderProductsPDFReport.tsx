@@ -5,191 +5,160 @@ import { FileText } from 'lucide-react';
 import { productOrderRequestsApi, productsApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import {
+  drawPageBackground,
+  drawHeader,
+  drawAllFooters,
+  drawTableHeaderRow,
+  drawAlternatingRow,
+  drawImageFrame,
+  drawSummaryCard,
+  newPageIfNeeded,
+  loadImageAsBase64,
+  COLORS,
+} from '@/utils/pdfHelpers';
+
+const SUBTITLE = 'Relatorio de Encomendas';
+
+const TABLE_COLUMNS = [
+  { label: 'FOTO', x: 16 },
+  { label: 'PRODUTO', x: 36 },
+  { label: 'QTD', x: 97 },
+  { label: 'P.CUSTO', x: 112 },
+  { label: 'P.VENDA', x: 142 },
+  { label: 'DATA', x: 175 },
+];
 
 const OrderProductsPDFReport = () => {
 
-  const loadImageAsBase64 = async (imageUrl: string): Promise<string | null> => {
-    try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Erro ao carregar imagem:', error);
-      return null;
-    }
-  };
-
   const generateOrderProductsReport = async () => {
     try {
-      // Buscar todas as solicitações de encomenda e produtos de encomenda em paralelo
       const [orderRequests, allProducts] = await Promise.all([
         productOrderRequestsApi.list(),
         productsApi.list({ is_order_product: 'true' }),
       ]);
 
-      const orderProducts = allProducts || [];
+      const orderProducts = (allProducts || []).filter((p: any) => p.is_order_product);
 
       if ((orderRequests || []).length === 0 && orderProducts.length === 0) {
-        toast({
-          title: "Aviso",
-          description: "Nenhuma encomenda encontrada.",
-        });
+        toast({ title: "Aviso", description: "Nenhuma encomenda encontrada." });
         return;
       }
 
-      // Criar PDF
       const doc = new jsPDF();
+      const ROW_HEIGHT = 20;
 
-      // Título
-      doc.setFontSize(18);
-      doc.text('Relatório de Encomendas', 20, 20);
+      // Primeira pagina
+      drawPageBackground(doc);
+      drawHeader(doc, SUBTITLE);
 
-      // Data de geração
-      doc.setFontSize(10);
-      doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 20, 30);
+      let y = 38;
+      y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
 
-      let yPosition = 50;
-
-      // Cabeçalhos
-      doc.setFontSize(12);
-      doc.text('Foto', 20, yPosition);
-      doc.text('Produto', 50, yPosition);
-      doc.text('Qtd', 110, yPosition);
-      doc.text('Preço Custo', 130, yPosition);
-      doc.text('Preço Venda', 165, yPosition);
-      doc.text('Data', 190, yPosition);
-
-      yPosition += 5;
-
-      // Linha separadora
-      doc.line(20, yPosition, 200, yPosition);
-
-      yPosition += 5;
-
-      // Dados das solicitações
-      doc.setFontSize(10);
       let totalCostPrice = 0;
       let totalSalePrice = 0;
       let totalQuantity = 0;
       let totalItems = 0;
+      let rowIndex = 0;
 
-      // Adicionar solicitações de encomenda
-      for (const request of (orderRequests || [])) {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 20;
+      const allEntries = [
+        ...(orderRequests || []).map((r: any) => ({
+          name: r.product_name || 'Produto nao encontrado',
+          costPrice: r.cost_price || 0,
+          salePrice: r.sale_price || 0,
+          quantity: r.requested_quantity,
+          imageUrl: r.image_url,
+          date: r.created_at,
+        })),
+        ...orderProducts.map((p: any) => ({
+          name: p.name,
+          costPrice: p.cost_price || 0,
+          salePrice: p.sale_price || 0,
+          quantity: p.quantity,
+          imageUrl: p.image_url,
+          date: p.created_at,
+        })),
+      ];
+
+      for (const entry of allEntries) {
+        const prevY = y;
+        y = newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE);
+
+        if (y < prevY) {
+          // Nova pagina
+          y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
+          rowIndex = 0;
         }
 
-        const productName = request.product_name || 'Produto não encontrado';
-        const costPrice = request.cost_price || 0;
-        const salePrice = request.sale_price || 0;
-        const quantity = request.requested_quantity;
-        const imageUrl = request.image_url;
+        drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT);
 
-        // Calcular totais
-        totalCostPrice += costPrice * quantity;
-        totalSalePrice += salePrice * quantity;
-        totalQuantity += quantity;
+        // Imagem
+        let imageBase64: string | null = null;
+        if (entry.imageUrl) {
+          imageBase64 = await loadImageAsBase64(entry.imageUrl);
+        }
+        drawImageFrame(doc, imageBase64, 16, y - 3, 14);
+
+        // Dados
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...COLORS.charcoal);
+        doc.text(entry.name.substring(0, 22), 36, y + 5);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(entry.quantity.toString(), 100, y + 5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.text(`R$ ${entry.costPrice.toFixed(2)}`, 112, y + 5);
+        doc.text(`R$ ${entry.salePrice.toFixed(2)}`, 142, y + 5);
+        doc.text(new Date(entry.date).toLocaleDateString('pt-BR'), 175, y + 5);
+
+        // Totais
+        totalCostPrice += entry.costPrice * entry.quantity;
+        totalSalePrice += entry.salePrice * entry.quantity;
+        totalQuantity += entry.quantity;
         totalItems += 1;
 
-        // Carregar e adicionar imagem se existir
-        if (imageUrl) {
-          try {
-            const imageBase64 = await loadImageAsBase64(imageUrl);
-            if (imageBase64) {
-              const imageSize = 15;
-              doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
-            }
-          } catch (error) {
-            console.error('Erro ao adicionar imagem:', error);
-          }
-        }
-
-        doc.text(productName.substring(0, 20), 50, yPosition);
-        doc.text(quantity.toString(), 110, yPosition);
-        doc.text(`R$ ${costPrice.toFixed(2)}`, 130, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 165, yPosition);
-        doc.text(new Date(request.created_at).toLocaleDateString('pt-BR'), 190, yPosition);
-
-        yPosition += 20;
+        y += ROW_HEIGHT;
+        rowIndex++;
       }
 
-      // Adicionar produtos do tipo encomenda
-      for (const product of orderProducts) {
-        if (yPosition > 250) {
-          doc.addPage();
-          yPosition = 20;
-        }
+      // Secao de resumo
+      y += 10;
+      y = newPageIfNeeded(doc, y, 65, SUBTITLE);
 
-        const productName = product.name;
-        const costPrice = product.cost_price || 0;
-        const salePrice = product.sale_price || 0;
-        const quantity = product.quantity;
-        const imageUrl = product.image_url;
-
-        // Calcular totais
-        totalCostPrice += costPrice * quantity;
-        totalSalePrice += salePrice * quantity;
-        totalQuantity += quantity;
-        totalItems += 1;
-
-        // Carregar e adicionar imagem se existir
-        if (imageUrl) {
-          try {
-            const imageBase64 = await loadImageAsBase64(imageUrl);
-            if (imageBase64) {
-              const imageSize = 15;
-              doc.addImage(imageBase64, 'JPEG', 20, yPosition - 12, imageSize, imageSize);
-            }
-          } catch (error) {
-            console.error('Erro ao adicionar imagem:', error);
-          }
-        }
-
-        doc.text(productName.substring(0, 20), 50, yPosition);
-        doc.text(quantity.toString(), 110, yPosition);
-        doc.text(`R$ ${costPrice.toFixed(2)}`, 130, yPosition);
-        doc.text(`R$ ${salePrice.toFixed(2)}`, 165, yPosition);
-        doc.text(new Date(product.created_at).toLocaleDateString('pt-BR'), 190, yPosition);
-
-        yPosition += 20;
-      }
-
-      // Totais
-      yPosition += 10;
-      doc.line(20, yPosition, 200, yPosition);
+      // Header do resumo
+      doc.setFillColor(...COLORS.burgundy);
+      doc.roundedRect(15, y - 5, 180, 12, 3, 3, 'F');
       doc.setFontSize(12);
-      yPosition += 10;
-      doc.text(`Total de encomendas: ${totalItems}`, 20, yPosition);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.white);
+      doc.text('Resumo', 23, y + 2);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...COLORS.charcoal);
+      y += 16;
 
-      yPosition += 8;
-      doc.text(`Quantidade total: ${totalQuantity}`, 20, yPosition);
-      yPosition += 8;
-      doc.text(`Valor total custo: R$ ${totalCostPrice.toFixed(2)}`, 20, yPosition);
-      yPosition += 8;
-      doc.text(`Valor total venda: R$ ${totalSalePrice.toFixed(2)}`, 20, yPosition);
+      // Cards 2x2
+      const cardW = 85;
+      const cardH = 22;
+      const gap = 10;
 
-      // Salvar PDF
+      drawSummaryCard(doc, 15, y, cardW, cardH, 'Total de Encomendas', totalItems.toString());
+      drawSummaryCard(doc, 15 + cardW + gap, y, cardW, cardH, 'Quantidade Total', totalQuantity.toString());
+
+      y += cardH + gap;
+
+      drawSummaryCard(doc, 15, y, cardW, cardH, 'Valor Total Custo', `R$ ${totalCostPrice.toFixed(2)}`);
+      drawSummaryCard(doc, 15 + cardW + gap, y, cardW, cardH, 'Valor Total Venda', `R$ ${totalSalePrice.toFixed(2)}`);
+
+      drawAllFooters(doc);
       doc.save(`relatorio-encomendas-${new Date().toISOString().split('T')[0]}.pdf`);
 
-      toast({
-        title: "Sucesso",
-        description: "Relatório PDF de encomendas gerado com sucesso!",
-      });
+      toast({ title: "Sucesso", description: "Relatorio PDF de encomendas gerado com sucesso!" });
 
     } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível gerar o relatório PDF.",
-        variant: "destructive",
-      });
+      console.error('Erro ao gerar relatorio:', error);
+      toast({ title: "Erro", description: "Nao foi possivel gerar o relatorio PDF.", variant: "destructive" });
     }
   };
 
@@ -199,7 +168,7 @@ const OrderProductsPDFReport = () => {
       className="bg-red-600 hover:bg-red-700 text-white"
     >
       <FileText className="w-4 h-4 mr-2" />
-      Relatório PDF Encomendas
+      Relatorio PDF Encomendas
     </Button>
   );
 };
