@@ -13,6 +13,7 @@ import {
   Receipt,
   UserCog,
   Building2,
+  Settings,
   UserCheck,
   FileBarChart,
   Truck,
@@ -64,6 +65,7 @@ const GESTAO: MenuItem[] = [
 const OUTROS: MenuItem[] = [
   { title: 'Relatório de Custos', url: '/sales-cost-report', page: 'sales-cost-report', icon: FileBarChart, tone: 'bg-teal-100 text-teal-600' },
   { title: 'Relatório de Auditoria', url: '/audit-log', page: 'audit-log', icon: Shield, tone: 'bg-yellow-100 text-yellow-700' },
+  { title: 'Config. Empresa', url: '/company-settings', page: 'company-settings', icon: Settings, tone: 'bg-gray-100 text-gray-600' },
   { title: 'Empresas', url: '/tenants', page: 'tenants', icon: Building2, adminOnly: true, tone: 'bg-slate-100 text-slate-600' },
   { title: 'Usuários', url: '/users', page: 'users', icon: UserCog, adminOnly: true, tone: 'bg-fuchsia-100 text-fuchsia-600' },
 ];

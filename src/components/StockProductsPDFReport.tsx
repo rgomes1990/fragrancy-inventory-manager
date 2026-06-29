@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
-import { productsApi, categoriesApi } from '@/services/apiClient';
+import { productsApi, categoriesApi, tenantBrandingApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import {
@@ -23,7 +23,8 @@ import {
   drawImageFrame,
   newPageIfNeeded,
   preloadImages,
-  COLORS,
+  getColors,
+  type TenantBranding,
 } from '@/utils/pdfHelpers';
 
 interface CategoryOption {
@@ -78,6 +79,14 @@ const StockProductsPDFReport = () => {
 
       setLoading(true);
 
+      // Carregar branding e produtos em paralelo
+      let branding: TenantBranding | null = null;
+      try {
+        branding = await tenantBrandingApi.get();
+      } catch { /* usa defaults */ }
+
+      const colors = getColors(branding);
+
       const stockProducts = await productsApi.list({ is_order_product: 'false', min_quantity: '1' });
 
       const filteredProducts = (stockProducts || []).filter((product: any) => {
@@ -116,55 +125,48 @@ const StockProductsPDFReport = () => {
         return a.localeCompare(b);
       });
 
-      // Pre-carregar todas as imagens em paralelo (redimensionadas + comprimidas)
+      // Pre-carregar todas as imagens em paralelo
       const imageCache = await preloadImages(filteredProducts);
 
       const doc = new jsPDF();
       const ROW_HEIGHT = 20;
 
-      // Primeira pagina
-      drawPageBackground(doc);
-      drawHeader(doc, SUBTITLE);
+      drawPageBackground(doc, colors);
+      await drawHeader(doc, SUBTITLE, branding, colors);
 
       let y = 38;
 
       for (const categoryName of sortedCategories) {
         const categoryProducts = productsByCategory[categoryName];
 
-        // Espaco para header da categoria + header da tabela + pelo menos 1 linha
-        y = newPageIfNeeded(doc, y, 40, SUBTITLE);
+        y = await newPageIfNeeded(doc, y, 40, SUBTITLE, branding, colors);
 
-        y = drawCategoryHeader(doc, categoryName, y);
-        y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
+        y = drawCategoryHeader(doc, categoryName, y, colors);
+        y = drawTableHeaderRow(doc, TABLE_COLUMNS, y, colors);
 
         let rowIndex = 0;
         for (const product of categoryProducts) {
-          y = newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE);
+          y = await newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE, branding, colors);
 
           if (y < 40) {
-            // Nova pagina — redesenhar header da categoria e tabela
-            y = drawCategoryHeader(doc, `${categoryName} (continuacao)`, y);
-            y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
+            y = drawCategoryHeader(doc, `${categoryName} (continuacao)`, y, colors);
+            y = drawTableHeaderRow(doc, TABLE_COLUMNS, y, colors);
             rowIndex = 0;
           }
 
-          drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT);
+          drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT, colors);
 
-          // Imagem (ja carregada e comprimida do cache)
           const imageBase64 = product.image_url ? (imageCache.get(product.image_url) || null) : null;
           drawImageFrame(doc, imageBase64, 20, y - 3, 14);
 
-          // Texto do produto
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
-          doc.setTextColor(...COLORS.charcoal);
+          doc.setTextColor(...colors.secondary);
           doc.text(product.name.substring(0, 35), 45, y + 5);
 
-          // Quantidade
           doc.setFont('helvetica', 'bold');
           doc.text((product.quantity || 0).toString(), 150, y + 5);
 
-          // Preco
           doc.setFont('helvetica', 'normal');
           doc.text(`R$ ${(product.sale_price || 0).toFixed(2)}`, 165, y + 5);
 
@@ -175,7 +177,7 @@ const StockProductsPDFReport = () => {
         y += 8;
       }
 
-      drawAllFooters(doc);
+      drawAllFooters(doc, colors);
       doc.save(`catalogo-estoque-${new Date().toISOString().split('T')[0]}.pdf`);
       toast({ title: "Sucesso", description: "Catalogo PDF gerado com sucesso!" });
       setShowDialog(false);

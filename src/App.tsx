@@ -26,6 +26,7 @@ import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
 import SalesCostReport from '@/components/SalesCostReport';
 import ReceivablesPage from '@/components/ReceivablesPage';
 import CashClosingsPage from '@/components/CashClosingsPage';
+import CompanySettingsPage from '@/components/CompanySettingsPage';
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ const App = () => {
                         <Route path="/receivables" element={<ReceivablesPage />} />
                         <Route path="/cash-closings" element={<CashClosingsPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
+                        <Route path="/company-settings" element={<CompanySettingsPage />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Layout>

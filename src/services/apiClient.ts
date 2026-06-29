@@ -172,6 +172,11 @@ export const productOrderRequestsApi = createCrudApi<any>('product-order-request
 export const usersApi = createCrudApi<any>('users');
 export const tenantsApi = createCrudApi<any>('tenants');
 
+export const tenantBrandingApi = {
+  get: () => request<any>('tenants', { params: { action: 'my-branding' } }),
+  update: (data: any) => request<any>('tenants', { method: 'PUT', params: { action: 'my-branding' }, body: data }),
+};
+
 export const auditLogApi = {
   list: (params?: Record<string, string | undefined>) =>
     request<any[]>('audit-log', { params }),

@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
-import { productOrderRequestsApi, productsApi } from '@/services/apiClient';
+import { productOrderRequestsApi, productsApi, tenantBrandingApi } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import {
@@ -15,7 +15,8 @@ import {
   drawSummaryCard,
   newPageIfNeeded,
   preloadImages,
-  COLORS,
+  getColors,
+  type TenantBranding,
 } from '@/utils/pdfHelpers';
 
 const SUBTITLE = 'Relatorio de Encomendas';
@@ -33,6 +34,14 @@ const OrderProductsPDFReport = () => {
 
   const generateOrderProductsReport = async () => {
     try {
+      // Carregar branding
+      let branding: TenantBranding | null = null;
+      try {
+        branding = await tenantBrandingApi.get();
+      } catch { /* usa defaults */ }
+
+      const colors = getColors(branding);
+
       const [orderRequests, allProducts] = await Promise.all([
         productOrderRequestsApi.list(),
         productsApi.list({ is_order_product: 'true' }),
@@ -48,12 +57,11 @@ const OrderProductsPDFReport = () => {
       const doc = new jsPDF();
       const ROW_HEIGHT = 20;
 
-      // Primeira pagina
-      drawPageBackground(doc);
-      drawHeader(doc, SUBTITLE);
+      drawPageBackground(doc, colors);
+      await drawHeader(doc, SUBTITLE, branding, colors);
 
       let y = 38;
-      y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
+      y = drawTableHeaderRow(doc, TABLE_COLUMNS, y, colors);
 
       let totalCostPrice = 0;
       let totalSalePrice = 0;
@@ -80,30 +88,27 @@ const OrderProductsPDFReport = () => {
         })),
       ];
 
-      // Pre-carregar todas as imagens em paralelo (redimensionadas + comprimidas)
+      // Pre-carregar imagens
       const imageItems = allEntries.map(e => ({ image_url: e.imageUrl }));
       const imageCache = await preloadImages(imageItems);
 
       for (const entry of allEntries) {
         const prevY = y;
-        y = newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE);
+        y = await newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE, branding, colors);
 
         if (y < prevY) {
-          // Nova pagina
-          y = drawTableHeaderRow(doc, TABLE_COLUMNS, y);
+          y = drawTableHeaderRow(doc, TABLE_COLUMNS, y, colors);
           rowIndex = 0;
         }
 
-        drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT);
+        drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT, colors);
 
-        // Imagem (ja carregada e comprimida do cache)
         const imageBase64 = entry.imageUrl ? (imageCache.get(entry.imageUrl) || null) : null;
         drawImageFrame(doc, imageBase64, 16, y - 3, 14);
 
-        // Dados
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...COLORS.charcoal);
+        doc.setTextColor(...colors.secondary);
         doc.text(entry.name.substring(0, 22), 36, y + 5);
 
         doc.setFont('helvetica', 'bold');
@@ -114,7 +119,6 @@ const OrderProductsPDFReport = () => {
         doc.text(`R$ ${entry.salePrice.toFixed(2)}`, 142, y + 5);
         doc.text(new Date(entry.date).toLocaleDateString('pt-BR'), 175, y + 5);
 
-        // Totais
         totalCostPrice += entry.costPrice * entry.quantity;
         totalSalePrice += entry.salePrice * entry.quantity;
         totalQuantity += entry.quantity;
@@ -126,33 +130,31 @@ const OrderProductsPDFReport = () => {
 
       // Secao de resumo
       y += 10;
-      y = newPageIfNeeded(doc, y, 65, SUBTITLE);
+      y = await newPageIfNeeded(doc, y, 65, SUBTITLE, branding, colors);
 
-      // Header do resumo
-      doc.setFillColor(...COLORS.burgundy);
+      doc.setFillColor(...colors.burgundy);
       doc.roundedRect(15, y - 5, 180, 12, 3, 3, 'F');
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...COLORS.white);
+      doc.setTextColor(255, 255, 255);
       doc.text('Resumo', 23, y + 2);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(...COLORS.charcoal);
+      doc.setTextColor(...colors.secondary);
       y += 16;
 
-      // Cards 2x2
       const cardW = 85;
       const cardH = 22;
       const gap = 10;
 
-      drawSummaryCard(doc, 15, y, cardW, cardH, 'Total de Encomendas', totalItems.toString());
-      drawSummaryCard(doc, 15 + cardW + gap, y, cardW, cardH, 'Quantidade Total', totalQuantity.toString());
+      drawSummaryCard(doc, 15, y, cardW, cardH, 'Total de Encomendas', totalItems.toString(), colors);
+      drawSummaryCard(doc, 15 + cardW + gap, y, cardW, cardH, 'Quantidade Total', totalQuantity.toString(), colors);
 
       y += cardH + gap;
 
-      drawSummaryCard(doc, 15, y, cardW, cardH, 'Valor Total Custo', `R$ ${totalCostPrice.toFixed(2)}`);
-      drawSummaryCard(doc, 15 + cardW + gap, y, cardW, cardH, 'Valor Total Venda', `R$ ${totalSalePrice.toFixed(2)}`);
+      drawSummaryCard(doc, 15, y, cardW, cardH, 'Valor Total Custo', `R$ ${totalCostPrice.toFixed(2)}`, colors);
+      drawSummaryCard(doc, 15 + cardW + gap, y, cardW, cardH, 'Valor Total Venda', `R$ ${totalSalePrice.toFixed(2)}`, colors);
 
-      drawAllFooters(doc);
+      drawAllFooters(doc, colors);
       doc.save(`relatorio-encomendas-${new Date().toISOString().split('T')[0]}.pdf`);
 
       toast({ title: "Sucesso", description: "Relatorio PDF de encomendas gerado com sucesso!" });
