@@ -172,7 +172,17 @@ export function drawSummaryCard(
 
 export async function loadImageAsBase64(imageUrl: string): Promise<string | null> {
   try {
-    const response = await fetch(imageUrl);
+    // Usar proxy da API para evitar CORS com imagens do R2
+    const API_BASE = import.meta.env.VITE_API_URL || '/api';
+    const proxyUrl = `${API_BASE}/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+
+    const token = localStorage.getItem('authToken');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(proxyUrl, { headers });
+    if (!response.ok) return null;
+
     const blob = await response.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();

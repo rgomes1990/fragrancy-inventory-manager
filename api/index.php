@@ -58,6 +58,7 @@ $controllers = [
     'product-order-requests' => 'product_order_requests.php',
     'dashboard'              => 'dashboard.php',
     'upload'                 => 'upload.php',
+    'image-proxy'            => 'image_proxy.php',
 ];
 
 if (!isset($controllers[$resource])) {
