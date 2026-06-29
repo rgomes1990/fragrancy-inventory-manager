@@ -172,7 +172,6 @@ export function drawSummaryCard(
 
 export async function loadImageAsBase64(imageUrl: string): Promise<string | null> {
   try {
-    // Usar proxy da API para evitar CORS com imagens do R2
     const API_BASE = import.meta.env.VITE_API_URL || '/api';
     const proxyUrl = `${API_BASE}/image-proxy?url=${encodeURIComponent(imageUrl)}`;
 
@@ -184,15 +183,46 @@ export async function loadImageAsBase64(imageUrl: string): Promise<string | null
     if (!response.ok) return null;
 
     const blob = await response.blob();
+    const bitmapUrl = URL.createObjectURL(blob);
+
+    // Redimensionar para thumbnail (60x60px) e comprimir como JPEG 60%
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const size = 60;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(bitmapUrl);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(bitmapUrl);
+        resolve(null);
+      };
+      img.src = bitmapUrl;
     });
   } catch {
     return null;
   }
+}
+
+export async function preloadImages(
+  items: { image_url?: string }[]
+): Promise<Map<string, string | null>> {
+  const cache = new Map<string, string | null>();
+  const unique = [...new Set(items.map(i => i.image_url).filter(Boolean))] as string[];
+
+  // Carregar em lotes de 5 para nao sobrecarregar
+  for (let i = 0; i < unique.length; i += 5) {
+    const batch = unique.slice(i, i + 5);
+    const results = await Promise.all(batch.map(url => loadImageAsBase64(url)));
+    batch.forEach((url, idx) => cache.set(url, results[idx]));
+  }
+
+  return cache;
 }
 
 export function newPageIfNeeded(doc: jsPDF, y: number, needed: number, subtitle: string): number {

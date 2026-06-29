@@ -14,7 +14,7 @@ import {
   drawImageFrame,
   drawSummaryCard,
   newPageIfNeeded,
-  loadImageAsBase64,
+  preloadImages,
   COLORS,
 } from '@/utils/pdfHelpers';
 
@@ -80,6 +80,10 @@ const OrderProductsPDFReport = () => {
         })),
       ];
 
+      // Pre-carregar todas as imagens em paralelo (redimensionadas + comprimidas)
+      const imageItems = allEntries.map(e => ({ image_url: e.imageUrl }));
+      const imageCache = await preloadImages(imageItems);
+
       for (const entry of allEntries) {
         const prevY = y;
         y = newPageIfNeeded(doc, y, ROW_HEIGHT + 5, SUBTITLE);
@@ -92,11 +96,8 @@ const OrderProductsPDFReport = () => {
 
         drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT);
 
-        // Imagem
-        let imageBase64: string | null = null;
-        if (entry.imageUrl) {
-          imageBase64 = await loadImageAsBase64(entry.imageUrl);
-        }
+        // Imagem (ja carregada e comprimida do cache)
+        const imageBase64 = entry.imageUrl ? (imageCache.get(entry.imageUrl) || null) : null;
         drawImageFrame(doc, imageBase64, 16, y - 3, 14);
 
         // Dados

@@ -22,7 +22,7 @@ import {
   drawAlternatingRow,
   drawImageFrame,
   newPageIfNeeded,
-  loadImageAsBase64,
+  preloadImages,
   COLORS,
 } from '@/utils/pdfHelpers';
 
@@ -116,6 +116,9 @@ const StockProductsPDFReport = () => {
         return a.localeCompare(b);
       });
 
+      // Pre-carregar todas as imagens em paralelo (redimensionadas + comprimidas)
+      const imageCache = await preloadImages(filteredProducts);
+
       const doc = new jsPDF();
       const ROW_HEIGHT = 20;
 
@@ -147,11 +150,8 @@ const StockProductsPDFReport = () => {
 
           drawAlternatingRow(doc, y, rowIndex, ROW_HEIGHT);
 
-          // Imagem
-          let imageBase64: string | null = null;
-          if (product.image_url) {
-            imageBase64 = await loadImageAsBase64(product.image_url);
-          }
+          // Imagem (ja carregada e comprimida do cache)
+          const imageBase64 = product.image_url ? (imageCache.get(product.image_url) || null) : null;
           drawImageFrame(doc, imageBase64, 20, y - 3, 14);
 
           // Texto do produto
