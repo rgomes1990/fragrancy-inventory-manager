@@ -43,8 +43,8 @@ const OrderProductsPDFReport = () => {
       const colors = getColors(branding);
 
       const [orderRequests, allProducts] = await Promise.all([
-        productOrderRequestsApi.list(),
-        productsApi.list({ is_order_product: 'true' }),
+        productOrderRequestsApi.list({ only_active_order_products: 'true' }),
+        productsApi.list(),
       ]);
 
       const orderProducts = (allProducts || []).filter((p: any) => p.is_order_product);
@@ -69,6 +69,16 @@ const OrderProductsPDFReport = () => {
       let totalItems = 0;
       let rowIndex = 0;
 
+      // IDs de produtos que ja aparecem nas solicitacoes de encomenda
+      const orderRequestProductIds = new Set(
+        (orderRequests || []).map((r: any) => r.product_id).filter(Boolean)
+      );
+
+      // Evitar duplicatas: so incluir orderProducts que nao tem solicitacao
+      const uniqueOrderProducts = orderProducts.filter(
+        (p: any) => !orderRequestProductIds.has(p.id)
+      );
+
       const allEntries = [
         ...(orderRequests || []).map((r: any) => ({
           name: r.product_name || 'Produto nao encontrado',
@@ -78,7 +88,7 @@ const OrderProductsPDFReport = () => {
           imageUrl: r.image_url,
           date: r.created_at,
         })),
-        ...orderProducts.map((p: any) => ({
+        ...uniqueOrderProducts.map((p: any) => ({
           name: p.name,
           costPrice: p.cost_price || 0,
           salePrice: p.sale_price || 0,

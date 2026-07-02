@@ -15,10 +15,15 @@ function handleRequest(array $user, ?string $id): void {
             $where = 'WHERE por.tenant_id = :tenant_id';
             $params[':tenant_id'] = $tenantId;
         }
+        // Filtrar por is_order_product se solicitado
+        $filterOrder = '';
+        if (!empty($_GET['only_active_order_products'])) {
+            $filterOrder = ($where ? ' AND' : ' WHERE') . ' p.is_order_product = 1';
+        }
         $sql = "SELECT por.*, p.name as product_name
                 FROM product_order_requests por
                 LEFT JOIN products p ON por.product_id = p.id
-                $where
+                $where$filterOrder
                 ORDER BY por.created_at DESC";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
