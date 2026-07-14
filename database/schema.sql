@@ -324,6 +324,39 @@ CREATE TABLE IF NOT EXISTS `stock_entries` (
   CONSTRAINT `fk_stock_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Trigger: ao inserir entrada de estoque, recalcula custo medio ponderado
+-- e soma a quantidade no produto (equivalente ao update_product_weighted_average
+-- do PostgreSQL/Supabase, que nao havia sido portado para o MySQL).
+DROP TRIGGER IF EXISTS `trigger_update_weighted_average`;
+DELIMITER $$
+CREATE TRIGGER `trigger_update_weighted_average`
+AFTER INSERT ON `stock_entries`
+FOR EACH ROW
+BEGIN
+  DECLARE current_qty INT DEFAULT 0;
+  DECLARE current_cost DECIMAL(10,2) DEFAULT 0.00;
+  DECLARE new_total_qty INT DEFAULT 0;
+  DECLARE new_avg_cost DECIMAL(10,2) DEFAULT 0.00;
+
+  SELECT quantity, cost_price INTO current_qty, current_cost
+  FROM products WHERE id = NEW.product_id;
+
+  SET new_total_qty = current_qty + NEW.quantity;
+
+  IF new_total_qty > 0 THEN
+    SET new_avg_cost = ROUND(((current_qty * current_cost) + (NEW.quantity * NEW.unit_cost)) / new_total_qty, 2);
+  ELSE
+    SET new_avg_cost = NEW.unit_cost;
+  END IF;
+
+  UPDATE products
+  SET cost_price = new_avg_cost,
+      quantity = new_total_qty,
+      updated_at = NOW()
+  WHERE id = NEW.product_id;
+END$$
+DELIMITER ;
+
 -- -----------------------------------------------------
 -- 18. EXPENSES
 -- -----------------------------------------------------

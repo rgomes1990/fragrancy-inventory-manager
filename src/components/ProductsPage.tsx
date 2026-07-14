@@ -32,6 +32,7 @@ import OrderProductsPDFReport from './OrderProductsPDFReport';
 import StockProductsPDFReport from './StockProductsPDFReport';
 import KitsPage from './KitsPage';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const ProductsPage = () => {
   const { tenantId, isAdmin, getTenantIdForInsert } = useTenantFilter();
@@ -477,19 +478,18 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) resetForm(); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
               {editingProduct ? 'Editar Produto' : selectedExistingProduct ? `Entrada de Estoque: ${selectedExistingProduct.name}` : 'Novo Produto / Entrada de Estoque'}
-            </CardTitle>
+            </DialogTitle>
             {!editingProduct && !selectedExistingProduct && (
-              <p className="text-sm text-muted-foreground">
+              <DialogDescription>
                 Digite o nome do produto. Se ele ja existir, selecione para dar entrada no estoque. Caso contrario, sera criado como novo.
-              </p>
+              </DialogDescription>
             )}
-          </CardHeader>
-          <CardContent>
+          </DialogHeader>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Product name with autocomplete */}
               <div className="relative md:col-span-2">
@@ -700,9 +700,8 @@ const ProductsPage = () => {
                 <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {typeFilter && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

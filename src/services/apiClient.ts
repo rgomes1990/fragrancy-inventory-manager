@@ -136,6 +136,8 @@ export const salePaymentsApi = {
   ...createCrudApi<any>('sale-payments'),
   listByGroup: (saleId: string) =>
     request<any[]>('sale-payments', { params: { sale_id: saleId } }),
+  listWithDetails: (params?: Record<string, string | undefined>) =>
+    request<any[]>('sale-payments', { params: { ...params, with_details: '1' } }),
 };
 export const ordersApi = createCrudApi<any>('orders');
 export const orderItemsApi = {
@@ -198,7 +200,13 @@ export const dashboardApi = {
 // Upload de arquivo
 export async function uploadFile(file: File): Promise<string> {
   const formData = new FormData();
-  formData.append('file', file);
+  // O firewall (mod_security) do servidor bloqueia nomes de arquivo com caracteres
+  // como apostrofo/acentos (ex.: "Victoria's Secret.jpg" -> HTTP 403). O backend gera
+  // o nome final via uniqid(), entao apenas a extensao importa. Enviamos um nome seguro.
+  const rawExt = file.name.includes('.') ? file.name.split('.').pop() ?? '' : '';
+  const safeExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const safeName = `upload_${Date.now()}.${safeExt}`;
+  formData.append('file', file, safeName);
 
   const token = getToken();
   const response = await fetch(`${API_BASE_URL}/upload`, {

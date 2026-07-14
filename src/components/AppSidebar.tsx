@@ -18,6 +18,7 @@ import {
   FileBarChart,
   Truck,
   Wallet,
+  History,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -52,6 +53,7 @@ const PRINCIPAL: MenuItem[] = [
   { title: 'Categorias', url: '/categories', page: 'categories', icon: ClipboardList, tone: 'bg-sky-100 text-sky-600' },
   { title: 'Vendas (PDV)', url: '/sales', page: 'sales', icon: ShoppingCart, tone: 'bg-violet-100 text-violet-600' },
   { title: 'A Receber', url: '/receivables', page: 'receivables', icon: Wallet, tone: 'bg-emerald-100 text-emerald-600' },
+  { title: 'Recebimentos', url: '/payment-history', page: 'payment-history', icon: History, tone: 'bg-cyan-100 text-cyan-600' },
   { title: 'Caixa', url: '/cash-closings', page: 'cash-closings', icon: Wallet, tone: 'bg-lime-100 text-lime-700' },
 ];
 

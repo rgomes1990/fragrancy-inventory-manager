@@ -63,7 +63,7 @@ const kitAvailability = (kit: Kit): number => {
   if (!kit.kit_items || kit.kit_items.length === 0) return 0;
   let m = Infinity;
   for (const it of kit.kit_items) {
-    const stock = it.products?.quantity ?? 0;
+    const stock = it.products?.quantity ?? it.product_quantity ?? 0;
     const p = Math.floor(stock / it.quantity);
     if (p < m) m = p;
   }

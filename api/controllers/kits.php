@@ -13,7 +13,7 @@ function handleRequest(array $user, ?string $id): void {
         $db = getDB();
         foreach ($kits as &$kit) {
             $stmt = $db->prepare("
-                SELECT ki.*, p.name as product_name, p.cost_price, p.sale_price
+                SELECT ki.*, p.name as product_name, p.cost_price, p.sale_price, p.quantity as product_quantity
                 FROM kit_items ki
                 LEFT JOIN products p ON ki.product_id = p.id
                 WHERE ki.kit_id = :kit_id
@@ -28,7 +28,7 @@ function handleRequest(array $user, ?string $id): void {
         if (!$kit) errorResponse('Kit nao encontrado', 404);
         $db = getDB();
         $stmt = $db->prepare("
-            SELECT ki.*, p.name as product_name, p.cost_price, p.sale_price
+            SELECT ki.*, p.name as product_name, p.cost_price, p.sale_price, p.quantity as product_quantity
             FROM kit_items ki
             LEFT JOIN products p ON ki.product_id = p.id
             WHERE ki.kit_id = :kit_id

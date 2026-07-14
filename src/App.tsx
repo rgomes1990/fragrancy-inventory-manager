@@ -25,6 +25,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import ProductOrderRequestsPage from '@/components/ProductOrderRequestsPage';
 import SalesCostReport from '@/components/SalesCostReport';
 import ReceivablesPage from '@/components/ReceivablesPage';
+import PaymentHistoryPage from '@/components/PaymentHistoryPage';
 import CashClosingsPage from '@/components/CashClosingsPage';
 import CompanySettingsPage from '@/components/CompanySettingsPage';
 
@@ -65,6 +66,7 @@ const App = () => {
                         <Route path="/profit-report" element={<ProfitReportPage />} />
                         <Route path="/sales-cost-report" element={<SalesCostReport />} />
                         <Route path="/receivables" element={<ReceivablesPage />} />
+                        <Route path="/payment-history" element={<PaymentHistoryPage />} />
                         <Route path="/cash-closings" element={<CashClosingsPage />} />
                         <Route path="/audit-log" element={<AuditLogPage />} />
                         <Route path="/company-settings" element={<CompanySettingsPage />} />

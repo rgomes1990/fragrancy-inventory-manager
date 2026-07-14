@@ -50,11 +50,17 @@ const CustomersPage = () => {
     }
 
     const searchLower = searchTerm.toLowerCase();
-    const filtered = customers.filter(customer =>
-      customer.name.toLowerCase().includes(searchLower) ||
-      customer.whatsapp?.toLowerCase().includes(searchLower) ||
-      customer.email?.toLowerCase().includes(searchLower)
-    );
+    const filtered = customers.filter(customer => {
+      try {
+        return (
+          (customer.name || '').toLowerCase().includes(searchLower) ||
+          (customer.whatsapp || '').toLowerCase().includes(searchLower) ||
+          (customer.email || '').toLowerCase().includes(searchLower)
+        );
+      } catch {
+        return false;
+      }
+    });
     setFilteredCustomers(filtered);
   };
 
@@ -361,7 +367,7 @@ const CustomersPage = () => {
                       <TableCell>{customer.whatsapp || '-'}</TableCell>
                       <TableCell>{customer.email || '-'}</TableCell>
                       <TableCell>
-                        {new Date(customer.created_at).toLocaleDateString('pt-BR')}
+                        {customer.created_at ? new Date(customer.created_at).toLocaleDateString('pt-BR') : '-'}
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">

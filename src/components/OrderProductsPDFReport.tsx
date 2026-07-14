@@ -43,7 +43,7 @@ const OrderProductsPDFReport = () => {
       const colors = getColors(branding);
 
       const [orderRequests, allProducts] = await Promise.all([
-        productOrderRequestsApi.list({ only_active_order_products: 'true' }),
+        productOrderRequestsApi.list(),
         productsApi.list(),
       ]);
 
@@ -85,7 +85,7 @@ const OrderProductsPDFReport = () => {
           costPrice: r.cost_price || 0,
           salePrice: r.sale_price || 0,
           quantity: r.requested_quantity,
-          imageUrl: r.image_url,
+          imageUrl: r.product_image_url || r.image_url,
           date: r.created_at,
         })),
         ...uniqueOrderProducts.map((p: any) => ({
