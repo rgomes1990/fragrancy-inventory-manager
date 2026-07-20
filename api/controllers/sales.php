@@ -114,7 +114,12 @@ function handleRequest(array $user, ?string $id): void {
         $stmtPay = $db->prepare("DELETE FROM sale_payments WHERE sale_id = :sid");
         $stmtPay->execute([':sid' => $id]);
 
-        // sale_items serao deletados automaticamente pelo CASCADE
+        // Apagar sale_items EXPLICITAMENTE (nao deixar para o CASCADE) para que o
+        // trigger AFTER DELETE em sale_items estorne o estoque. No MySQL, deletes
+        // disparados por CASCADE de FK NAO acionam triggers.
+        $stmtItems = $db->prepare("DELETE FROM sale_items WHERE sale_id = :sid");
+        $stmtItems->execute([':sid' => $id]);
+
         if (!$crud->delete($id)) errorResponse('Erro ao deletar venda', 500);
 
         jsonResponse(['success' => true]);

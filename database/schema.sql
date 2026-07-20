@@ -357,6 +357,55 @@ BEGIN
 END$$
 DELIMITER ;
 
+-- Triggers: baixa/estorno automatico de estoque na venda.
+-- A baixa era feita no frontend (SalesPage.tsx) de forma nao-atomica, causando
+-- descompasso entre estoque fisico e do sistema. Agora e feita no banco:
+--   * item com product_id  -> ajusta o proprio produto
+--   * item com kit_id       -> expande kit_items e ajusta cada componente
+-- OBS: no MySQL, deletes disparados por CASCADE de FK NAO acionam triggers; por
+-- isso o DELETE de venda em api/controllers/sales.php apaga os sale_items
+-- explicitamente antes de remover a venda (para o AFTER DELETE estornar).
+-- NOTA: a tabela `sale_items` (e a coluna sales.sale_number) foram criadas
+-- manualmente no banco de producao e nao estao versionadas neste schema.
+DROP TRIGGER IF EXISTS `trigger_sale_item_decrement`;
+DROP TRIGGER IF EXISTS `trigger_sale_item_restore`;
+DELIMITER $$
+CREATE TRIGGER `trigger_sale_item_decrement`
+AFTER INSERT ON `sale_items`
+FOR EACH ROW
+BEGIN
+  IF NEW.product_id IS NOT NULL THEN
+    UPDATE products
+    SET quantity = quantity - NEW.quantity,
+        updated_at = NOW()
+    WHERE id = NEW.product_id;
+  ELSEIF NEW.kit_id IS NOT NULL THEN
+    UPDATE products p
+    JOIN kit_items ki ON ki.product_id = p.id
+    SET p.quantity = p.quantity - (ki.quantity * NEW.quantity),
+        p.updated_at = NOW()
+    WHERE ki.kit_id = NEW.kit_id;
+  END IF;
+END$$
+CREATE TRIGGER `trigger_sale_item_restore`
+AFTER DELETE ON `sale_items`
+FOR EACH ROW
+BEGIN
+  IF OLD.product_id IS NOT NULL THEN
+    UPDATE products
+    SET quantity = quantity + OLD.quantity,
+        updated_at = NOW()
+    WHERE id = OLD.product_id;
+  ELSEIF OLD.kit_id IS NOT NULL THEN
+    UPDATE products p
+    JOIN kit_items ki ON ki.product_id = p.id
+    SET p.quantity = p.quantity + (ki.quantity * OLD.quantity),
+        p.updated_at = NOW()
+    WHERE ki.kit_id = OLD.kit_id;
+  END IF;
+END$$
+DELIMITER ;
+
 -- -----------------------------------------------------
 -- 18. EXPENSES
 -- -----------------------------------------------------

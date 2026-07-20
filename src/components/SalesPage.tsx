@@ -391,13 +391,8 @@ const SalesPage = () => {
         }
       }
 
-      // Apply stock decrements
-      for (const [pid, qty] of Object.entries(productDecrement)) {
-        const p = products.find(x => x.id === pid);
-        if (!p) continue;
-        await productsApi.update(pid, { quantity: p.quantity - qty });
-      }
-
+      // Baixa de estoque agora e feita no banco (trigger AFTER INSERT em sale_items).
+      // productDecrement acima e usado apenas para validar estoque antes de vender.
 
       toast({
         title: "Sucesso",
@@ -598,22 +593,8 @@ const SalesPage = () => {
   const handleEditSubmit = async (saleData: any) => {
     if (!editingSale) return;
     try {
-      // Devolver estoque dos itens antigos
-      const oldItems = (editingSale as any).items || [];
-      for (const item of oldItems) {
-        if (item.product_id) {
-          const p = products.find(x => x.id === item.product_id);
-          if (p) await productsApi.update(item.product_id, { quantity: p.quantity + item.quantity });
-        } else if (item.kit_id) {
-          const kit = kits.find(k => k.id === item.kit_id);
-          if (kit && (kit as any).kit_items) {
-            for (const ki of (kit as any).kit_items) {
-              const p = products.find(x => x.id === ki.product_id);
-              if (p) await productsApi.update(ki.product_id, { quantity: p.quantity + (ki.quantity * item.quantity) });
-            }
-          }
-        }
-      }
+      // Estoque: ao deletar os itens antigos e recriar os novos abaixo, os triggers
+      // do banco (AFTER DELETE / AFTER INSERT em sale_items) estornam e baixam sozinhos.
 
       // Atualizar cabecalho da venda
       const totalPrice = saleData.items.reduce((s: number, i: any) => s + i.subtotal, 0) - (saleData.discount_amount || 0);
@@ -650,26 +631,7 @@ const SalesPage = () => {
         });
       }
 
-      // Decrementar estoque dos novos itens
-      const productDecrement: Record<string, number> = {};
-      for (const item of saleData.items) {
-        if (item.item_type === 'product' && item.product_id) {
-          productDecrement[item.product_id] = (productDecrement[item.product_id] || 0) + item.quantity;
-        } else if (item.item_type === 'kit' && item.kit_id) {
-          const kit = kits.find(k => k.id === item.kit_id);
-          if (kit && (kit as any).kit_items) {
-            for (const ki of (kit as any).kit_items) {
-              productDecrement[ki.product_id] = (productDecrement[ki.product_id] || 0) + (ki.quantity * item.quantity);
-            }
-          }
-        }
-      }
-      // Refetch products para ter estoque atualizado apos devolucao
-      const freshProducts = await productsApi.list();
-      for (const [pid, qty] of Object.entries(productDecrement)) {
-        const p = freshProducts.find((x: any) => x.id === pid);
-        if (p) await productsApi.update(pid, { quantity: p.quantity - qty });
-      }
+      // Baixa/estorno de estoque tratados pelos triggers do banco (ver acima).
 
       toast({ title: "Venda atualizada com sucesso!" });
       setEditingSale(null);
@@ -684,27 +646,8 @@ const SalesPage = () => {
     if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
 
     try {
-      // Devolver estoque de cada item da venda
-      const items = (sale as any).items || [];
-      for (const item of items) {
-        if (item.kit_id) {
-          const kit = kits.find(k => k.id === item.kit_id);
-          if (kit && (kit as any).kit_items) {
-            for (const ki of (kit as any).kit_items) {
-              const p = products.find(x => x.id === ki.product_id);
-              if (p) {
-                await productsApi.update(ki.product_id, { quantity: p.quantity + (ki.quantity * item.quantity) });
-              }
-            }
-          }
-        } else if (item.product_id) {
-          const p = products.find(x => x.id === item.product_id);
-          if (p) {
-            await productsApi.update(item.product_id, { quantity: p.quantity + item.quantity });
-          }
-        }
-      }
-
+      // Estorno de estoque tratado no backend: o DELETE da venda apaga os sale_items
+      // explicitamente e o trigger AFTER DELETE devolve a quantidade ao estoque.
       await salesApi.delete(sale.id);
 
       toast({
